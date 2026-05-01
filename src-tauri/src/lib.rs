@@ -13,9 +13,21 @@ use audio::AudioThread;
 use driver::FlamedriverProfile;
 use ipc::{
     AudioState, ProjectState,
-    close_project, create_project, get_driver_info, get_project_info,
-    list_drivers, open_project, play_fm_test_tone, play_psg_test_tone,
-    save_project, stop_all_sound,
+    // Phase 1
+    play_fm_test_tone, play_psg_test_tone, stop_all_sound,
+    // Project management
+    create_project, open_project, save_project, close_project, get_project_info,
+    // Driver info
+    list_drivers, get_driver_info,
+    // FM instruments
+    add_fm_instrument, update_fm_instrument, delete_fm_instrument,
+    list_fm_instruments, preview_fm_instrument,
+    // PSG instruments
+    add_psg_instrument, update_psg_instrument, delete_psg_instrument,
+    list_psg_instruments, preview_psg_instrument,
+    // DAC instruments
+    import_dac_wav, import_dac_raw, update_dac_instrument, reconvert_dac,
+    delete_dac_instrument, list_dac_instruments, preview_dac,
 };
 use model::driver::DriverRegistry;
 use project::ProjectManager;
@@ -46,6 +58,23 @@ pub fn run() {
             get_project_info,
             list_drivers,
             get_driver_info,
+            add_fm_instrument,
+            update_fm_instrument,
+            delete_fm_instrument,
+            list_fm_instruments,
+            preview_fm_instrument,
+            add_psg_instrument,
+            update_psg_instrument,
+            delete_psg_instrument,
+            list_psg_instruments,
+            preview_psg_instrument,
+            import_dac_wav,
+            import_dac_raw,
+            update_dac_instrument,
+            reconvert_dac,
+            delete_dac_instrument,
+            list_dac_instruments,
+            preview_dac,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

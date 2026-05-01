@@ -121,14 +121,16 @@ impl AudioEngine {
             let psg_sample = self.sn76489.render_sample() as i32;
 
             // --- Mix and normalize to f32 [-1.0, 1.0] ---
-            // YM2612 nuked-opm outputs ~14-bit signed samples (±768 typical for single op).
-            // PSG VOLUME_TABLE max is 8191 × 4 channels = 32764.
-            // We normalise by 32768 so full-scale ±32768 maps to ±1.0.
-            let mix_l = (ym_l + psg_sample).clamp(-32768, 32767);
-            let mix_r = (ym_r + psg_sample).clamp(-32768, 32767);
+            // Nuked OPN2 outputs 9-bit DAC values (±256 per operator, ±1020 for algo 7).
+            // PSG VOLUME_TABLE max is 8191 per channel (×4 = 32764 theoretical).
+            // On real hardware the YM2612 analog output is amplified relative to PSG.
+            // Scale FM up by 32 to match PSG levels (~real Genesis mixing ratio).
+            let fm_scale: i32 = 32;
+            let scaled_l = ym_l * fm_scale + psg_sample;
+            let scaled_r = ym_r * fm_scale + psg_sample;
 
-            buffer[frame * 2]     = (mix_l as f32) / 32768.0;
-            buffer[frame * 2 + 1] = (mix_r as f32) / 32768.0;
+            buffer[frame * 2]     = (scaled_l as f32 / 32768.0).clamp(-1.0, 1.0);
+            buffer[frame * 2 + 1] = (scaled_r as f32 / 32768.0).clamp(-1.0, 1.0);
         }
     }
 }
@@ -170,12 +172,12 @@ mod tests {
         let mut engine = AudioEngine::new(44100);
         let mut buf = [0.0f32; 128];
         engine.render(&mut buf);
-        // The nuked-opm emulator has a small constant bias (~3/32768 ≈ 0.000092)
-        // at idle — this is accurate hardware behaviour (residual envelope accumulator).
-        // We check that no significant audio is produced, not mathematical zero.
+        // The nuked-opm emulator has a small constant bias (~3) at idle — this is
+        // accurate hardware behaviour. After FM scaling (×32), the idle level is
+        // ~96/32768 ≈ 0.003. We check that no significant audio is produced.
         for &s in &buf {
             assert!(
-                s.abs() < 0.001,
+                s.abs() < 0.01,
                 "new engine with no commands should produce near-silence, got {s}"
             );
         }
@@ -211,10 +213,10 @@ mod tests {
         let mut buf_after = [0.0f32; 2048];
         engine.render(&mut buf_after);
 
-        let any_loud_after = buf_after.iter().any(|s| s.abs() >= 0.001);
+        let any_loud_after = buf_after.iter().any(|s| s.abs() >= 0.01);
         assert!(
             !any_loud_after,
-            "after Panic, all output should be near-silent (< 0.001); loudest was {:.6}",
+            "after Panic, all output should be near-silent (< 0.01); loudest was {:.6}",
             buf_after.iter().cloned().fold(0.0f32, f32::max)
         );
     }

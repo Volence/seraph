@@ -9,6 +9,15 @@ use crate::audio::engine::AudioEngine;
 
 const RING_BUFFER_CAPACITY: usize = 1024;
 
+// SAFETY: cpal::Stream on Linux/ALSA contains a *mut () PhantomData that marks
+// it !Send to prevent accidental cross-thread access to the underlying ALSA handle.
+// After AudioThread::new() returns, _stream is only ever held alive (never accessed).
+// All mutable interaction goes through the Send+Sync ring buffer producer and an
+// AtomicBool.  The Mutex<AudioThread> in AudioState serialises all callers, so
+// there is no concurrent access to the stream handle.
+unsafe impl Send for AudioThread {}
+unsafe impl Sync for AudioThread {}
+
 pub struct AudioThread {
     producer: rtrb::Producer<AudioCommand>,
     _stream: cpal::Stream,

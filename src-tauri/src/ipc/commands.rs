@@ -1,10 +1,18 @@
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
 
 use crate::audio::{AudioCommand, AudioThread};
+use crate::model::driver::{ChannelLayout, DriverFeature};
+use crate::model::song::{Song, SongMetadata};
+use crate::project::ProjectManager;
 
 pub struct AudioState {
     pub thread: Mutex<AudioThread>,
+}
+
+pub struct ProjectState {
+    pub manager: Mutex<ProjectManager>,
 }
 
 // --- FM register helpers ---
@@ -145,4 +153,104 @@ pub fn stop_all_sound(state: State<'_, AudioState>) -> Result<String, String> {
     thread.send(AudioCommand::Panic);
 
     Ok("All sound stopped".to_string())
+}
+
+// --- Project Management ---
+
+#[tauri::command]
+pub fn create_project(
+    state: State<'_, ProjectState>,
+    path: String,
+    name: String,
+    driver_id: String,
+    tempo: f64,
+    time_sig_num: u8,
+    time_sig_den: u8,
+) -> Result<(), String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.create(&PathBuf::from(path), &name, &driver_id, tempo, (time_sig_num, time_sig_den))
+}
+
+#[tauri::command]
+pub fn open_project(state: State<'_, ProjectState>, path: String) -> Result<Song, String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.open(&PathBuf::from(path))
+}
+
+#[tauri::command]
+pub fn save_project(state: State<'_, ProjectState>) -> Result<(), String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.save()
+}
+
+#[tauri::command]
+pub fn close_project(state: State<'_, ProjectState>) -> Result<(), String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.close();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_project_info(state: State<'_, ProjectState>) -> Result<Option<SongMetadata>, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr.metadata().cloned())
+}
+
+// --- Driver Info ---
+
+#[derive(serde::Serialize)]
+pub struct DriverInfo {
+    pub id: String,
+    pub name: String,
+}
+
+#[tauri::command]
+pub fn list_drivers(state: State<'_, ProjectState>) -> Result<Vec<DriverInfo>, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr
+        .driver_registry()
+        .list()
+        .into_iter()
+        .map(|(id, name)| DriverInfo {
+            id: id.to_string(),
+            name: name.to_string(),
+        })
+        .collect())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriverDetail {
+    pub id: String,
+    pub name: String,
+    pub layout: ChannelLayout,
+    pub features: Vec<DriverFeature>,
+}
+
+#[tauri::command]
+pub fn get_driver_info(state: State<'_, ProjectState>, driver_id: String) -> Result<DriverDetail, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let driver = mgr
+        .driver_registry()
+        .get(&driver_id)
+        .ok_or_else(|| format!("unknown driver: {driver_id}"))?;
+
+    let all_features = [
+        DriverFeature::SsgEg,
+        DriverFeature::Fm3SpecialMode,
+        DriverFeature::MultiDac,
+        DriverFeature::Dpcm,
+        DriverFeature::PseudoStereo,
+    ];
+    let features: Vec<DriverFeature> = all_features
+        .into_iter()
+        .filter(|&f| driver.supports_feature(f))
+        .collect();
+
+    Ok(DriverDetail {
+        id: driver.id().to_string(),
+        name: driver.name().to_string(),
+        layout: driver.channel_layout(),
+        features,
+    })
 }

@@ -2,6 +2,7 @@ mod audio;
 mod model;
 mod driver;
 mod project;
+mod dac;
 mod ym2612;
 mod sn76489;
 mod ipc;

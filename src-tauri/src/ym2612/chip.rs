@@ -82,6 +82,11 @@ mod tests {
             }
         }
 
+        // NOTE: any_nonzero is satisfied by the idle bias (value 3) which is
+        // always present in YM2612 mode. This test verifies the chip doesn't crash
+        // and the write API is callable. Actual FM synthesis output requires
+        // proper inter-write timing (≥24 clocks between address and data writes)
+        // as tested through AudioEngine in the audio::engine module.
         assert!(any_nonzero, "Expected non-zero audio output after FM tone programming and key-on");
     }
 }

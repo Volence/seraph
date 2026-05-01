@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::audio::command::AudioCommand;
 use crate::ym2612::Ym2612;
 use crate::sn76489::Sn76489;
@@ -8,12 +9,20 @@ const SN76489_CLOCK_DIVIDER: f64 = 16.0;
 pub struct AudioEngine {
     ym2612: Ym2612,
     sn76489: Sn76489,
-    #[allow(dead_code)]
     sample_rate: f64,
     ym_clocks_per_sample: f64,
     psg_clocks_per_sample: f64,
     ym_clock_accumulator: f64,
     psg_clock_accumulator: f64,
+    dac_samples: Option<Arc<Vec<u8>>>,
+    dac_position: f64,
+    dac_step: f64,
+    psg_preview_envelope: Option<Arc<Vec<u8>>>,
+    psg_preview_loop: Option<usize>,
+    psg_preview_channel: u8,
+    psg_preview_index: usize,
+    psg_preview_tick_acc: f64,
+    psg_preview_samples_per_tick: f64,
 }
 
 impl AudioEngine {
@@ -30,6 +39,15 @@ impl AudioEngine {
             psg_clocks_per_sample,
             ym_clock_accumulator: 0.0,
             psg_clock_accumulator: 0.0,
+            dac_samples: None,
+            dac_position: 0.0,
+            dac_step: 0.0,
+            psg_preview_envelope: None,
+            psg_preview_loop: None,
+            psg_preview_channel: 0,
+            psg_preview_index: 0,
+            psg_preview_tick_acc: 0.0,
+            psg_preview_samples_per_tick: sample_rate_f / 60.0,
         }
     }
 
@@ -72,11 +90,38 @@ impl AudioEngine {
                 self.ym2612.write(1, value);
                 for _ in 0..24 { self.ym2612.clock(); }
             }
+            AudioCommand::DacPlayback { samples, sample_rate } => {
+                self.dac_samples = Some(samples);
+                self.dac_position = 0.0;
+                self.dac_step = sample_rate as f64 / self.sample_rate;
+            }
+            AudioCommand::PsgEnvelopePreview { channel, period, envelope, loop_point } => {
+                let low_nibble = (period & 0x0F) as u8;
+                let high_bits = ((period >> 4) & 0x3F) as u8;
+                self.sn76489.write(0x80 | (channel << 5) | low_nibble);
+                self.sn76489.write(high_bits);
+                self.sn76489.write(0x90 | (channel << 5));
+                self.psg_preview_envelope = Some(envelope);
+                self.psg_preview_loop = loop_point;
+                self.psg_preview_channel = channel;
+                self.psg_preview_index = 0;
+                self.psg_preview_tick_acc = 0.0;
+            }
+            AudioCommand::StopPreview => {
+                self.dac_samples = None;
+                self.dac_position = 0.0;
+                if self.psg_preview_envelope.take().is_some() {
+                    self.sn76489.write(0x90 | (self.psg_preview_channel << 5) | 0x0F);
+                }
+            }
             AudioCommand::Panic => {
                 self.ym2612.reset();
                 self.sn76489.reset();
                 self.ym_clock_accumulator = 0.0;
                 self.psg_clock_accumulator = 0.0;
+                self.dac_samples = None;
+                self.dac_position = 0.0;
+                self.psg_preview_envelope = None;
             }
         }
     }
@@ -120,14 +165,47 @@ impl AudioEngine {
             }
             let psg_sample = self.sn76489.render_sample() as i32;
 
-            // --- Mix and normalize to f32 [-1.0, 1.0] ---
-            // Nuked OPN2 outputs 9-bit DAC values (±256 per operator, ±1020 for algo 7).
-            // PSG VOLUME_TABLE max is 8191 per channel (×4 = 32764 theoretical).
-            // On real hardware the YM2612 analog output is amplified relative to PSG.
-            // Scale FM up by 32 to match PSG levels (~real Genesis mixing ratio).
+            // --- DAC ---
             let fm_scale: i32 = 32;
-            let scaled_l = ym_l * fm_scale + psg_sample;
-            let scaled_r = ym_r * fm_scale + psg_sample;
+            let dac_sample = if let Some(ref samples) = self.dac_samples {
+                let idx = self.dac_position as usize;
+                if idx < samples.len() {
+                    let raw = samples[idx] as i32 - 128;
+                    self.dac_position += self.dac_step;
+                    raw * fm_scale
+                } else {
+                    self.dac_samples = None;
+                    0
+                }
+            } else {
+                0
+            };
+
+            // --- PSG envelope stepping ---
+            if let Some(ref envelope) = self.psg_preview_envelope.clone() {
+                self.psg_preview_tick_acc += 1.0;
+                if self.psg_preview_tick_acc >= self.psg_preview_samples_per_tick {
+                    self.psg_preview_tick_acc -= self.psg_preview_samples_per_tick;
+                    if self.psg_preview_index < envelope.len() {
+                        let vol = envelope[self.psg_preview_index];
+                        let attenuation = 15u8.saturating_sub(vol);
+                        self.sn76489.write(0x90 | (self.psg_preview_channel << 5) | attenuation);
+                        self.psg_preview_index += 1;
+                        if self.psg_preview_index >= envelope.len() {
+                            if let Some(lp) = self.psg_preview_loop {
+                                self.psg_preview_index = lp;
+                            } else {
+                                self.sn76489.write(0x90 | (self.psg_preview_channel << 5) | 0x0F);
+                                self.psg_preview_envelope = None;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Mix and normalize ---
+            let scaled_l = ym_l * fm_scale + psg_sample + dac_sample;
+            let scaled_r = ym_r * fm_scale + psg_sample + dac_sample;
 
             buffer[frame * 2]     = (scaled_l as f32 / 32768.0).clamp(-1.0, 1.0);
             buffer[frame * 2 + 1] = (scaled_r as f32 / 32768.0).clamp(-1.0, 1.0);
@@ -193,6 +271,35 @@ mod tests {
 
         let has_signal = buf.iter().any(|s| s.abs() > 0.001);
         assert!(has_signal, "FM tone through engine should produce non-zero audio output");
+    }
+
+    #[test]
+    fn test_dac_playback_produces_audio() {
+        let mut engine = AudioEngine::new(44100);
+        let samples: Vec<u8> = (0..1000).map(|i| if i % 2 == 0 { 200 } else { 56 }).collect();
+        engine.process_command(AudioCommand::DacPlayback {
+            samples: Arc::new(samples),
+            sample_rate: 16000,
+        });
+        let mut buf = [0.0f32; 4096];
+        engine.render(&mut buf);
+        let has_signal = buf.iter().any(|s| s.abs() > 0.01);
+        assert!(has_signal, "DAC playback should produce audible output");
+    }
+
+    #[test]
+    fn test_dac_stops_after_samples_exhausted() {
+        let mut engine = AudioEngine::new(44100);
+        let samples = vec![200u8; 10];
+        engine.process_command(AudioCommand::DacPlayback {
+            samples: Arc::new(samples),
+            sample_rate: 44100,
+        });
+        let mut buf = [0.0f32; 4096];
+        engine.render(&mut buf);
+        let tail = &buf[100..];
+        let tail_signal = tail.iter().any(|s| s.abs() > 0.01);
+        assert!(!tail_signal, "DAC should stop after samples exhausted");
     }
 
     #[test]

@@ -682,6 +682,21 @@ pub fn update_region(
 }
 
 #[tauri::command]
+pub fn move_region(
+    state: State<'_, ProjectState>,
+    src_track_id: String,
+    region_id: String,
+    dst_track_id: String,
+    start_tick: u64,
+) -> Result<(), String> {
+    let src = Uuid::parse_str(&src_track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let dst = Uuid::parse_str(&dst_track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.move_region(src, r, dst, start_tick)
+}
+
+#[tauri::command]
 pub fn delete_region(
     state: State<'_, ProjectState>,
     track_id: String,

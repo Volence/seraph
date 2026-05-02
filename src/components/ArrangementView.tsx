@@ -76,6 +76,16 @@ export function ArrangementView({
     refresh();
   }
 
+  async function handleRegionMove(srcTrackId: string, regionId: string, dstTrackId: string, startTick: number) {
+    await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
+    refresh();
+  }
+
+  async function handleRegionResize(trackId: string, regionId: string, startTick: number, durationTicks: number) {
+    await ipc.updateRegion(trackId, regionId, startTick, durationTicks);
+    refresh();
+  }
+
   async function handleSeek(tick: number) {
     await ipc.transportSeek(tick);
   }
@@ -181,6 +191,8 @@ export function ArrangementView({
           }}
           onRegionDoubleClick={handleRegionDoubleClick}
           onRegionCreate={handleRegionCreate}
+          onRegionMove={handleRegionMove}
+          onRegionResize={handleRegionResize}
         />
       </div>
     </div>

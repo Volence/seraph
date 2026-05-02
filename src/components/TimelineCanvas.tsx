@@ -15,6 +15,8 @@ interface TimelineCanvasProps {
   onRegionClick: (trackId: string, regionId: string) => void;
   onRegionDoubleClick: (trackId: string, regionId: string) => void;
   onRegionCreate: (trackId: string, startTick: number, durationTicks: number) => void;
+  onRegionMove: (srcTrackId: string, regionId: string, dstTrackId: string, startTick: number) => void;
+  onRegionResize: (trackId: string, regionId: string, startTick: number, durationTicks: number) => void;
 }
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -22,6 +24,8 @@ const CHANNEL_COLORS: Record<string, string> = {
   psg: "#44cc66",
   dac: "#ff8844",
 };
+
+const EDGE_THRESHOLD = 8;
 
 function trackChannelType(track: Track): string {
   const ch = track.channel;
@@ -31,10 +35,18 @@ function trackChannelType(track: Track): string {
   return "dac";
 }
 
+type DragMode = "create" | "move" | "resize-left" | "resize-right";
+
 interface DragState {
+  mode: DragMode;
   trackIdx: number;
   startX: number;
   currentX: number;
+  currentTrackIdx: number;
+  regionTrackId?: string;
+  regionId?: string;
+  regionStartTick?: number;
+  regionDuration?: number;
 }
 
 export function TimelineCanvas({
@@ -50,6 +62,8 @@ export function TimelineCanvas({
   onRegionClick,
   onRegionDoubleClick,
   onRegionCreate,
+  onRegionMove,
+  onRegionResize,
 }: TimelineCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +80,29 @@ export function TimelineCanvas({
 
   function snapToBar(tick: number): number {
     return Math.round(tick / ticksPerBar) * ticksPerBar;
+  }
+
+  function hitTestRegion(x: number, y: number): {
+    trackIdx: number;
+    trackId: string;
+    regionId: string;
+    edge: "left" | "right" | null;
+  } | null {
+    const trackIdx = Math.floor(y / trackHeight);
+    if (trackIdx < 0 || trackIdx >= tracks.length) return null;
+    const startTick = scrollLeft * ticksPerPixel;
+    const track = tracks[trackIdx];
+    for (const region of track.regions) {
+      const rx = (region.startTick - startTick) / ticksPerPixel;
+      const rw = region.durationTicks / ticksPerPixel;
+      if (x >= rx && x <= rx + rw) {
+        let edge: "left" | "right" | null = null;
+        if (x - rx < EDGE_THRESHOLD) edge = "left";
+        else if (rx + rw - x < EDGE_THRESHOLD) edge = "right";
+        return { trackIdx, trackId: track.id, regionId: region.id, edge };
+      }
+    }
+    return null;
   }
 
   const draw = useCallback(() => {
@@ -100,6 +137,8 @@ export function TimelineCanvas({
       ctx.stroke();
     }
 
+    const d = dragRef.current;
+
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
       const color = CHANNEL_COLORS[trackChannelType(track)] || "#888";
@@ -107,6 +146,11 @@ export function TimelineCanvas({
       const rh = trackHeight - 4;
 
       for (const region of track.regions) {
+        const isBeingDragged = d && (d.mode === "move" || d.mode === "resize-left" || d.mode === "resize-right")
+          && d.regionTrackId === track.id && d.regionId === region.id;
+
+        if (isBeingDragged) continue;
+
         const x = (region.startTick - startTick) / ticksPerPixel;
         const rw = region.durationTicks / ticksPerPixel;
 
@@ -139,26 +183,77 @@ export function TimelineCanvas({
       }
     }
 
-    // Draw drag preview
-    const d = dragRef.current;
-    if (d && d.trackIdx < tracks.length) {
-      const track = tracks[d.trackIdx];
-      const color = CHANNEL_COLORS[trackChannelType(track)] || "#888";
-      const rawStart = pixelToTick(Math.min(d.startX, d.currentX));
-      const rawEnd = pixelToTick(Math.max(d.startX, d.currentX));
-      const snapStart = snapToBar(rawStart);
-      const snapEnd = Math.max(snapStart + ticksPerBar, snapToBar(rawEnd));
-      const px1 = (snapStart - startTick) / ticksPerPixel;
-      const px2 = (snapEnd - startTick) / ticksPerPixel;
-      const dy = d.trackIdx * trackHeight + 2;
-      const dh = trackHeight - 4;
-      ctx.fillStyle = color + "55";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.fillRect(px1, dy, px2 - px1, dh);
-      ctx.strokeRect(px1, dy, px2 - px1, dh);
-      ctx.setLineDash([]);
+    if (d) {
+      if (d.mode === "create" && d.trackIdx < tracks.length) {
+        const track = tracks[d.trackIdx];
+        const color = CHANNEL_COLORS[trackChannelType(track)] || "#888";
+        const rawStart = pixelToTick(Math.min(d.startX, d.currentX));
+        const rawEnd = pixelToTick(Math.max(d.startX, d.currentX));
+        const sStart = snapToBar(rawStart);
+        const sEnd = Math.max(sStart + ticksPerBar, snapToBar(rawEnd));
+        const px1 = (sStart - startTick) / ticksPerPixel;
+        const px2 = (sEnd - startTick) / ticksPerPixel;
+        const dy = d.trackIdx * trackHeight + 2;
+        const dh = trackHeight - 4;
+        ctx.fillStyle = color + "55";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.fillRect(px1, dy, px2 - px1, dh);
+        ctx.strokeRect(px1, dy, px2 - px1, dh);
+        ctx.setLineDash([]);
+      }
+
+      if (d.mode === "move" && d.regionStartTick != null && d.regionDuration != null) {
+        const deltaPx = d.currentX - d.startX;
+        const deltaTick = deltaPx * ticksPerPixel;
+        const newStart = snapToBar(Math.max(0, d.regionStartTick + deltaTick));
+        const tIdx = d.currentTrackIdx;
+        const track = tIdx < tracks.length ? tracks[tIdx] : null;
+        const color = track ? (CHANNEL_COLORS[trackChannelType(track)] || "#888") : "#888";
+        const px1 = (newStart - startTick) / ticksPerPixel;
+        const pw = d.regionDuration / ticksPerPixel;
+        const dy = tIdx * trackHeight + 2;
+        const dh = trackHeight - 4;
+        ctx.fillStyle = color + "55";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.fillRect(px1, dy, pw, dh);
+        ctx.strokeRect(px1, dy, pw, dh);
+        ctx.setLineDash([]);
+      }
+
+      if ((d.mode === "resize-left" || d.mode === "resize-right") && d.regionStartTick != null && d.regionDuration != null) {
+        const origStart = d.regionStartTick;
+        const origEnd = origStart + d.regionDuration;
+        const deltaPx = d.currentX - d.startX;
+        const deltaTick = deltaPx * ticksPerPixel;
+        let newStart: number, newEnd: number;
+        if (d.mode === "resize-left") {
+          newStart = snapToBar(Math.max(0, origStart + deltaTick));
+          newEnd = origEnd;
+          if (newStart >= newEnd) newStart = newEnd - ticksPerBar;
+        } else {
+          newStart = origStart;
+          newEnd = snapToBar(origEnd + deltaTick);
+          if (newEnd <= newStart) newEnd = newStart + ticksPerBar;
+        }
+        const tIdx = d.trackIdx;
+        const track = tIdx < tracks.length ? tracks[tIdx] : null;
+        const color = track ? (CHANNEL_COLORS[trackChannelType(track)] || "#888") : "#888";
+        const px1 = (newStart - startTick) / ticksPerPixel;
+        const pw = (newEnd - newStart) / ticksPerPixel;
+        const dy = tIdx * trackHeight + 2;
+        const dh = trackHeight - 4;
+        ctx.fillStyle = color + "55";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.fillRect(px1, dy, pw, dh);
+        ctx.strokeRect(px1, dy, pw, dh);
+        ctx.setLineDash([]);
+      }
     }
 
     if (playing) {
@@ -188,21 +283,6 @@ export function TimelineCanvas({
     return () => cancelAnimationFrame(animRef.current);
   }, [draw, playing]);
 
-  function hitTestRegion(x: number, y: number): { trackId: string; regionId: string } | null {
-    const trackIdx = Math.floor(y / trackHeight);
-    if (trackIdx < 0 || trackIdx >= tracks.length) return null;
-    const startTick = scrollLeft * ticksPerPixel;
-    const track = tracks[trackIdx];
-    for (const region of track.regions) {
-      const rx = (region.startTick - startTick) / ticksPerPixel;
-      const rw = region.durationTicks / ticksPerPixel;
-      if (x >= rx && x <= rx + rw) {
-        return { trackId: track.id, regionId: region.id };
-      }
-    }
-    return null;
-  }
-
   function handleMouseDown(e: React.MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -211,13 +291,42 @@ export function TimelineCanvas({
     const y = e.clientY - rect.top;
 
     const hit = hitTestRegion(x, y);
-    if (hit) return;
+    if (hit) {
+      e.preventDefault();
+      const track = tracks[hit.trackIdx];
+      const region = track.regions.find((r) => r.id === hit.regionId);
+      if (!region) return;
+
+      if (hit.edge === "left") {
+        setDrag({
+          mode: "resize-left", trackIdx: hit.trackIdx, startX: x, currentX: x,
+          currentTrackIdx: hit.trackIdx,
+          regionTrackId: hit.trackId, regionId: hit.regionId,
+          regionStartTick: region.startTick, regionDuration: region.durationTicks,
+        });
+      } else if (hit.edge === "right") {
+        setDrag({
+          mode: "resize-right", trackIdx: hit.trackIdx, startX: x, currentX: x,
+          currentTrackIdx: hit.trackIdx,
+          regionTrackId: hit.trackId, regionId: hit.regionId,
+          regionStartTick: region.startTick, regionDuration: region.durationTicks,
+        });
+      } else {
+        setDrag({
+          mode: "move", trackIdx: hit.trackIdx, startX: x, currentX: x,
+          currentTrackIdx: hit.trackIdx,
+          regionTrackId: hit.trackId, regionId: hit.regionId,
+          regionStartTick: region.startTick, regionDuration: region.durationTicks,
+        });
+      }
+      return;
+    }
 
     const trackIdx = Math.floor(y / trackHeight);
     if (trackIdx < 0 || trackIdx >= tracks.length) return;
 
     e.preventDefault();
-    setDrag({ trackIdx, startX: x, currentX: x });
+    setDrag({ mode: "create", trackIdx, startX: x, currentX: x, currentTrackIdx: trackIdx });
   }
 
   useEffect(() => {
@@ -228,25 +337,57 @@ export function TimelineCanvas({
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      setDrag((prev) => prev ? { ...prev, currentX: x } : null);
+      const y = e.clientY - rect.top;
+      const newTrackIdx = Math.max(0, Math.min(tracks.length - 1, Math.floor(y / trackHeight)));
+      setDrag((prev) => prev ? { ...prev, currentX: x, currentTrackIdx: newTrackIdx } : null);
     }
 
     function handleMouseUp(e: MouseEvent) {
       const d = dragRef.current;
-      if (!d) return;
+      if (!d) { setDrag(null); return; }
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) { setDrag(null); return; }
       const rect = canvas.getBoundingClientRect();
       const endX = e.clientX - rect.left;
+      const endY = e.clientY - rect.top;
 
-      const rawStart = pixelToTick(Math.min(d.startX, endX));
-      const rawEnd = pixelToTick(Math.max(d.startX, endX));
-      const snapStart = snapToBar(rawStart);
-      const snapEnd = Math.max(snapStart + ticksPerBar, snapToBar(rawEnd));
-
-      if (d.trackIdx < tracks.length) {
-        onRegionCreate(tracks[d.trackIdx].id, snapStart, snapEnd - snapStart);
+      if (d.mode === "create") {
+        const rawStart = pixelToTick(Math.min(d.startX, endX));
+        const rawEnd = pixelToTick(Math.max(d.startX, endX));
+        const sStart = snapToBar(rawStart);
+        const sEnd = Math.max(sStart + ticksPerBar, snapToBar(rawEnd));
+        if (d.trackIdx < tracks.length) {
+          onRegionCreate(tracks[d.trackIdx].id, sStart, sEnd - sStart);
+        }
       }
+
+      if (d.mode === "move" && d.regionTrackId && d.regionId && d.regionStartTick != null) {
+        const deltaPx = endX - d.startX;
+        const deltaTick = deltaPx * ticksPerPixel;
+        const newStart = snapToBar(Math.max(0, d.regionStartTick + deltaTick));
+        const endTrackIdx = Math.max(0, Math.min(tracks.length - 1, Math.floor(endY / trackHeight)));
+        const dstTrackId = tracks[endTrackIdx].id;
+        onRegionMove(d.regionTrackId, d.regionId, dstTrackId, newStart);
+      }
+
+      if ((d.mode === "resize-left" || d.mode === "resize-right") && d.regionTrackId && d.regionId && d.regionStartTick != null && d.regionDuration != null) {
+        const origStart = d.regionStartTick;
+        const origEnd = origStart + d.regionDuration;
+        const deltaPx = endX - d.startX;
+        const deltaTick = deltaPx * ticksPerPixel;
+        let newStart: number, newEnd: number;
+        if (d.mode === "resize-left") {
+          newStart = snapToBar(Math.max(0, origStart + deltaTick));
+          newEnd = origEnd;
+          if (newStart >= newEnd) newStart = newEnd - ticksPerBar;
+        } else {
+          newStart = origStart;
+          newEnd = snapToBar(origEnd + deltaTick);
+          if (newEnd <= newStart) newEnd = newStart + ticksPerBar;
+        }
+        onRegionResize(d.regionTrackId, d.regionId, newStart, newEnd - newStart);
+      }
+
       setDrag(null);
     }
 
@@ -256,9 +397,10 @@ export function TimelineCanvas({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, onRegionCreate]);
+  }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, trackHeight, onRegionCreate, onRegionMove, onRegionResize]);
 
   function handleClick(e: React.MouseEvent) {
+    if (drag) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -284,12 +426,31 @@ export function TimelineCanvas({
     }
   }
 
+  function handleMouseMoveCanvas(e: React.MouseEvent) {
+    if (drag) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hit = hitTestRegion(x, y);
+    if (hit?.edge) {
+      canvas.style.cursor = "col-resize";
+    } else if (hit) {
+      canvas.style.cursor = "grab";
+    } else {
+      canvas.style.cursor = "crosshair";
+    }
+  }
+
   return (
     <div ref={containerRef} className={styles.container}>
       <canvas
         ref={canvasRef}
         className={styles.canvas}
         onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMoveCanvas}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       />

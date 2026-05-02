@@ -644,6 +644,27 @@ impl ProjectManager {
         Ok(())
     }
 
+    pub fn move_region(&mut self, src_track_id: Uuid, region_id: Uuid, dst_track_id: Uuid, start_tick: u64) -> Result<(), String> {
+        if src_track_id == dst_track_id {
+            let track = self.tracks.iter_mut().find(|t| t.id == src_track_id)
+                .ok_or("source track not found")?;
+            let region = track.regions.iter_mut().find(|r| r.id == region_id)
+                .ok_or("region not found")?;
+            region.start_tick = start_tick;
+            return Ok(());
+        }
+        let src = self.tracks.iter_mut().find(|t| t.id == src_track_id)
+            .ok_or("source track not found")?;
+        let pos = src.regions.iter().position(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        let mut region = src.regions.remove(pos);
+        region.start_tick = start_tick;
+        let dst = self.tracks.iter_mut().find(|t| t.id == dst_track_id)
+            .ok_or("destination track not found")?;
+        dst.regions.push(region);
+        Ok(())
+    }
+
     pub fn delete_region(&mut self, track_id: Uuid, region_id: Uuid) -> Result<(), String> {
         let track = self.tracks.iter_mut().find(|t| t.id == track_id)
             .ok_or("track not found")?;

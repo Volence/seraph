@@ -183,6 +183,15 @@ export async function updateRegion(
   return invoke("update_region", { trackId, regionId, startTick, durationTicks });
 }
 
+export async function moveRegion(
+  srcTrackId: string,
+  regionId: string,
+  dstTrackId: string,
+  startTick: number,
+): Promise<void> {
+  return invoke("move_region", { srcTrackId, regionId, dstTrackId, startTick });
+}
+
 export async function deleteRegion(trackId: string, regionId: string): Promise<void> {
   return invoke("delete_region", { trackId, regionId });
 }

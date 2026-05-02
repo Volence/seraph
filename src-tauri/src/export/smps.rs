@@ -252,9 +252,228 @@ pub fn generate_voice_bank_asm(song_label: &str, voices: &[&FmInstrument], drive
     asm
 }
 
-// --- Validation ---
+// --- Assembly Generation ---
 
 use crate::model::song::Song;
+
+fn sanitize_label(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .collect()
+}
+
+fn channel_type_label(ch: &ChannelAssignment) -> &'static str {
+    match ch {
+        ChannelAssignment::Fm(_) => "FM",
+        ChannelAssignment::Psg(_) => "PSG",
+        ChannelAssignment::PsgNoise => "PSG_Noise",
+        ChannelAssignment::Dac(_) => "DAC",
+    }
+}
+
+fn channel_index(ch: &ChannelAssignment) -> u8 {
+    match ch {
+        ChannelAssignment::Fm(n) => n + 1,
+        ChannelAssignment::Psg(n) => n + 1,
+        ChannelAssignment::PsgNoise => 4,
+        ChannelAssignment::Dac(n) => n + 1,
+    }
+}
+
+fn flush_line(asm: &mut String, items: &mut Vec<String>) {
+    if items.is_empty() { return; }
+    asm.push_str(&format!("\tdc.b {}\n", items.join(", ")));
+    items.clear();
+}
+
+fn format_channel_data(events: &[SmpsEvent]) -> String {
+    let mut asm = String::new();
+    let mut line_items: Vec<String> = Vec::new();
+    let mut last_duration: Option<u64> = None;
+
+    for event in events {
+        match event {
+            SmpsEvent::SetVoice(idx) => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str(&format!("\tsmpsSetvoice\t${idx:02X}\n"));
+                last_duration = None;
+            }
+            SmpsEvent::SetPan(pan_byte) => {
+                flush_line(&mut asm, &mut line_items);
+                let pan_name = match pan_byte {
+                    0x80 => "panLeft",
+                    0x40 => "panRight",
+                    _ => "panCenter",
+                };
+                asm.push_str(&format!("\tsmpsPan\t\t\t{pan_name}, $00\n"));
+            }
+            SmpsEvent::SetPsgVoice(idx) => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str(&format!("\tsmpsSetPSGVoice\t${idx:02X}\n"));
+            }
+            SmpsEvent::Tie => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str("\tsmpsNoAttack\n");
+                last_duration = None;
+            }
+            SmpsEvent::Note { pitch_name, duration } => {
+                if last_duration == Some(*duration) {
+                    line_items.push(pitch_name.clone());
+                } else {
+                    line_items.push(pitch_name.clone());
+                    line_items.push(format!("${duration:02X}"));
+                    last_duration = Some(*duration);
+                }
+                if line_items.len() >= 12 {
+                    flush_line(&mut asm, &mut line_items);
+                }
+            }
+            SmpsEvent::Rest { duration } => {
+                if last_duration == Some(*duration) {
+                    line_items.push("nRst".into());
+                } else {
+                    line_items.push("nRst".into());
+                    line_items.push(format!("${duration:02X}"));
+                    last_duration = Some(*duration);
+                }
+                if line_items.len() >= 12 {
+                    flush_line(&mut asm, &mut line_items);
+                }
+            }
+            SmpsEvent::Stop => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str("\tsmpsStop\n");
+            }
+        }
+    }
+    flush_line(&mut asm, &mut line_items);
+    asm
+}
+
+/// Generate the complete music assembly file.
+pub fn generate_music_asm(
+    song: &Song,
+    instruments: &InstrumentBank,
+    voice_map: &HashMap<Uuid, u8>,
+    params: &SmpsTempoParams,
+) -> Result<String, Vec<ExportError>> {
+    let label = sanitize_label(&song.metadata.name);
+    let mut asm = String::new();
+
+    asm.push_str("; ============================================================\n");
+    asm.push_str(&format!("; Song: {}\n", song.metadata.name));
+    asm.push_str("; Exported from MegaDAW\n");
+    asm.push_str("; ============================================================\n\n");
+
+    let active_tracks: Vec<&Track> = song.tracks.iter()
+        .filter(|t| !t.muted && t.regions.iter().any(|r| !r.notes.is_empty()))
+        .collect();
+    let fm_count = active_tracks.iter().filter(|t| matches!(t.channel, ChannelAssignment::Fm(_))).count();
+    let dac_count = active_tracks.iter().filter(|t| matches!(t.channel, ChannelAssignment::Dac(_))).count();
+    let psg_count = active_tracks.iter().filter(|t| matches!(t.channel, ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise)).count();
+    let fm_dac_count = fm_count + dac_count;
+
+    asm.push_str(&format!("Snd_{label}_Header:\n"));
+    asm.push_str("\tsmpsHeaderStartSong 3\n");
+    asm.push_str(&format!("\tsmpsHeaderVoice\t\tSnd_{label}_Voices\n"));
+    asm.push_str(&format!("\tsmpsHeaderChan\t\t${fm_dac_count:02X}, ${psg_count:02X}\n"));
+    asm.push_str(&format!("\tsmpsHeaderTempo\t\t${:02X}, ${:02X}\n", params.divider, params.modifier));
+
+    for track in &active_tracks {
+        if !matches!(track.channel, ChannelAssignment::Dac(_)) { continue; }
+        let ch_label = format!("Snd_{label}_DAC{}", channel_index(&track.channel));
+        asm.push_str(&format!("\tsmpsHeaderDAC\t\t{ch_label}, $00, $00\n"));
+    }
+    for track in &active_tracks {
+        if !matches!(track.channel, ChannelAssignment::Fm(_)) { continue; }
+        let ch_label = format!("Snd_{label}_FM{}", channel_index(&track.channel));
+        let vol = 0xFF - ((track.volume as u16 * 0x7F / 100) as u8);
+        asm.push_str(&format!("\tsmpsHeaderFM\t\t{ch_label}, $00, ${vol:02X}\n"));
+    }
+    for track in &active_tracks {
+        if !matches!(track.channel, ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise) { continue; }
+        let ch_label = format!("Snd_{label}_PSG{}", channel_index(&track.channel));
+        let vol = 0x0F - ((track.volume as u16 * 0x0F / 100) as u8);
+        asm.push_str(&format!("\tsmpsHeaderPSG\t\t{ch_label}, $00, ${vol:02X}, $00, $00\n"));
+    }
+
+    asm.push('\n');
+
+    let mut all_errors = Vec::new();
+
+    for track in &active_tracks {
+        let type_label = channel_type_label(&track.channel);
+        let ch_idx = channel_index(&track.channel);
+        let ch_label = format!("Snd_{label}_{type_label}{ch_idx}");
+
+        asm.push_str("; ------------------------------------------------------------\n");
+        asm.push_str(&format!("; {type_label} Channel {ch_idx} - \"{}\"\n", track.name));
+        asm.push_str("; ------------------------------------------------------------\n");
+        asm.push_str(&format!("{ch_label}:\n"));
+
+        let mut events: Vec<SmpsEvent> = Vec::new();
+
+        match &track.channel {
+            ChannelAssignment::Fm(_) => {
+                if let Some(inst_id) = &track.instrument_id {
+                    if let Some(&voice_idx) = voice_map.get(inst_id) {
+                        events.push(SmpsEvent::SetVoice(voice_idx));
+                    }
+                }
+            }
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
+                events.push(SmpsEvent::SetPsgVoice(0));
+            }
+            _ => {}
+        }
+
+        if matches!(track.channel, ChannelAssignment::Fm(_)) {
+            let pan_byte = match track.pan {
+                Pan::Left => 0x80u8,
+                Pan::Right => 0x40,
+                Pan::Center => 0xC0,
+            };
+            events.push(SmpsEvent::SetPan(pan_byte));
+        }
+
+        let mut all_notes: Vec<(u64, u8, u64)> = Vec::new();
+        for region in &track.regions {
+            for note in &region.notes {
+                let abs_tick = region.start_tick + note.tick;
+                all_notes.push((abs_tick, note.pitch, note.duration_ticks));
+            }
+        }
+        all_notes.sort_by_key(|&(tick, _, _)| tick);
+
+        let total_duration = track.regions.iter()
+            .map(|r| r.start_tick + r.duration_ticks)
+            .max()
+            .unwrap_or(0);
+
+        match encode_channel_events(&all_notes, total_duration, params) {
+            Ok(note_events) => events.extend(note_events),
+            Err(e) => {
+                let mut err = e;
+                err.track_name = track.name.clone();
+                all_errors.push(err);
+                continue;
+            }
+        }
+
+        events.push(SmpsEvent::Stop);
+
+        asm.push_str(&format_channel_data(&events));
+        asm.push('\n');
+    }
+
+    if !all_errors.is_empty() {
+        return Err(all_errors);
+    }
+
+    Ok(asm)
+}
+
+// --- Validation ---
 
 /// Validate the song for SMPS export. Returns a list of errors (empty = valid).
 pub fn validate_for_export(
@@ -538,5 +757,50 @@ mod tests {
         let params = compute_tempo_params(120.0, 480);
         let errors = validate_for_export(&song, &song.instruments, &params);
         assert!(errors.iter().any(|e| e.message.contains("outside SMPS range")));
+    }
+
+    #[test]
+    fn test_generate_music_asm_basic() {
+        use crate::model::song::*;
+        use crate::model::instrument::*;
+
+        let inst_id = Uuid::new_v4();
+        let song = Song {
+            metadata: SongMetadata {
+                name: "TestSong".into(), tempo: 120.0, time_signature: (4, 4),
+                ticks_per_beat: 480, driver_id: "flamedriver".into(),
+            },
+            tracks: vec![Track {
+                id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
+                instrument_id: Some(inst_id), regions: vec![Region {
+                    id: Uuid::new_v4(), start_tick: 0, duration_ticks: 960,
+                    notes: vec![
+                        Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480 },
+                        Note { tick: 480, pitch: 64, velocity: 100, duration_ticks: 480 },
+                    ],
+                }],
+                muted: false, solo: false, volume: 100, pan: Pan::Center,
+            }],
+            instruments: InstrumentBank {
+                fm: vec![FmInstrument {
+                    id: inst_id, name: "TestPatch".into(), algorithm: 4, feedback: 7,
+                    operators: [FmOperator::default(); 4],
+                    metadata: InstrumentMetadata::default(),
+                }],
+                psg: vec![], dac: vec![],
+            },
+        };
+
+        let params = compute_tempo_params(120.0, 480);
+        let (voice_map, _voices) = build_voice_index(&song.tracks, &song.instruments);
+        let asm = generate_music_asm(&song, &song.instruments, &voice_map, &params).unwrap();
+
+        assert!(asm.contains("Snd_TestSong_Header:"));
+        assert!(asm.contains("smpsHeaderStartSong 3"));
+        assert!(asm.contains("smpsSetvoice"));
+        assert!(asm.contains("smpsPan"));
+        assert!(asm.contains("nC4"));
+        assert!(asm.contains("nE4"));
+        assert!(asm.contains("smpsStop"));
     }
 }

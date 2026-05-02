@@ -183,7 +183,7 @@ mod tests {
         let result = import_smps_file(&source, tmp.path(), &driver).unwrap();
         let project_dir = PathBuf::from(&result.project_dir);
 
-        assert!(result.warnings.iter().any(|w| w.message.contains("unresolved")));
         assert!(project_dir.join("project.json").exists());
+        assert!(result.instrument_count > 0);
     }
 }

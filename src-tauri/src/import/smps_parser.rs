@@ -702,6 +702,72 @@ pub fn parse_smps(source: &str) -> Result<SmpsFile, String> {
     })
 }
 
+pub fn parse_voice_bank(source: &str) -> Result<Vec<[u8; 25]>, String> {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut voices = Vec::new();
+
+    let mut alg: u8 = 0;
+    let mut fb: u8 = 0;
+    let mut detune = [0u8; 4];
+    let mut mul = [0u8; 4];
+    let mut rs = [0u8; 4];
+    let mut ar = [0u8; 4];
+    let mut am = [0u8; 4];
+    let mut d1r = [0u8; 4];
+    let mut d2r = [0u8; 4];
+    let mut sl = [0u8; 4];
+    let mut rr = [0u8; 4];
+    let mut tl = [0u8; 4];
+    let mut in_voice = false;
+
+    for line in &lines {
+        let trimmed = strip_comment(line).trim();
+        if trimmed.is_empty() { continue; }
+
+        if trimmed.starts_with("smpsVcAlgorithm") {
+            if in_voice {
+                voices.push(build_voice_bytes(alg, fb, &detune, &mul, &rs, &ar, &am, &d1r, &d2r, &sl, &rr, &tl));
+            }
+            in_voice = true;
+            detune = [0; 4]; mul = [0; 4]; rs = [0; 4]; ar = [0; 4];
+            am = [0; 4]; d1r = [0; 4]; d2r = [0; 4]; sl = [0; 4];
+            rr = [0; 4]; tl = [0; 4]; fb = 0;
+            let args = extract_macro_args(trimmed, "smpsVcAlgorithm");
+            alg = args.first().and_then(|a| parse_hex(a)).unwrap_or(0);
+        } else if trimmed.starts_with("smpsVcFeedback") {
+            let args = extract_macro_args(trimmed, "smpsVcFeedback");
+            fb = args.first().and_then(|a| parse_hex(a)).unwrap_or(0);
+        } else if trimmed.starts_with("smpsVcUnusedBits") {
+        } else if trimmed.starts_with("smpsVcDetune") {
+            detune = parse_4_args(trimmed, "smpsVcDetune");
+        } else if trimmed.starts_with("smpsVcCoarseFreq") {
+            mul = parse_4_args(trimmed, "smpsVcCoarseFreq");
+        } else if trimmed.starts_with("smpsVcRateScale") {
+            rs = parse_4_args(trimmed, "smpsVcRateScale");
+        } else if trimmed.starts_with("smpsVcAttackRate") {
+            ar = parse_4_args(trimmed, "smpsVcAttackRate");
+        } else if trimmed.starts_with("smpsVcAmpMod") {
+            am = parse_4_args(trimmed, "smpsVcAmpMod");
+        } else if trimmed.starts_with("smpsVcDecayRate1") {
+            d1r = parse_4_args(trimmed, "smpsVcDecayRate1");
+        } else if trimmed.starts_with("smpsVcDecayRate2") {
+            d2r = parse_4_args(trimmed, "smpsVcDecayRate2");
+        } else if trimmed.starts_with("smpsVcDecayLevel") {
+            sl = parse_4_args(trimmed, "smpsVcDecayLevel");
+        } else if trimmed.starts_with("smpsVcReleaseRate") {
+            rr = parse_4_args(trimmed, "smpsVcReleaseRate");
+        } else if trimmed.starts_with("smpsVcTotalLevel") {
+            tl = parse_4_args(trimmed, "smpsVcTotalLevel");
+        }
+    }
+
+    if in_voice {
+        voices.push(build_voice_bytes(alg, fb, &detune, &mul, &rs, &ar, &am, &d1r, &d2r, &sl, &rr, &tl));
+    }
+
+    Ok(voices)
+}
+
 pub fn build_note_table() -> HashMap<String, u8> {
     let mut map = HashMap::new();
     map.insert("nRst".into(), 0x80);

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::driver::flamedriver::FlamedriverProfile;
 use crate::model::driver::DriverProfile;
 use crate::model::instrument::*;
 use crate::model::song::*;
@@ -27,7 +26,23 @@ pub fn map_smps_to_song(smps: &SmpsFile, driver: &dyn DriverProfile) -> Result<M
     let mut instruments = InstrumentBank::default();
     let mut voice_to_fm_id: HashMap<u8, Uuid> = HashMap::new();
 
-    for (i, voice_bytes) in smps.voices.iter().enumerate() {
+    let voices = if smps.voices.is_empty() && matches!(smps.voice_ref, VoiceRef::Uvb) {
+        static UVB_SOURCE: &str = include_str!("../../test_data/UniBank.asm");
+        match parse_voice_bank(UVB_SOURCE) {
+            Ok(v) => v,
+            Err(e) => {
+                warnings.push(ImportWarning {
+                    channel: String::new(),
+                    message: format!("UVB parse error: {e}"),
+                });
+                vec![]
+            }
+        }
+    } else {
+        smps.voices.clone()
+    };
+
+    for (i, voice_bytes) in voices.iter().enumerate() {
         match driver.fm_from_bytes(voice_bytes) {
             Ok(mut inst) => {
                 inst.name = format!("Voice {}", i);
@@ -322,6 +337,7 @@ fn resolve_dac_sample(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::driver::flamedriver::FlamedriverProfile;
     use crate::import::smps_parser::{SmpsFile, SmpsChannel, SmpsChannelKind, SmpsEvent, VoiceRef};
 
     fn make_simple_smps() -> SmpsFile {
@@ -434,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn test_map_uvb_creates_placeholder_instruments() {
+    fn test_map_uvb_resolves_from_bundled_bank() {
         let smps = SmpsFile {
             song_label: "UVB_Test".into(),
             voice_ref: VoiceRef::Uvb,
@@ -458,8 +474,8 @@ mod tests {
         };
         let driver = FlamedriverProfile;
         let result = map_smps_to_song(&smps, &driver).unwrap();
-        assert_eq!(result.song.instruments.fm.len(), 1);
-        assert!(result.song.instruments.fm[0].name.contains("unresolved"));
-        assert!(result.warnings.iter().any(|w| w.message.contains("unresolved")));
+        assert!(result.song.instruments.fm.len() >= 1);
+        assert_eq!(result.song.instruments.fm[0].name, "Voice 0");
+        assert_eq!(result.song.instruments.fm[0].algorithm, 4);
     }
 }

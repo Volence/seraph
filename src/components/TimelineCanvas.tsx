@@ -41,6 +41,7 @@ interface DragState {
   mode: DragMode;
   trackIdx: number;
   startX: number;
+  startY: number;
   currentX: number;
   currentTrackIdx: number;
   regionTrackId?: string;
@@ -319,21 +320,21 @@ export function TimelineCanvas({
 
       if (hit.edge === "left") {
         setDrag({
-          mode: "resize-left", trackIdx: hit.trackIdx, startX: x, currentX: x,
+          mode: "resize-left", trackIdx: hit.trackIdx, startX: x, startY: y, currentX: x,
           currentTrackIdx: hit.trackIdx,
           regionTrackId: hit.trackId, regionId: hit.regionId,
           regionStartTick: region.startTick, regionDuration: region.durationTicks,
         });
       } else if (hit.edge === "right") {
         setDrag({
-          mode: "resize-right", trackIdx: hit.trackIdx, startX: x, currentX: x,
+          mode: "resize-right", trackIdx: hit.trackIdx, startX: x, startY: y, currentX: x,
           currentTrackIdx: hit.trackIdx,
           regionTrackId: hit.trackId, regionId: hit.regionId,
           regionStartTick: region.startTick, regionDuration: region.durationTicks,
         });
       } else {
         setDrag({
-          mode: "move", trackIdx: hit.trackIdx, startX: x, currentX: x,
+          mode: "move", trackIdx: hit.trackIdx, startX: x, startY: y, currentX: x,
           currentTrackIdx: hit.trackIdx,
           regionTrackId: hit.trackId, regionId: hit.regionId,
           regionStartTick: region.startTick, regionDuration: region.durationTicks,
@@ -346,7 +347,7 @@ export function TimelineCanvas({
     if (trackIdx < 0 || trackIdx >= tracks.length) return;
 
     e.preventDefault();
-    setDrag({ mode: "create", trackIdx, startX: x, currentX: x, currentTrackIdx: trackIdx });
+    setDrag({ mode: "create", trackIdx, startX: x, startY: y, currentX: x, currentTrackIdx: trackIdx });
   }
 
   useEffect(() => {
@@ -377,7 +378,7 @@ export function TimelineCanvas({
       const endX = e.clientX - rect.left;
       const endY = e.clientY - rect.top;
 
-      const movedEnough = Math.abs(endX - d.startX) > 4 || Math.abs(endY - (d.trackIdx * trackHeight + trackHeight / 2)) > trackHeight / 2;
+      const movedEnough = Math.abs(endX - d.startX) > 4 || Math.abs(endY - d.startY) > 4;
 
       if (d.mode === "create" && movedEnough) {
         const rawStart = pixelToTick(Math.min(d.startX, endX));
@@ -385,7 +386,13 @@ export function TimelineCanvas({
         const sStart = snapToBar(rawStart);
         const sEnd = Math.max(sStart + ticksPerBar, snapToBar(rawEnd));
         if (d.trackIdx < tracks.length) {
-          onRegionCreate(tracks[d.trackIdx].id, sStart, sEnd - sStart);
+          const track = tracks[d.trackIdx];
+          const overlaps = track.regions.some((r) =>
+            sStart < r.startTick + r.durationTicks && sStart + (sEnd - sStart) > r.startTick
+          );
+          if (!overlaps) {
+            onRegionCreate(track.id, sStart, sEnd - sStart);
+          }
         }
       }
 

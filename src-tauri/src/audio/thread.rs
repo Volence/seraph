@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rtrb::RingBuffer;
@@ -22,6 +22,7 @@ pub struct AudioThread {
     producer: rtrb::Producer<AudioCommand>,
     _stream: cpal::Stream,
     running: Arc<AtomicBool>,
+    position_tick: Arc<AtomicU64>,
 }
 
 impl AudioThread {
@@ -49,8 +50,9 @@ impl AudioThread {
         let running = Arc::new(AtomicBool::new(true));
         let running_cb = Arc::clone(&running);
 
-        // AudioEngine is created inside the closure so it lives entirely on the audio thread.
+        // AudioEngine is created here; capture the position atomic before moving into the closure.
         let mut engine = AudioEngine::new(sample_rate);
+        let position_tick = engine.position_tick();
 
         let err_fn = |err| eprintln!("[AudioThread] stream error: {err}");
 
@@ -86,6 +88,7 @@ impl AudioThread {
             producer,
             _stream: stream,
             running,
+            position_tick,
         })
     }
 
@@ -95,6 +98,10 @@ impl AudioThread {
     /// This method is non-blocking and real-time safe on the caller side.
     pub fn send(&mut self, cmd: AudioCommand) -> bool {
         self.producer.push(cmd).is_ok()
+    }
+
+    pub fn position_tick(&self) -> &Arc<AtomicU64> {
+        &self.position_tick
     }
 
     /// Signal the audio callback to stop rendering (output silence instead).

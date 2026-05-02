@@ -1,5 +1,7 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use crate::audio::command::AudioCommand;
+use crate::sequencer::{Sequencer, SequencerOutput};
 use crate::ym2612::Ym2612;
 use crate::sn76489::Sn76489;
 
@@ -23,6 +25,9 @@ pub struct AudioEngine {
     psg_preview_index: usize,
     psg_preview_tick_acc: f64,
     psg_preview_samples_per_tick: f64,
+    sequencer: Sequencer,
+    position_tick: Arc<AtomicU64>,
+    sequencer_output_buf: Vec<SequencerOutput>,
 }
 
 impl AudioEngine {
@@ -48,7 +53,14 @@ impl AudioEngine {
             psg_preview_index: 0,
             psg_preview_tick_acc: 0.0,
             psg_preview_samples_per_tick: sample_rate_f / 60.0,
+            sequencer: Sequencer::new(sample_rate),
+            position_tick: Arc::new(AtomicU64::new(0)),
+            sequencer_output_buf: Vec::new(),
         }
+    }
+
+    pub fn position_tick(&self) -> Arc<AtomicU64> {
+        self.position_tick.clone()
     }
 
     pub fn process_command(&mut self, cmd: AudioCommand) {
@@ -123,6 +135,48 @@ impl AudioEngine {
                 self.dac_position = 0.0;
                 self.psg_preview_envelope = None;
             }
+            AudioCommand::TransportPlay => {
+                self.sequencer.play();
+            }
+            AudioCommand::TransportStop => {
+                let mut output = Vec::new();
+                self.sequencer.stop(&mut output);
+                self.apply_sequencer_output(&mut output);
+            }
+            AudioCommand::TransportSeek { tick } => {
+                let mut output = Vec::new();
+                self.sequencer.seek(tick, &mut output);
+                self.apply_sequencer_output(&mut output);
+                self.position_tick.store(tick, Ordering::Relaxed);
+            }
+            AudioCommand::TransportSetLoop { start_tick, end_tick } => {
+                self.sequencer.set_loop(start_tick, end_tick);
+            }
+            AudioCommand::TransportClearLoop => {
+                self.sequencer.clear_loop();
+            }
+            AudioCommand::LoadSequence { snapshot } => {
+                self.sequencer.load_snapshot(snapshot);
+            }
+        }
+    }
+
+    fn apply_sequencer_output(&mut self, output: &mut Vec<SequencerOutput>) {
+        for cmd in output.drain(..) {
+            match cmd {
+                SequencerOutput::FmWrite(w) => {
+                    self.ym2612.write(w.port, w.data);
+                    for _ in 0..24 { self.ym2612.clock(); }
+                }
+                SequencerOutput::PsgWrite(data) => {
+                    self.sn76489.write(data);
+                }
+                SequencerOutput::DacPlayback { samples, sample_rate } => {
+                    self.dac_samples = Some(samples);
+                    self.dac_position = 0.0;
+                    self.dac_step = sample_rate as f64 / self.sample_rate;
+                }
+            }
         }
     }
 
@@ -135,6 +189,18 @@ impl AudioEngine {
         let frame_count = buffer.len() / 2;
 
         for frame in 0..frame_count {
+            // --- Sequencer ---
+            self.sequencer_output_buf.clear();
+            self.sequencer.advance(&mut self.sequencer_output_buf);
+            if !self.sequencer_output_buf.is_empty() {
+                let mut buf = std::mem::take(&mut self.sequencer_output_buf);
+                self.apply_sequencer_output(&mut buf);
+                self.sequencer_output_buf = buf;
+            }
+            if self.sequencer.is_playing() {
+                self.position_tick.store(self.sequencer.current_tick_u64(), Ordering::Relaxed);
+            }
+
             // --- YM2612 ---
             // Accumulate fractional YM clocks and drain whole ticks.
             self.ym_clock_accumulator += self.ym_clocks_per_sample;

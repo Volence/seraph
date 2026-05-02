@@ -10,6 +10,12 @@ pub enum AudioCommand {
     DacPlayback { samples: Arc<Vec<u8>>, sample_rate: u32 },
     PsgEnvelopePreview { channel: u8, period: u16, envelope: Arc<Vec<u8>>, loop_point: Option<usize> },
     StopPreview,
+    TransportPlay,
+    TransportStop,
+    TransportSeek { tick: u64 },
+    TransportSetLoop { start_tick: u64, end_tick: u64 },
+    TransportClearLoop,
+    LoadSequence { snapshot: crate::sequencer::SequencerSnapshot },
 }
 
 #[cfg(test)]

@@ -150,6 +150,7 @@ export function PianoRoll({ region, onClose }: PianoRollProps) {
           selectedNotes={selectedNotes}
           onNoteClick={handleNoteClick}
           onNoteAdd={handleNoteAdd}
+          onAudition={handleAudition}
           onNoteResize={handleNoteResize}
           onScrollTopChange={setScrollTop}
         />

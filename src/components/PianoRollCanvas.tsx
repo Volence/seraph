@@ -14,6 +14,7 @@ interface PianoRollCanvasProps {
   selectedNotes: Set<number>;
   onNoteClick: (index: number) => void;
   onNoteAdd: (tick: number, pitch: number) => void;
+  onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
   onScrollTopChange: (scrollTop: number) => void;
 }
@@ -36,6 +37,7 @@ export function PianoRollCanvas({
   selectedNotes,
   onNoteClick,
   onNoteAdd,
+  onAudition,
   onNoteResize,
   onScrollTopChange,
 }: PianoRollCanvasProps) {
@@ -136,6 +138,7 @@ export function PianoRollCanvas({
 
     if (hit) {
       onNoteClick(hit.index);
+      onAudition(notes[hit.index].pitch);
       return;
     }
 
@@ -145,6 +148,7 @@ export function PianoRollCanvas({
     const snapped = Math.floor(clickTick / gridSnapTicks) * gridSnapTicks;
     if (clickPitch >= minPitch && clickPitch <= maxPitch) {
       onNoteAdd(snapped, clickPitch);
+      onAudition(clickPitch);
     }
   }
 

@@ -11,7 +11,7 @@ pub enum ChannelType {
 
 #[derive(Debug, Clone)]
 pub enum InstrumentData {
-    FmPatch([u8; 25]),
+    FmPatch { bytes: [u8; 25], ssg_eg: [u8; 4] },
     PsgEnvelope { period: u16, envelope: Arc<Vec<u8>>, loop_point: Option<usize> },
     DacSample { samples: Arc<Vec<u8>>, sample_rate: u32 },
 }
@@ -43,6 +43,7 @@ pub struct OverlapWarning {
 #[derive(Debug, Clone)]
 pub struct ChannelSequence {
     pub channel_type: ChannelType,
+    pub volume: u8,
     pub events: Vec<SequencerEvent>,
     pub overlaps: Vec<OverlapWarning>,
 }
@@ -86,7 +87,7 @@ mod tests {
             pitch: 60,
             velocity: 100,
             duration_ticks: 240,
-            instrument: InstrumentData::FmPatch([0; 25]),
+            instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
         };
         assert_eq!(on.tick(), 480);
         let off = SequencerEvent::NoteOff { tick: 720, pitch: 60 };
@@ -95,10 +96,10 @@ mod tests {
 
     #[test]
     fn test_instrument_data_clone() {
-        let fm = InstrumentData::FmPatch([42; 25]);
+        let fm = InstrumentData::FmPatch { bytes: [42; 25], ssg_eg: [0; 4] };
         let fm2 = fm.clone();
         match fm2 {
-            InstrumentData::FmPatch(bytes) => assert_eq!(bytes[0], 42),
+            InstrumentData::FmPatch { bytes, .. } => assert_eq!(bytes[0], 42),
             _ => panic!("wrong variant"),
         }
     }

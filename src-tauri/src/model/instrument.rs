@@ -32,6 +32,8 @@ pub struct FmOperator {
     pub sustain_level: u8,
     pub release_rate: u8,
     pub total_level: u8,
+    #[serde(default)]
+    pub ssg_eg: u8,
 }
 
 impl Default for FmOperator {
@@ -39,7 +41,7 @@ impl Default for FmOperator {
         Self {
             detune: 0, multiple: 1, rate_scale: 0, attack_rate: 31,
             amp_mod: false, d1r: 0, d2r: 0, sustain_level: 0,
-            release_rate: 15, total_level: 127,
+            release_rate: 15, total_level: 127, ssg_eg: 0,
         }
     }
 }
@@ -90,7 +92,7 @@ mod tests {
         FmOperator {
             detune: 4, multiple: 1, rate_scale: 0, attack_rate: 31,
             amp_mod: false, d1r: 4, d2r: 0, sustain_level: 1,
-            release_rate: 8, total_level: 5,
+            release_rate: 8, total_level: 5, ssg_eg: 0,
         }
     }
 

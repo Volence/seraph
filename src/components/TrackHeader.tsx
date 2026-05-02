@@ -47,6 +47,17 @@ export function TrackHeader({ track, selected, onUpdate, onClick }: TrackHeaderP
     ipc.reloadSequence();
   }
 
+  async function handleVolume(e: React.ChangeEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    const vol = parseInt(e.target.value);
+    await ipc.updateTrack(
+      track.id, track.name, track.channel, track.instrumentId,
+      track.muted, track.solo, vol, track.pan,
+    );
+    onUpdate();
+    ipc.reloadSequence();
+  }
+
   return (
     <div
       className={`${styles.header} ${selected ? styles.selected : ""}`}
@@ -71,6 +82,16 @@ export function TrackHeader({ track, selected, onUpdate, onClick }: TrackHeaderP
         >
           S
         </button>
+        <input
+          type="range"
+          className={styles.volumeSlider}
+          min={0}
+          max={127}
+          value={track.volume}
+          onChange={handleVolume}
+          onClick={(e) => e.stopPropagation()}
+          title={`Vol: ${track.volume}`}
+        />
       </div>
     </div>
   );

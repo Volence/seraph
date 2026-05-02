@@ -9,6 +9,18 @@ use std::sync::Arc;
 // Map each packed position to the YM2612 register slot offset.
 const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
 
+// Carrier operator mask per algorithm (packed index: 0=Op4, 1=Op3, 2=Op2, 3=Op1)
+const CARRIER_MASK: [[bool; 4]; 8] = [
+    [true,  false, false, false], // algo 0: Op4
+    [true,  false, false, false], // algo 1: Op4
+    [true,  false, false, false], // algo 2: Op4
+    [true,  false, false, false], // algo 3: Op4
+    [true,  false, true,  false], // algo 4: Op4, Op2
+    [true,  true,  true,  false], // algo 5: Op4, Op3, Op2
+    [true,  true,  true,  false], // algo 6: Op4, Op3, Op2
+    [true,  true,  true,  true],  // algo 7: all
+];
+
 pub struct Sequencer {
     snapshot: SequencerSnapshot,
     playing: bool,
@@ -148,9 +160,10 @@ impl Sequencer {
             self.channel_cursors[ch_idx] = new_cursor;
 
             let channel_type = self.snapshot.channels[ch_idx].channel_type.clone();
+            let volume = self.snapshot.channels[ch_idx].volume;
             for i in pending {
                 let event = self.snapshot.channels[ch_idx].events[i].clone();
-                self.process_event(ch_idx, &channel_type, &event, output);
+                self.process_event(ch_idx, &channel_type, volume, &event, output);
             }
         }
     }
@@ -159,6 +172,7 @@ impl Sequencer {
         &mut self,
         ch_idx: usize,
         channel_type: &ChannelType,
+        volume: u8,
         event: &SequencerEvent,
         output: &mut Vec<SequencerOutput>,
     ) {
@@ -170,13 +184,13 @@ impl Sequencer {
 
                 match channel_type {
                     ChannelType::Fm(hw_ch) => {
-                        self.program_fm(*hw_ch, *pitch, instrument, output);
+                        self.program_fm(*hw_ch, *pitch, volume, instrument, output);
                     }
                     ChannelType::Psg(hw_ch) => {
-                        self.program_psg(*hw_ch, *pitch, output);
+                        self.program_psg(*hw_ch, *pitch, volume, output);
                     }
                     ChannelType::PsgNoise => {
-                        self.program_psg_noise(output);
+                        self.program_psg_noise(volume, output);
                     }
                     ChannelType::Dac(_) => {
                         if let InstrumentData::DacSample { samples, sample_rate } = instrument {
@@ -196,32 +210,33 @@ impl Sequencer {
         }
     }
 
-    fn program_fm(&mut self, hw_ch: u8, pitch: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+    fn program_fm(&mut self, hw_ch: u8, pitch: u8, volume: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
         let (port_base, ch_offset) = if hw_ch < 3 { (0u32, hw_ch) } else { (2u32, hw_ch - 3) };
 
-        if let InstrumentData::FmPatch(patch) = instrument {
-            if self.last_fm_patch[hw_ch as usize] != *patch {
-                // Packed layout from fm_to_bytes (Flamedriver order: op4,op3,op2,op1):
-                //   [0..4]  DT/MUL   → 0x30
-                //   [4..8]  RS/AR    → 0x50
-                //   [8..12] AM/D1R   → 0x60
-                //   [12..16] D2R     → 0x70
-                //   [16..20] SL/RR   → 0x80
-                //   [20..24] TL      → 0x40 (bit 7 = carrier flag, strip it)
-                //   [24]    FB/ALG   → 0xB0
-                for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
-                    let slot = slot_off + ch_offset;
-                    self.fm_write(port_base, 0x30 + slot, patch[i], output);
-                    self.fm_write(port_base, 0x50 + slot, patch[4 + i], output);
-                    self.fm_write(port_base, 0x60 + slot, patch[8 + i], output);
-                    self.fm_write(port_base, 0x70 + slot, patch[12 + i], output);
-                    self.fm_write(port_base, 0x80 + slot, patch[16 + i], output);
-                    self.fm_write(port_base, 0x40 + slot, patch[20 + i] & 0x7F, output);
-                }
-                self.fm_write(port_base, 0xB0 + ch_offset, patch[24], output);
-                self.fm_write(port_base, 0xB4 + ch_offset, 0xC0, output);
-                self.last_fm_patch[hw_ch as usize] = *patch;
+        if let InstrumentData::FmPatch { bytes: patch, ssg_eg } = instrument {
+            let alg = (patch[24] & 0x07) as usize;
+            let carriers = &CARRIER_MASK[alg.min(7)];
+            let vol_offset = 127u16.saturating_sub(volume as u16);
+
+            for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
+                let slot = slot_off + ch_offset;
+                self.fm_write(port_base, 0x30 + slot, patch[i], output);
+                self.fm_write(port_base, 0x50 + slot, patch[4 + i], output);
+                self.fm_write(port_base, 0x60 + slot, patch[8 + i], output);
+                self.fm_write(port_base, 0x70 + slot, patch[12 + i], output);
+                self.fm_write(port_base, 0x80 + slot, patch[16 + i], output);
+                let raw_tl = (patch[20 + i] & 0x7F) as u16;
+                let tl = if carriers[i] {
+                    (raw_tl + vol_offset).min(127) as u8
+                } else {
+                    raw_tl as u8
+                };
+                self.fm_write(port_base, 0x40 + slot, tl, output);
+                self.fm_write(port_base, 0x90 + slot, ssg_eg[i], output);
             }
+            self.fm_write(port_base, 0xB0 + ch_offset, patch[24], output);
+            self.fm_write(port_base, 0xB4 + ch_offset, 0xC0, output);
+            self.last_fm_patch[hw_ch as usize] = *patch;
         }
 
         let (block, fnum) = midi_to_fm_freq(pitch);
@@ -235,18 +250,20 @@ impl Sequencer {
         output.push(SequencerOutput::FmWrite(FmRegisterWrite { port: 1, data: 0xF0 | ch_encoded }));
     }
 
-    fn program_psg(&self, hw_ch: u8, pitch: u8, output: &mut Vec<SequencerOutput>) {
+    fn program_psg(&self, hw_ch: u8, pitch: u8, volume: u8, output: &mut Vec<SequencerOutput>) {
         let period = midi_to_psg_period(pitch);
         let low_nibble = (period & 0x0F) as u8;
         let high_bits = ((period >> 4) & 0x3F) as u8;
+        let atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127) as u8;
         output.push(SequencerOutput::PsgWrite(0x80 | (hw_ch << 5) | low_nibble));
         output.push(SequencerOutput::PsgWrite(high_bits));
-        output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | 0x00));
+        output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | (atten & 0x0F)));
     }
 
-    fn program_psg_noise(&self, output: &mut Vec<SequencerOutput>) {
+    fn program_psg_noise(&self, volume: u8, output: &mut Vec<SequencerOutput>) {
+        let atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127) as u8;
         output.push(SequencerOutput::PsgWrite(0xE0 | 0x04));
-        output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | 0x00));
+        output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | (atten & 0x0F)));
     }
 
     fn key_off_channel(&self, _ch_idx: usize, channel_type: &ChannelType, output: &mut Vec<SequencerOutput>) {
@@ -303,13 +320,14 @@ mod tests {
             loop_end: None,
             channels: vec![ChannelSequence {
                 channel_type: ChannelType::Fm(0),
+                volume: 127,
                 events: vec![
                     SequencerEvent::NoteOn {
                         tick: 0,
                         pitch: 60,
                         velocity: 100,
                         duration_ticks: 480,
-                        instrument: InstrumentData::FmPatch([0; 25]),
+                        instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
                     },
                     SequencerEvent::NoteOff { tick: 480, pitch: 60 },
                 ],

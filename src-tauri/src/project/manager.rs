@@ -512,8 +512,10 @@ impl ProjectManager {
                 }
             }
 
+            let volume = tracks[0].volume;
             channels.push(ChannelSequence {
                 channel_type,
+                volume,
                 events,
                 overlaps,
             });
@@ -546,7 +548,13 @@ impl ProjectManager {
                 } else {
                     [0u8; 25]
                 };
-                Some(InstrumentData::FmPatch(bytes))
+                let ssg_eg = [
+                    inst.operators[3].ssg_eg,
+                    inst.operators[2].ssg_eg,
+                    inst.operators[1].ssg_eg,
+                    inst.operators[0].ssg_eg,
+                ];
+                Some(InstrumentData::FmPatch { bytes, ssg_eg })
             }
             ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
                 let inst = self.instruments.psg.iter().find(|i| &i.id == inst_id)?;

@@ -213,10 +213,10 @@ mod tests {
             algorithm: 4,
             feedback: 5,
             operators: [
-                FmOperator { detune: 1, multiple: 2, rate_scale: 0, attack_rate: 31, amp_mod: false, d1r: 5, d2r: 3, sustain_level: 2, release_rate: 8, total_level: 10 },
-                FmOperator { detune: 3, multiple: 4, rate_scale: 1, attack_rate: 28, amp_mod: true, d1r: 7, d2r: 5, sustain_level: 4, release_rate: 10, total_level: 20 },
-                FmOperator { detune: 5, multiple: 6, rate_scale: 2, attack_rate: 25, amp_mod: false, d1r: 9, d2r: 7, sustain_level: 6, release_rate: 12, total_level: 30 },
-                FmOperator { detune: 7, multiple: 8, rate_scale: 3, attack_rate: 22, amp_mod: true, d1r: 11, d2r: 9, sustain_level: 8, release_rate: 14, total_level: 40 },
+                FmOperator { detune: 1, multiple: 2, rate_scale: 0, attack_rate: 31, amp_mod: false, d1r: 5, d2r: 3, sustain_level: 2, release_rate: 8, total_level: 10, ssg_eg: 0 },
+                FmOperator { detune: 3, multiple: 4, rate_scale: 1, attack_rate: 28, amp_mod: true, d1r: 7, d2r: 5, sustain_level: 4, release_rate: 10, total_level: 20, ssg_eg: 0 },
+                FmOperator { detune: 5, multiple: 6, rate_scale: 2, attack_rate: 25, amp_mod: false, d1r: 9, d2r: 7, sustain_level: 6, release_rate: 12, total_level: 30, ssg_eg: 0 },
+                FmOperator { detune: 7, multiple: 8, rate_scale: 3, attack_rate: 22, amp_mod: true, d1r: 11, d2r: 9, sustain_level: 8, release_rate: 14, total_level: 40, ssg_eg: 0 },
             ],
             metadata: InstrumentMetadata::default(),
         }

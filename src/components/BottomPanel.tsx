@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SelectedInstrument, SelectedRegion } from "../types/model";
+import type { SelectedInstrument, SelectedRegion, SongMetadata } from "../types/model";
 import { FmEditor } from "./FmEditor";
 import { PsgEditor } from "./PsgEditor";
 import { DacEditor } from "./DacEditor";
@@ -10,9 +10,11 @@ interface BottomPanelProps {
   selectedInstrument: SelectedInstrument | null;
   selectedRegion: SelectedRegion | null;
   onCloseRegion: () => void;
+  playing: boolean;
+  projectMeta: SongMetadata;
 }
 
-export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion }: BottomPanelProps) {
+export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion, playing, projectMeta }: BottomPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   const showPianoRoll = selectedRegion !== null;
@@ -27,7 +29,7 @@ export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion 
       {!collapsed && (
         <div className={styles.editor}>
           {showPianoRoll ? (
-            <PianoRoll region={selectedRegion} onClose={onCloseRegion} />
+            <PianoRoll region={selectedRegion} onClose={onCloseRegion} playing={playing} projectMeta={projectMeta} />
           ) : (
             <>
               {!selectedInstrument && (

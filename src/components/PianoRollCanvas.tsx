@@ -17,6 +17,8 @@ interface PianoRollCanvasProps {
   onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
   onScrollTopChange: (scrollTop: number) => void;
+  playheadTick: number;
+  playing: boolean;
 }
 
 const EDGE_THRESHOLD = 6;
@@ -40,6 +42,8 @@ export function PianoRollCanvas({
   onAudition,
   onNoteResize,
   onScrollTopChange,
+  playheadTick,
+  playing,
 }: PianoRollCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,9 +105,32 @@ export function PianoRollCanvas({
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     }
-  }, [notes, minPitch, maxPitch, durationTicks, ticksPerPixel, rowHeight, gridSnapTicks, channelColor, selectedNotes, canvasWidth, canvasHeight, totalNotes]);
 
-  useEffect(() => { draw(); }, [draw]);
+    if (playheadTick >= 0 && playheadTick <= durationTicks) {
+      const px = playheadTick / ticksPerPixel;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, canvasHeight);
+      ctx.stroke();
+    }
+  }, [notes, minPitch, maxPitch, durationTicks, ticksPerPixel, rowHeight, gridSnapTicks, channelColor, selectedNotes, canvasWidth, canvasHeight, totalNotes, playheadTick]);
+
+  const animRef = useRef(0);
+  useEffect(() => {
+    function animate() {
+      draw();
+      if (playing) {
+        animRef.current = requestAnimationFrame(animate);
+      }
+    }
+    draw();
+    if (playing) {
+      animRef.current = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(animRef.current);
+  }, [draw, playing]);
 
   function findNoteAtPos(x: number, y: number): { index: number; nearEdge: boolean } | null {
     const clickRow = Math.floor(y / rowHeight);

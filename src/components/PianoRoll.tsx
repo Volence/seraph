@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Note, SelectedRegion } from "../types/model";
+import type { Note, SelectedRegion, SongMetadata } from "../types/model";
+import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { PianoRollKeys } from "./PianoRollKeys";
 import { PianoRollCanvas } from "./PianoRollCanvas";
 import { VelocityLane } from "./VelocityLane";
@@ -9,6 +10,8 @@ import styles from "./PianoRoll.module.css";
 interface PianoRollProps {
   region: SelectedRegion;
   onClose: () => void;
+  playing: boolean;
+  projectMeta: SongMetadata;
 }
 
 const GRID_OPTIONS: { label: string; divisor: number }[] = [
@@ -34,7 +37,7 @@ const PITCH_RANGES: Record<string, [number, number]> = {
   dac: [0, 0],
 };
 
-export function PianoRoll({ region, onClose }: PianoRollProps) {
+export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
@@ -45,6 +48,8 @@ export function PianoRoll({ region, onClose }: PianoRollProps) {
   const rowHeight = 14;
   const ticksPerPixel = region.durationTicks / 800;
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
+  const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
+  const playheadTick = playing ? interpolatedTick - region.startTick : -1;
 
   const refresh = useCallback(async () => {
     const tracks = await ipc.listTracks();
@@ -153,6 +158,8 @@ export function PianoRoll({ region, onClose }: PianoRollProps) {
           onAudition={handleAudition}
           onNoteResize={handleNoteResize}
           onScrollTopChange={setScrollTop}
+          playheadTick={playheadTick}
+          playing={playing}
         />
       </div>
       <VelocityLane

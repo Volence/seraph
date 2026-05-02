@@ -124,6 +124,8 @@ export default function App() {
           selectedInstrument={selectedInstrument}
           selectedRegion={selectedRegions[selectedRegions.length - 1] ?? null}
           onCloseRegion={() => setSelectedRegions([])}
+          playing={playing}
+          projectMeta={projectMeta!}
         />
       )}
       {showNewProject && (

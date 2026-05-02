@@ -4,6 +4,7 @@ mod driver;
 mod ipc;
 mod model;
 mod project;
+mod sequencer;
 mod sn76489;
 mod ym2612;
 

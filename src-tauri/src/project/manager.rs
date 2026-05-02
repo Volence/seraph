@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -7,6 +7,9 @@ use uuid::Uuid;
 use crate::model::driver::DriverRegistry;
 use crate::model::instrument::*;
 use crate::model::song::*;
+use crate::sequencer::{
+    SequencerSnapshot, ChannelSequence, ChannelType, SequencerEvent, InstrumentData, OverlapWarning,
+};
 
 pub struct ProjectManager {
     project_path: Option<PathBuf>,
@@ -355,6 +358,173 @@ impl ProjectManager {
         self.dac_pcm_cache.insert(id, Arc::new(pcm_data));
         self.dirty_instruments.insert(id);
     }
+
+    // --- Snapshot Builder ---
+
+    pub fn build_snapshot(&self) -> SequencerSnapshot {
+        let metadata = match &self.metadata {
+            Some(m) => m,
+            None => return SequencerSnapshot::empty(),
+        };
+
+        let any_solo = self.tracks.iter().any(|t| t.solo);
+
+        let mut channel_map: BTreeMap<String, Vec<&Track>> = BTreeMap::new();
+
+        for track in &self.tracks {
+            if track.muted {
+                continue;
+            }
+            if any_solo && !track.solo {
+                continue;
+            }
+            let key = match &track.channel {
+                ChannelAssignment::Fm(n) => format!("fm_{n}"),
+                ChannelAssignment::Psg(n) => format!("psg_{n}"),
+                ChannelAssignment::PsgNoise => "psg_noise".to_string(),
+                ChannelAssignment::Dac(n) => format!("dac_{n}"),
+            };
+            channel_map.entry(key).or_default().push(track);
+        }
+
+        let driver = self.driver_registry.get(metadata.driver_id.as_str());
+
+        let mut channels = Vec::new();
+        for (_key, tracks) in &channel_map {
+            let channel_type = match &tracks[0].channel {
+                ChannelAssignment::Fm(n) => ChannelType::Fm(*n),
+                ChannelAssignment::Psg(n) => ChannelType::Psg(*n),
+                ChannelAssignment::PsgNoise => ChannelType::PsgNoise,
+                ChannelAssignment::Dac(n) => ChannelType::Dac(*n),
+            };
+
+            let mut events: Vec<SequencerEvent> = Vec::new();
+            let mut overlap_sources: Vec<(u64, u64, String)> = Vec::new();
+
+            for track in tracks {
+                let inst_data = self.resolve_instrument_data(track, driver);
+                for region in &track.regions {
+                    for note in &region.notes {
+                        let abs_tick = region.start_tick + note.tick;
+                        let end_tick = abs_tick + note.duration_ticks;
+                        if let Some(ref data) = inst_data {
+                            events.push(SequencerEvent::NoteOn {
+                                tick: abs_tick,
+                                pitch: note.pitch,
+                                velocity: note.velocity,
+                                duration_ticks: note.duration_ticks,
+                                instrument: data.clone(),
+                            });
+                        }
+                        events.push(SequencerEvent::NoteOff {
+                            tick: end_tick,
+                            pitch: note.pitch,
+                        });
+                        overlap_sources.push((abs_tick, end_tick, track.id.to_string()));
+                    }
+                }
+            }
+
+            // NoteOff before NoteOn at same tick
+            events.sort_by(|a, b| {
+                let ta = a.tick();
+                let tb = b.tick();
+                if ta != tb {
+                    return ta.cmp(&tb);
+                }
+                let priority = |e: &SequencerEvent| -> u8 {
+                    match e {
+                        SequencerEvent::NoteOff { .. } => 0,
+                        SequencerEvent::NoteOn { .. } => 1,
+                    }
+                };
+                priority(a).cmp(&priority(b))
+            });
+
+            let mut overlaps = Vec::new();
+            overlap_sources.sort_by_key(|s| s.0);
+            for i in 0..overlap_sources.len() {
+                for j in (i + 1)..overlap_sources.len() {
+                    if overlap_sources[j].0 >= overlap_sources[i].1 {
+                        break;
+                    }
+                    let ch_name = match &channel_type {
+                        ChannelType::Fm(n) => format!("FM{}", n + 1),
+                        ChannelType::Psg(n) => format!("PSG{}", n + 1),
+                        ChannelType::PsgNoise => "PSG Noise".to_string(),
+                        ChannelType::Dac(n) => format!("DAC{}", n + 1),
+                    };
+                    overlaps.push(OverlapWarning {
+                        channel_name: ch_name,
+                        tick_start: overlap_sources[j].0,
+                        tick_end: overlap_sources[i].1.min(overlap_sources[j].1),
+                        track_ids: vec![
+                            overlap_sources[i].2.clone(),
+                            overlap_sources[j].2.clone(),
+                        ],
+                    });
+                }
+            }
+
+            channels.push(ChannelSequence {
+                channel_type,
+                events,
+                overlaps,
+            });
+        }
+
+        SequencerSnapshot {
+            tempo_bpm: metadata.tempo,
+            ticks_per_beat: metadata.ticks_per_beat,
+            loop_start: None,
+            loop_end: None,
+            channels,
+        }
+    }
+
+    fn resolve_instrument_data(
+        &self,
+        track: &Track,
+        driver: Option<&dyn crate::model::driver::DriverProfile>,
+    ) -> Option<InstrumentData> {
+        let inst_id = track.instrument_id.as_ref()?;
+        match &track.channel {
+            ChannelAssignment::Fm(_) => {
+                let inst = self.instruments.fm.iter().find(|i| &i.id == inst_id)?;
+                let bytes: [u8; 25] = if let Some(drv) = driver {
+                    let vec = drv.fm_to_bytes(inst);
+                    let mut arr = [0u8; 25];
+                    let len = vec.len().min(25);
+                    arr[..len].copy_from_slice(&vec[..len]);
+                    arr
+                } else {
+                    [0u8; 25]
+                };
+                Some(InstrumentData::FmPatch(bytes))
+            }
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
+                let inst = self.instruments.psg.iter().find(|i| &i.id == inst_id)?;
+                Some(InstrumentData::PsgEnvelope {
+                    period: 0,
+                    envelope: Arc::new(inst.volume_sequence.clone()),
+                    loop_point: inst.loop_point,
+                })
+            }
+            ChannelAssignment::Dac(_) => {
+                let inst = self.instruments.dac.iter().find(|i| &i.id == inst_id)?;
+                let pcm = self.dac_pcm_cache.get(inst_id)?;
+                Some(InstrumentData::DacSample {
+                    samples: pcm.clone(),
+                    sample_rate: inst.target_sample_rate,
+                })
+            }
+        }
+    }
+
+    pub fn get_all_overlaps(&self) -> Vec<OverlapWarning> {
+        let snapshot = self.build_snapshot();
+        snapshot.channels.into_iter().flat_map(|ch| ch.overlaps).collect()
+    }
 }
 
 #[cfg(test)]
@@ -518,6 +688,218 @@ mod tests {
         assert_eq!(cached.as_ref(), &pcm_data);
 
         assert!(mgr.get_dac_pcm(&Uuid::new_v4()).is_none());
+
+        cleanup(&path);
+    }
+
+    // --- Snapshot builder tests ---
+
+    #[test]
+    fn test_build_snapshot_empty_project() {
+        let path = temp_project_path("snap_empty");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Empty", "flamedriver", 140.0, (4, 4)).unwrap();
+
+        let snap = mgr.build_snapshot();
+        assert_eq!(snap.tempo_bpm, 140.0);
+        assert_eq!(snap.ticks_per_beat, 480);
+        assert!(snap.channels.is_empty());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_build_snapshot_skips_muted_tracks() {
+        let path = temp_project_path("snap_mute");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Mute Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let fm_inst = FmInstrument {
+            id: Uuid::nil(),
+            name: "Test".into(),
+            algorithm: 0,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        let fm_id = mgr.add_fm_instrument(fm_inst);
+
+        mgr.tracks.push(Track {
+            id: Uuid::new_v4(),
+            name: "FM1".into(),
+            channel: ChannelAssignment::Fm(0),
+            instrument_id: Some(fm_id),
+            regions: vec![Region {
+                id: Uuid::new_v4(),
+                start_tick: 0,
+                duration_ticks: 480,
+                notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 }],
+            }],
+            muted: true,
+            solo: false,
+            volume: 100,
+            pan: Pan::Center,
+        });
+
+        let snap = mgr.build_snapshot();
+        assert!(snap.channels.is_empty(), "muted track should be excluded");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_build_snapshot_solo_filters() {
+        let path = temp_project_path("snap_solo");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Solo Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let fm_inst = FmInstrument {
+            id: Uuid::nil(),
+            name: "Test".into(),
+            algorithm: 0,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        let fm_id = mgr.add_fm_instrument(fm_inst);
+
+        let note = Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 };
+        let region = Region {
+            id: Uuid::new_v4(),
+            start_tick: 0,
+            duration_ticks: 480,
+            notes: vec![note.clone()],
+        };
+
+        mgr.tracks.push(Track {
+            id: Uuid::new_v4(),
+            name: "FM1-Solo".into(),
+            channel: ChannelAssignment::Fm(0),
+            instrument_id: Some(fm_id),
+            regions: vec![region.clone()],
+            muted: false,
+            solo: true,
+            volume: 100,
+            pan: Pan::Center,
+        });
+        mgr.tracks.push(Track {
+            id: Uuid::new_v4(),
+            name: "FM2-NotSolo".into(),
+            channel: ChannelAssignment::Fm(1),
+            instrument_id: Some(fm_id),
+            regions: vec![Region {
+                id: Uuid::new_v4(),
+                start_tick: 0,
+                duration_ticks: 480,
+                notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 }],
+            }],
+            muted: false,
+            solo: false,
+            volume: 100,
+            pan: Pan::Center,
+        });
+
+        let snap = mgr.build_snapshot();
+        assert_eq!(snap.channels.len(), 1, "only solo'd track should appear");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_build_snapshot_detects_overlaps() {
+        let path = temp_project_path("snap_overlap");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Overlap Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let fm_inst = FmInstrument {
+            id: Uuid::nil(),
+            name: "Test".into(),
+            algorithm: 0,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        let fm_id = mgr.add_fm_instrument(fm_inst);
+
+        mgr.tracks.push(Track {
+            id: Uuid::new_v4(),
+            name: "FM1-A".into(),
+            channel: ChannelAssignment::Fm(0),
+            instrument_id: Some(fm_id),
+            regions: vec![Region {
+                id: Uuid::new_v4(),
+                start_tick: 0,
+                duration_ticks: 960,
+                notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480 }],
+            }],
+            muted: false,
+            solo: false,
+            volume: 100,
+            pan: Pan::Center,
+        });
+        mgr.tracks.push(Track {
+            id: Uuid::new_v4(),
+            name: "FM1-B".into(),
+            channel: ChannelAssignment::Fm(0),
+            instrument_id: Some(fm_id),
+            regions: vec![Region {
+                id: Uuid::new_v4(),
+                start_tick: 0,
+                duration_ticks: 960,
+                notes: vec![Note { tick: 240, pitch: 64, velocity: 100, duration_ticks: 480 }],
+            }],
+            muted: false,
+            solo: false,
+            volume: 100,
+            pan: Pan::Center,
+        });
+
+        let snap = mgr.build_snapshot();
+        assert_eq!(snap.channels.len(), 1);
+        assert!(!snap.channels[0].overlaps.is_empty(), "should detect overlap");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_build_snapshot_events_sorted() {
+        let path = temp_project_path("snap_sorted");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Sort Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let fm_inst = FmInstrument {
+            id: Uuid::nil(),
+            name: "Test".into(),
+            algorithm: 0,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        let fm_id = mgr.add_fm_instrument(fm_inst);
+
+        mgr.tracks.push(Track {
+            id: Uuid::new_v4(),
+            name: "FM1".into(),
+            channel: ChannelAssignment::Fm(0),
+            instrument_id: Some(fm_id),
+            regions: vec![Region {
+                id: Uuid::new_v4(),
+                start_tick: 0,
+                duration_ticks: 1920,
+                notes: vec![
+                    Note { tick: 480, pitch: 60, velocity: 100, duration_ticks: 240 },
+                    Note { tick: 0, pitch: 48, velocity: 100, duration_ticks: 480 },
+                ],
+            }],
+            muted: false,
+            solo: false,
+            volume: 100,
+            pan: Pan::Center,
+        });
+
+        let snap = mgr.build_snapshot();
+        let ticks: Vec<u64> = snap.channels[0].events.iter().map(|e| e.tick()).collect();
+        assert!(ticks.windows(2).all(|w| w[0] <= w[1]), "events should be sorted by tick");
 
         cleanup(&path);
     }

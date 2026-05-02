@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::path::Path;
 use serde::Serialize;
-use super::instrument::{DacInstrument, FmInstrument, PsgInstrument};
+use super::instrument::{DacInstrument, FmInstrument, InstrumentBank, PsgInstrument};
+use super::song::Song;
+use crate::export::{ExportResult, ExportError};
 
 pub trait DriverProfile: Send + Sync {
     fn name(&self) -> &str;
@@ -14,6 +17,12 @@ pub trait DriverProfile: Send + Sync {
     fn fm_from_bytes(&self, bytes: &[u8]) -> Result<FmInstrument, String>;
     fn import_formats(&self) -> Vec<&str>;
     fn export_formats(&self) -> Vec<&str>;
+    fn export_song(
+        &self,
+        song: &Song,
+        instruments: &InstrumentBank,
+        output_dir: &Path,
+    ) -> Result<ExportResult, Vec<ExportError>>;
 }
 
 #[derive(Debug, Clone, Serialize)]

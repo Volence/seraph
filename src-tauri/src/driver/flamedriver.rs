@@ -1,5 +1,8 @@
+use std::path::Path;
+use crate::export::{ExportResult, ExportError};
 use crate::model::driver::*;
 use crate::model::instrument::*;
+use crate::model::song::Song;
 use uuid::Uuid;
 
 pub struct FlamedriverProfile;
@@ -187,6 +190,20 @@ impl DriverProfile for FlamedriverProfile {
 
     fn export_formats(&self) -> Vec<&str> {
         vec!["smps2asm", "binary"]
+    }
+
+    fn export_song(
+        &self,
+        _song: &Song,
+        _instruments: &InstrumentBank,
+        _output_dir: &Path,
+    ) -> Result<ExportResult, Vec<ExportError>> {
+        Err(vec![ExportError {
+            track_name: String::new(),
+            region_index: None,
+            note_index: None,
+            message: "Export not yet implemented".into(),
+        }])
     }
 }
 

@@ -21,6 +21,9 @@ export function InstrumentBrowser({ onSelect, selectedInstrument }: InstrumentBr
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number; type: "fm" | "psg" | "dac"; id: string;
   } | null>(null);
+  const [renaming, setRenaming] = useState<{
+    type: "fm" | "psg" | "dac"; id: string; name: string;
+  } | null>(null);
 
   const refreshAll = useCallback(async () => {
     const [fm, psg, dac] = await Promise.all([
@@ -103,25 +106,29 @@ export function InstrumentBrowser({ onSelect, selectedInstrument }: InstrumentBr
     setContextMenu({ x: e.clientX, y: e.clientY, type, id });
   }
 
-  async function handleRename(type: "fm" | "psg" | "dac", id: string) {
+  function handleRename(type: "fm" | "psg" | "dac", id: string) {
     setContextMenu(null);
     const currentName =
       type === "fm" ? fmList.find((i) => i.id === id)?.name :
       type === "psg" ? psgList.find((i) => i.id === id)?.name :
       dacList.find((i) => i.id === id)?.name;
-    const newName = window.prompt("Rename instrument:", currentName ?? "");
-    if (!newName || newName === currentName) return;
+    setRenaming({ type, id, name: currentName ?? "" });
+  }
 
+  async function commitRename() {
+    if (!renaming || !renaming.name.trim()) { setRenaming(null); return; }
+    const { type, id, name } = renaming;
     if (type === "fm") {
       const inst = fmList.find((i) => i.id === id);
-      if (inst) await ipc.updateFmInstrument(id, { ...inst, name: newName });
+      if (inst) await ipc.updateFmInstrument(id, { ...inst, name });
     } else if (type === "psg") {
       const inst = psgList.find((i) => i.id === id);
-      if (inst) await ipc.updatePsgInstrument(id, { ...inst, name: newName });
+      if (inst) await ipc.updatePsgInstrument(id, { ...inst, name });
     } else {
       const inst = dacList.find((i) => i.id === id);
-      if (inst) await ipc.updateDacInstrument(id, { ...inst, name: newName });
+      if (inst) await ipc.updateDacInstrument(id, { ...inst, name });
     }
+    setRenaming(null);
     await refreshAll();
   }
 
@@ -234,6 +241,25 @@ export function InstrumentBrowser({ onSelect, selectedInstrument }: InstrumentBr
             <button className={styles.menuItem} onClick={() => handleDuplicate(contextMenu.type, contextMenu.id)}>Duplicate</button>
           )}
           <button className={`${styles.menuItem} ${styles.danger}`} onClick={() => handleDelete(contextMenu.type, contextMenu.id)}>Delete</button>
+        </div>
+      )}
+
+      {renaming && (
+        <div className={styles.renameOverlay} onClick={() => setRenaming(null)}>
+          <div className={styles.renameDialog} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.renameTitle}>Rename Instrument</h3>
+            <input
+              className={styles.renameInput}
+              value={renaming.name}
+              onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && commitRename()}
+              autoFocus
+            />
+            <div className={styles.renameButtons}>
+              <button className={styles.renameCancelBtn} onClick={() => setRenaming(null)}>Cancel</button>
+              <button className={styles.renameOkBtn} onClick={commitRename}>Rename</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

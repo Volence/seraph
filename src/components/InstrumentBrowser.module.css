@@ -121,3 +121,75 @@
 .menuItem.danger {
   color: var(--error);
 }
+
+.renameOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.renameDialog {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  width: 340px;
+  max-width: 90vw;
+}
+
+.renameTitle {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.renameInput {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.renameInput:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+
+.renameButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.renameCancelBtn {
+  padding: 6px 14px;
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.renameCancelBtn:hover {
+  color: var(--text-primary);
+}
+
+.renameOkBtn {
+  padding: 6px 16px;
+  background: var(--accent-fm);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.renameOkBtn:hover {
+  opacity: 0.9;
+}

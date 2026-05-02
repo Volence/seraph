@@ -1,0 +1,33 @@
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+
+.track:hover {
+  background: var(--bg-surface);
+}
+
+.badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.fm { background: var(--accent-fm); color: #000; }
+.psg { background: var(--accent-psg); color: #000; }
+.dac { background: var(--accent-dac); color: #000; }
+
+.name {
+  font-size: 12px;
+}

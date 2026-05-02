@@ -1,0 +1,123 @@
+.browser {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.sectionHeader:hover {
+  color: var(--text-primary);
+}
+
+.sectionTitle {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.count {
+  color: var(--text-secondary);
+  font-size: 10px;
+  margin-left: auto;
+}
+
+.addBtn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.addBtn:hover {
+  background: var(--border);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 20px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.item:hover {
+  background: var(--bg-surface);
+}
+
+.item.selected {
+  background: var(--bg-surface);
+  border-left: 2px solid var(--accent-fm);
+  padding-left: 18px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fmDot { background: var(--accent-fm); }
+.psgDot { background: var(--accent-psg); }
+.dacDot { background: var(--accent-dac); }
+
+.itemName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contextMenu {
+  position: fixed;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 0;
+  z-index: 200;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  color: var(--text-primary);
+  border: none;
+  text-align: left;
+  font-size: 12px;
+}
+
+.menuItem:hover {
+  background: var(--bg-surface);
+}
+
+.menuItem.danger {
+  color: var(--error);
+}

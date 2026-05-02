@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { SongMetadata, SelectedInstrument } from "../types/model";
+import { TrackList } from "./TrackList";
+import { InstrumentBrowser } from "./InstrumentBrowser";
 import styles from "./Sidebar.module.css";
 
 interface SidebarProps {
@@ -8,7 +10,7 @@ interface SidebarProps {
   onSelectInstrument: (inst: SelectedInstrument | null) => void;
 }
 
-export function Sidebar({ projectMeta: _projectMeta, selectedInstrument: _selectedInstrument, onSelectInstrument: _onSelectInstrument }: SidebarProps) {
+export function Sidebar({ projectMeta, selectedInstrument, onSelectInstrument }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<"tracks" | "instruments">("instruments");
 
   return (
@@ -28,11 +30,12 @@ export function Sidebar({ projectMeta: _projectMeta, selectedInstrument: _select
         </button>
       </div>
       <div className={styles.content}>
-        {activeTab === "tracks" && (
-          <p className={styles.placeholder}>Track list — Task 6</p>
-        )}
+        {activeTab === "tracks" && <TrackList driverId={projectMeta.driverId} />}
         {activeTab === "instruments" && (
-          <p className={styles.placeholder}>Instrument browser — Task 6</p>
+          <InstrumentBrowser
+            onSelect={onSelectInstrument}
+            selectedInstrument={selectedInstrument}
+          />
         )}
       </div>
     </div>

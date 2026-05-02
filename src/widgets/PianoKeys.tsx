@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./PianoKeys.module.css";
 
 interface PianoKeysProps {
   onNoteOn: (midiNote: number) => void;
+  onNoteOff?: () => void;
 }
 
 const WHITE_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 const BLACK_SEMITONES = [1, 3, 6, 8, 10];
 const BLACK_POSITIONS = [0, 1, 3, 4, 5];
 
-export function PianoKeys({ onNoteOn }: PianoKeysProps) {
+export function PianoKeys({ onNoteOn, onNoteOff }: PianoKeysProps) {
   const [octave, setOctave] = useState(4);
   const [activeKey, setActiveKey] = useState<number | null>(null);
+  const [held, setHeld] = useState(false);
 
   function handleKey(semitone: number, e: React.MouseEvent) {
     let oct = octave;
@@ -20,8 +22,19 @@ export function PianoKeys({ onNoteOn }: PianoKeysProps) {
     const midiNote = Math.max(0, Math.min(127, (oct + 1) * 12 + semitone));
     onNoteOn(midiNote);
     setActiveKey(semitone);
-    setTimeout(() => setActiveKey(null), 150);
+    setHeld(true);
   }
+
+  useEffect(() => {
+    if (!held) return;
+    function handleUp() {
+      setHeld(false);
+      setActiveKey(null);
+      onNoteOff?.();
+    }
+    window.addEventListener("mouseup", handleUp);
+    return () => window.removeEventListener("mouseup", handleUp);
+  }, [held, onNoteOff]);
 
   return (
     <div className={styles.container}>

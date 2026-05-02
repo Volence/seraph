@@ -22,7 +22,7 @@ use ipc::{
     list_drivers, get_driver_info,
     // FM instruments
     add_fm_instrument, update_fm_instrument, delete_fm_instrument,
-    list_fm_instruments, preview_fm_instrument,
+    list_fm_instruments, preview_fm_instrument, stop_fm_preview,
     // PSG instruments
     add_psg_instrument, update_psg_instrument, delete_psg_instrument,
     list_psg_instruments, preview_psg_instrument,
@@ -90,6 +90,7 @@ pub fn run() {
             delete_fm_instrument,
             list_fm_instruments,
             preview_fm_instrument,
+            stop_fm_preview,
             add_psg_instrument,
             update_psg_instrument,
             delete_psg_instrument,

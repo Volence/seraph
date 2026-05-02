@@ -37,9 +37,9 @@ pub struct FmOperator {
 impl Default for FmOperator {
     fn default() -> Self {
         Self {
-            detune: 0, multiple: 0, rate_scale: 0, attack_rate: 0,
+            detune: 0, multiple: 1, rate_scale: 0, attack_rate: 31,
             amp_mod: false, d1r: 0, d2r: 0, sustain_level: 0,
-            release_rate: 0, total_level: 127,
+            release_rate: 15, total_level: 127,
         }
     }
 }

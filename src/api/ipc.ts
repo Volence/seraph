@@ -81,6 +81,10 @@ export async function previewFmInstrument(id: string, midiNote: number): Promise
   return invoke("preview_fm_instrument", { id, midiNote });
 }
 
+export async function stopFmPreview(): Promise<void> {
+  return invoke("stop_fm_preview");
+}
+
 export async function addPsgInstrument(instrument: PsgInstrument): Promise<string> {
   return invoke<string>("add_psg_instrument", { instrument });
 }

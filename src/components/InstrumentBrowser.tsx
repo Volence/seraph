@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import type {
   FmInstrument, PsgInstrument, DacInstrument,
-  SelectedInstrument, FmOperator,
+  SelectedInstrument,
 } from "../types/model";
+import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER } from "../types/model";
 import * as ipc from "../api/ipc";
 import styles from "./InstrumentBrowser.module.css";
 
@@ -45,19 +46,13 @@ export function InstrumentBrowser({ onSelect, selectedInstrument }: InstrumentBr
     return () => window.removeEventListener("click", close);
   }, [contextMenu]);
 
-  const defaultOp: FmOperator = {
-    detune: 0, multiple: 0, rateScale: 0, attackRate: 0,
-    ampMod: false, d1r: 0, d2r: 0, sustainLevel: 0,
-    releaseRate: 0, totalLevel: 127,
-  };
-
   async function addFm() {
     const inst: FmInstrument = {
       id: "00000000-0000-0000-0000-000000000000",
       name: "New FM Patch",
       algorithm: 0,
       feedback: 0,
-      operators: [defaultOp, defaultOp, defaultOp, defaultOp],
+      operators: [DEFAULT_FM_MODULATOR, DEFAULT_FM_MODULATOR, DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER],
       metadata: { category: "", author: "", tags: [] },
     };
     const id = await ipc.addFmInstrument(inst);

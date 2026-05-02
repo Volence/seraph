@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Note, SelectedRegion, SongMetadata } from "../types/model";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { PianoRollKeys } from "./PianoRollKeys";
@@ -62,8 +62,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  async function handleNoteAdd(tick: number, pitch: number) {
-    await ipc.addNote(region.trackId, region.regionId, tick, pitch, 100, gridSnapTicks);
+  async function handleNoteAdd(tick: number, pitch: number, duration: number) {
+    await ipc.addNote(region.trackId, region.regionId, tick, pitch, 100, duration);
     refresh();
   }
 
@@ -102,12 +102,16 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedNotes, region.trackId, region.regionId, refresh]);
 
+  const fmPreviewTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>);
+
   async function handleAudition(pitch: number) {
     const tracks = await ipc.listTracks();
     const track = tracks.find((t) => t.id === region.trackId);
     if (!track?.instrumentId) return;
     if (region.channelType === "fm") {
+      clearTimeout(fmPreviewTimer.current);
       await ipc.previewFmInstrument(track.instrumentId, pitch);
+      fmPreviewTimer.current = setTimeout(() => { ipc.stopFmPreview(); }, 500);
     } else if (region.channelType === "psg") {
       await ipc.previewPsgInstrument(track.instrumentId, pitch);
     } else {

@@ -95,7 +95,10 @@ export function FmEditor({ instrumentId }: FmEditorProps) {
       ))}
 
       <div className={styles.previewSection}>
-        <PianoKeys onNoteOn={(note) => ipc.previewFmInstrument(instrumentId, note)} />
+        <PianoKeys
+          onNoteOn={(note) => ipc.previewFmInstrument(instrumentId, note)}
+          onNoteOff={() => ipc.stopFmPreview()}
+        />
       </div>
     </div>
   );

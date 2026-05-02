@@ -13,7 +13,7 @@ interface PianoRollCanvasProps {
   channelColor: string;
   selectedNotes: Set<number>;
   onNoteClick: (index: number) => void;
-  onNoteAdd: (tick: number, pitch: number) => void;
+  onNoteAdd: (tick: number, pitch: number, durationTicks: number) => void;
   onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
   onScrollTopChange: (scrollTop: number) => void;
@@ -48,6 +48,8 @@ export function PianoRollCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ noteIndex: number; startX: number; origDuration: number } | null>(null);
+  const drawingRef = useRef<{ startTick: number; pitch: number; endTick: number } | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
 
   const totalNotes = maxPitch - minPitch + 1;
   const canvasWidth = durationTicks / ticksPerPixel;
@@ -104,6 +106,23 @@ export function PianoRollCanvas({
       ctx.strokeStyle = selected ? "#ffffff" : channelColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+
+    const dr = drawingRef.current;
+    if (dr) {
+      const x = dr.startTick / ticksPerPixel;
+      const dur = Math.max(gridSnapTicks, dr.endTick - dr.startTick);
+      const w = Math.max(2, dur / ticksPerPixel);
+      const row = maxPitch - dr.pitch;
+      const y = row * rowHeight + 1;
+      const h = rowHeight - 2;
+      ctx.fillStyle = channelColor + "88";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = channelColor;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      ctx.setLineDash([]);
     }
 
     if (playheadTick >= 0 && playheadTick <= durationTicks) {
@@ -174,10 +193,51 @@ export function PianoRollCanvas({
     const clickPitch = maxPitch - clickRow;
     const snapped = Math.floor(clickTick / gridSnapTicks) * gridSnapTicks;
     if (clickPitch >= minPitch && clickPitch <= maxPitch) {
-      onNoteAdd(snapped, clickPitch);
+      e.preventDefault();
+      drawingRef.current = { startTick: snapped, pitch: clickPitch, endTick: snapped + gridSnapTicks };
+      setIsDrawing(true);
       onAudition(clickPitch);
     }
   }
+
+  useEffect(() => {
+    if (!isDrawing) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const canvas = canvasRef.current;
+      if (!canvas || !drawingRef.current) return;
+      canvas.style.cursor = "crosshair";
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const rawEndTick = x * ticksPerPixel;
+      const snappedEnd = Math.ceil(rawEndTick / gridSnapTicks) * gridSnapTicks;
+      drawingRef.current.endTick = Math.max(
+        drawingRef.current.startTick + gridSnapTicks,
+        snappedEnd,
+      );
+      draw();
+    }
+
+    function handleMouseUp() {
+      const dr = drawingRef.current;
+      if (dr) {
+        const duration = Math.max(gridSnapTicks, dr.endTick - dr.startTick);
+        onNoteAdd(dr.startTick, dr.pitch, duration);
+      }
+      drawingRef.current = null;
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = "";
+      draw();
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDrawing, ticksPerPixel, gridSnapTicks, onNoteAdd, draw]);
 
   useEffect(() => {
     if (!drag) return;
@@ -211,7 +271,7 @@ export function PianoRollCanvas({
   }, [drag, ticksPerPixel, gridSnapTicks, onNoteResize]);
 
   function handleMouseMove(e: React.MouseEvent) {
-    if (drag) return;
+    if (drag || isDrawing) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();

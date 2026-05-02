@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Track, SongMetadata, SelectedRegion, SelectedInstrument, FmOperator } from "../types/model";
+import type { Track, SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
+import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { TrackHeader } from "./TrackHeader";
@@ -17,11 +18,8 @@ interface ArrangementViewProps {
   selectedInstrument: SelectedInstrument | null;
 }
 
-const defaultOp: FmOperator = {
-  detune: 0, multiple: 0, rateScale: 0, attackRate: 0,
-  ampMod: false, d1r: 0, d2r: 0, sustainLevel: 0,
-  releaseRate: 0, totalLevel: 127,
-};
+const M = DEFAULT_FM_MODULATOR;
+const C = DEFAULT_FM_CARRIER;
 
 function channelType(track: Track): "fm" | "psg" | "dac" {
   const ch = track.channel;
@@ -126,7 +124,7 @@ export function ArrangementView({
       name: "New FM Patch",
       algorithm: 0,
       feedback: 0,
-      operators: [defaultOp, defaultOp, defaultOp, defaultOp],
+      operators: [M, M, M, C],
       metadata: { category: "", author: "", tags: [] },
     });
     refresh();

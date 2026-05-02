@@ -143,17 +143,30 @@ export type SelectedInstrument =
   | { type: "psg"; id: string }
   | { type: "dac"; id: string };
 
-export const DEFAULT_FM_OPERATOR: FmOperator = {
+export const DEFAULT_FM_MODULATOR: FmOperator = {
   detune: 0,
-  multiple: 0,
+  multiple: 1,
   rateScale: 0,
-  attackRate: 0,
+  attackRate: 31,
   ampMod: false,
   d1r: 0,
   d2r: 0,
   sustainLevel: 0,
-  releaseRate: 0,
+  releaseRate: 15,
   totalLevel: 127,
+};
+
+export const DEFAULT_FM_CARRIER: FmOperator = {
+  detune: 0,
+  multiple: 1,
+  rateScale: 0,
+  attackRate: 31,
+  ampMod: false,
+  d1r: 0,
+  d2r: 0,
+  sustainLevel: 0,
+  releaseRate: 7,
+  totalLevel: 20,
 };
 
 export const DEFAULT_METADATA: InstrumentMetadata = {

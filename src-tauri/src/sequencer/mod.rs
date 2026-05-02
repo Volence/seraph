@@ -5,7 +5,9 @@ pub use snapshot::*;
 use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
 use std::sync::Arc;
 
-const OP_REG_OFFSETS: [u8; 4] = [0x00, 0x08, 0x04, 0x0C];
+// Flamedriver packs operators in order: op4, op3, op2, op1.
+// Map each packed position to the YM2612 register slot offset.
+const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
 
 pub struct Sequencer {
     snapshot: SequencerSnapshot,
@@ -185,14 +187,22 @@ impl Sequencer {
 
         if let InstrumentData::FmPatch(patch) = instrument {
             if self.last_fm_patch[hw_ch as usize] != *patch {
-                for (op_idx, &reg_off) in OP_REG_OFFSETS.iter().enumerate() {
-                    let slot = reg_off + ch_offset;
-                    self.fm_write(port_base, 0x30 + slot, patch[op_idx], output);
-                    self.fm_write(port_base, 0x40 + slot, patch[4 + op_idx], output);
-                    self.fm_write(port_base, 0x50 + slot, patch[8 + op_idx], output);
-                    self.fm_write(port_base, 0x60 + slot, patch[12 + op_idx], output);
-                    self.fm_write(port_base, 0x70 + slot, patch[16 + op_idx], output);
-                    self.fm_write(port_base, 0x80 + slot, patch[20 + op_idx], output);
+                // Packed layout from fm_to_bytes (Flamedriver order: op4,op3,op2,op1):
+                //   [0..4]  DT/MUL   → 0x30
+                //   [4..8]  RS/AR    → 0x50
+                //   [8..12] AM/D1R   → 0x60
+                //   [12..16] D2R     → 0x70
+                //   [16..20] SL/RR   → 0x80
+                //   [20..24] TL      → 0x40 (bit 7 = carrier flag, strip it)
+                //   [24]    FB/ALG   → 0xB0
+                for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
+                    let slot = slot_off + ch_offset;
+                    self.fm_write(port_base, 0x30 + slot, patch[i], output);
+                    self.fm_write(port_base, 0x50 + slot, patch[4 + i], output);
+                    self.fm_write(port_base, 0x60 + slot, patch[8 + i], output);
+                    self.fm_write(port_base, 0x70 + slot, patch[12 + i], output);
+                    self.fm_write(port_base, 0x80 + slot, patch[16 + i], output);
+                    self.fm_write(port_base, 0x40 + slot, patch[20 + i] & 0x7F, output);
                 }
                 self.fm_write(port_base, 0xB0 + ch_offset, patch[24], output);
                 self.fm_write(port_base, 0xB4 + ch_offset, 0xC0, output);

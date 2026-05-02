@@ -349,6 +349,15 @@ pub fn preview_fm_instrument(
     Ok(())
 }
 
+#[tauri::command]
+pub fn stop_fm_preview(
+    audio_state: State<'_, AudioState>,
+) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::FmKeyOff { channel: 0 });
+    Ok(())
+}
+
 // --- PSG Instrument CRUD ---
 
 #[tauri::command]

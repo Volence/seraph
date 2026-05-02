@@ -201,13 +201,23 @@ export function TimelineCanvas({
           ctx.strokeRect(rx + 1, y + 1, rrw - 2, rh - 2);
         }
 
-        if (ticksPerPixel < 4 && region.notes.length > 0) {
-          ctx.fillStyle = color + "88";
+        if (region.notes.length > 0) {
+          let lo = 127, hi = 0;
+          for (const note of region.notes) {
+            if (note.pitch < lo) lo = note.pitch;
+            if (note.pitch > hi) hi = note.pitch;
+          }
+          const span = Math.max(hi - lo, 1);
+          const pad = 3;
+          const innerH = rh - pad * 2;
+          const noteH = Math.max(1, Math.min(3, Math.floor(innerH / (span + 1))));
+          ctx.fillStyle = color + "bb";
           for (const note of region.notes) {
             const nx = rx + note.tick / ticksPerPixel;
             const nw = Math.max(1, note.durationTicks / ticksPerPixel);
-            const noteY = y + rh - ((note.pitch - 24) / 96) * rh;
-            ctx.fillRect(nx, noteY, nw, 2);
+            const pct = span > 0 ? (note.pitch - lo) / span : 0.5;
+            const noteY = y + pad + innerH - pct * (innerH - noteH);
+            ctx.fillRect(nx, noteY, nw, noteH);
           }
         }
       }

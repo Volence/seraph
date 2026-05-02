@@ -1,0 +1,77 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.octBtn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.octLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 24px;
+  text-align: center;
+}
+
+.keyboard {
+  position: relative;
+  display: flex;
+  width: 140px;
+  height: 60px;
+}
+
+.whiteKey {
+  flex: 1;
+  background: #eee;
+  border: 1px solid #999;
+  border-radius: 0 0 3px 3px;
+  cursor: pointer;
+}
+
+.whiteKey:hover {
+  background: #ddd;
+}
+
+.whiteKey.activeWhite {
+  background: var(--accent-fm);
+}
+
+.blackKey {
+  position: absolute;
+  width: 10%;
+  height: 58%;
+  background: #222;
+  border: 1px solid #111;
+  border-radius: 0 0 2px 2px;
+  cursor: pointer;
+  z-index: 1;
+  transform: translateX(-50%);
+}
+
+.blackKey:hover {
+  background: #444;
+}
+
+.blackKey.activeBlack {
+  background: var(--accent-fm);
+}

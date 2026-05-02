@@ -56,6 +56,20 @@ export function ArrangementView({
     return () => clearInterval(interval);
   }, [refresh]);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedRegion) {
+        e.preventDefault();
+        ipc.deleteRegion(selectedRegion.trackId, selectedRegion.regionId).then(() => {
+          onSelectRegion(null);
+          refresh();
+        });
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedRegion, onSelectRegion, refresh]);
+
   function handleRegionDoubleClick(trackId: string, regionId: string) {
     const track = tracks.find((t) => t.id === trackId);
     if (!track) return;

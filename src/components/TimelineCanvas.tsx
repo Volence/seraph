@@ -331,6 +331,12 @@ export function TimelineCanvas({
 
   useEffect(() => {
     if (!drag) return;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      if (drag.mode === "move") canvas.style.cursor = "grabbing";
+      else if (drag.mode === "resize-left" || drag.mode === "resize-right") canvas.style.cursor = "col-resize";
+      else canvas.style.cursor = "crosshair";
+    }
 
     function handleMouseMove(e: MouseEvent) {
       const canvas = canvasRef.current;

@@ -252,6 +252,100 @@ pub fn generate_voice_bank_asm(song_label: &str, voices: &[&FmInstrument], drive
     asm
 }
 
+// --- Validation ---
+
+use crate::model::song::Song;
+
+/// Validate the song for SMPS export. Returns a list of errors (empty = valid).
+pub fn validate_for_export(
+    song: &Song,
+    instruments: &InstrumentBank,
+    params: &SmpsTempoParams,
+) -> Vec<ExportError> {
+    let mut errors = Vec::new();
+
+    for track in &song.tracks {
+        if track.muted { continue; }
+
+        if track.instrument_id.is_none() {
+            errors.push(ExportError {
+                track_name: track.name.clone(),
+                region_index: None,
+                note_index: None,
+                message: "No instrument assigned".into(),
+            });
+            continue;
+        }
+
+        let inst_id = track.instrument_id.as_ref().unwrap();
+
+        let inst_exists = match &track.channel {
+            ChannelAssignment::Fm(_) => instruments.fm.iter().any(|i| &i.id == inst_id),
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => instruments.psg.iter().any(|i| &i.id == inst_id),
+            ChannelAssignment::Dac(_) => instruments.dac.iter().any(|i| &i.id == inst_id),
+        };
+        if !inst_exists {
+            errors.push(ExportError {
+                track_name: track.name.clone(),
+                region_index: None,
+                note_index: None,
+                message: "Assigned instrument not found".into(),
+            });
+            continue;
+        }
+
+        let has_notes = track.regions.iter().any(|r| !r.notes.is_empty());
+        if !has_notes {
+            errors.push(ExportError {
+                track_name: track.name.clone(),
+                region_index: None,
+                note_index: None,
+                message: "Track has no notes".into(),
+            });
+            continue;
+        }
+
+        let mut sorted_regions: Vec<&crate::model::song::Region> = track.regions.iter().collect();
+        sorted_regions.sort_by_key(|r| r.start_tick);
+        for w in sorted_regions.windows(2) {
+            let a_end = w[0].start_tick + w[0].duration_ticks;
+            if a_end > w[1].start_tick {
+                errors.push(ExportError {
+                    track_name: track.name.clone(),
+                    region_index: None,
+                    note_index: None,
+                    message: format!("Overlapping regions at tick {}", w[1].start_tick),
+                });
+            }
+        }
+
+        for (ri, region) in track.regions.iter().enumerate() {
+            for (ni, note) in region.notes.iter().enumerate() {
+                let is_dac = matches!(track.channel, ChannelAssignment::Dac(_));
+                if !is_dac && midi_to_smps_note(note.pitch).is_none() {
+                    errors.push(ExportError {
+                        track_name: track.name.clone(),
+                        region_index: Some(ri),
+                        note_index: Some(ni),
+                        message: format!("Pitch {} is outside SMPS range (C0-Bb7, MIDI 12-95)", note.pitch),
+                    });
+                }
+
+                if !is_dac && daw_to_smps_duration(note.duration_ticks, params).is_none() {
+                    errors.push(ExportError {
+                        track_name: track.name.clone(),
+                        region_index: Some(ri),
+                        note_index: Some(ni),
+                        message: format!("Note duration {} DAW ticks rounds to 0 SMPS ticks", note.duration_ticks),
+                    });
+                }
+            }
+        }
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,5 +482,61 @@ mod tests {
         let (map, voices) = build_voice_index(&tracks, &bank);
         assert!(voices.is_empty());
         assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_validate_missing_instrument() {
+        use crate::model::song::*;
+        use crate::model::instrument::*;
+
+        let song = Song {
+            metadata: SongMetadata {
+                name: "Test".into(), tempo: 120.0, time_signature: (4, 4),
+                ticks_per_beat: 480, driver_id: "flamedriver".into(),
+            },
+            tracks: vec![Track {
+                id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
+                instrument_id: None, regions: vec![], muted: false, solo: false,
+                volume: 100, pan: Pan::Center,
+            }],
+            instruments: InstrumentBank { fm: vec![], psg: vec![], dac: vec![] },
+        };
+        let params = compute_tempo_params(120.0, 480);
+        let errors = validate_for_export(&song, &song.instruments, &params);
+        assert!(!errors.is_empty());
+        assert!(errors[0].message.contains("No instrument assigned"));
+    }
+
+    #[test]
+    fn test_validate_pitch_out_of_range() {
+        use crate::model::song::*;
+        use crate::model::instrument::*;
+
+        let inst_id = Uuid::new_v4();
+        let song = Song {
+            metadata: SongMetadata {
+                name: "Test".into(), tempo: 120.0, time_signature: (4, 4),
+                ticks_per_beat: 480, driver_id: "flamedriver".into(),
+            },
+            tracks: vec![Track {
+                id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
+                instrument_id: Some(inst_id), regions: vec![Region {
+                    id: Uuid::new_v4(), start_tick: 0, duration_ticks: 480,
+                    notes: vec![Note { tick: 0, pitch: 5, velocity: 100, duration_ticks: 480 }],
+                }],
+                muted: false, solo: false, volume: 100, pan: Pan::Center,
+            }],
+            instruments: InstrumentBank {
+                fm: vec![FmInstrument {
+                    id: inst_id, name: "Test".into(), algorithm: 0, feedback: 0,
+                    operators: [FmOperator::default(); 4],
+                    metadata: InstrumentMetadata::default(),
+                }],
+                psg: vec![], dac: vec![],
+            },
+        };
+        let params = compute_tempo_params(120.0, 480);
+        let errors = validate_for_export(&song, &song.instruments, &params);
+        assert!(errors.iter().any(|e| e.message.contains("outside SMPS range")));
     }
 }

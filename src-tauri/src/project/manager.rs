@@ -130,7 +130,7 @@ impl ProjectManager {
                     let inst: DacInstrument =
                         serde_json::from_str(&data).map_err(|e| e.to_string())?;
                     let pcm_path = path.join("instruments/dac").join(&inst.pcm_file);
-                    if pcm_path.exists() {
+                    if !inst.pcm_file.is_empty() && pcm_path.exists() {
                         let pcm_data = fs::read(&pcm_path).map_err(|e| e.to_string())?;
                         self.dac_pcm_cache.insert(inst.id, Arc::new(pcm_data));
                     }

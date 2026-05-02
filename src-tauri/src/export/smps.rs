@@ -26,7 +26,7 @@ pub fn compute_tempo_params(bpm: f64, ticks_per_beat: u32) -> SmpsTempoParams {
 
     for divider in 1..=4u8 {
         for modifier in 1..=255u8 {
-            let smps_ticks_per_sec = (modifier as f64 / 256.0) * 60.0;
+            let smps_ticks_per_sec = (60.0 / divider as f64) * (256.0 - modifier as f64) / 256.0;
             let smps_ticks_per_beat = smps_ticks_per_sec / beats_per_second;
             let daw_per_smps = tpb / smps_ticks_per_beat;
 
@@ -59,7 +59,7 @@ pub fn compute_tempo_params(bpm: f64, ticks_per_beat: u32) -> SmpsTempoParams {
         }
     }
 
-    let smps_ticks_per_sec = (best_modifier as f64 / 256.0) * 60.0;
+    let smps_ticks_per_sec = (60.0 / best_divider as f64) * (256.0 - best_modifier as f64) / 256.0;
     let smps_ticks_per_beat = smps_ticks_per_sec / beats_per_second;
     let daw_per_smps = tpb / smps_ticks_per_beat;
 

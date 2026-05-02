@@ -20,7 +20,8 @@ pub fn map_smps_to_song(smps: &SmpsFile, driver: &dyn DriverProfile) -> Result<M
     let mut warnings = Vec::new();
     let daw_per_smps = DAW_TICKS_PER_BEAT as f64 / SMPS_TICKS_PER_BEAT;
 
-    let smps_ticks_per_sec = (smps.tempo_modifier as f64 / 256.0) * 60.0;
+    let divider = smps.tempo_divider.max(1) as f64;
+    let smps_ticks_per_sec = (60.0 / divider) * (256.0 - smps.tempo_modifier as f64) / 256.0;
     let bpm = smps_ticks_per_sec * 60.0 / SMPS_TICKS_PER_BEAT;
 
     let mut instruments = InstrumentBank::default();
@@ -228,6 +229,7 @@ fn map_channel_events(
 ) -> (Vec<Note>, Vec<ImportWarning>) {
     let mut notes = Vec::new();
     let mut warnings = Vec::new();
+    let mut unsupported_counts: HashMap<String, u32> = HashMap::new();
     let mut cursor: f64 = 0.0;
     let mut transpose: i16 = ch.initial_pitch as i16;
     let mut tying = false;
@@ -278,12 +280,20 @@ fn map_channel_events(
             SmpsEvent::SetVoice(_) | SmpsEvent::SetPan(_) => {}
             SmpsEvent::Stop => break,
             SmpsEvent::Unsupported { name } => {
-                warnings.push(ImportWarning {
-                    channel: ch.label.clone(),
-                    message: format!("unsupported: {}", name),
-                });
+                *unsupported_counts.entry(name.clone()).or_insert(0u32) += 1;
             }
         }
+    }
+
+    for (name, count) in &unsupported_counts {
+        warnings.push(ImportWarning {
+            channel: ch.label.clone(),
+            message: if *count == 1 {
+                format!("unsupported: {name}")
+            } else {
+                format!("unsupported: {name} ({count} occurrences)")
+            },
+        });
     }
 
     (notes, warnings)

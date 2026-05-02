@@ -1,0 +1,136 @@
+.psgEditor {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  height: 100%;
+}
+
+.graphSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.graphHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-psg);
+}
+
+.graphActions {
+  display: flex;
+  gap: 4px;
+}
+
+.smallBtn {
+  padding: 3px 8px;
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.smallBtn:hover {
+  background: var(--border);
+}
+
+.settingsSection {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settingGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settingLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toggle {
+  font-size: 12px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.toggle input {
+  accent-color: var(--accent-psg);
+}
+
+.noiseButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.noiseBtn {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.noiseBtn:hover {
+  color: var(--text-primary);
+}
+
+.noiseBtn.activeNoise {
+  background: var(--accent-psg);
+  color: #000;
+  border-color: var(--accent-psg);
+}
+
+.periodRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.periodLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.periodInput {
+  width: 80px;
+  padding: 4px 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.previewBtn {
+  padding: 8px 16px;
+  background: var(--accent-psg);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.previewBtn:hover {
+  opacity: 0.9;
+}

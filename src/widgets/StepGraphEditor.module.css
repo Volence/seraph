@@ -1,0 +1,11 @@
+.container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-app);
+}
+
+.canvas {
+  display: block;
+  cursor: crosshair;
+}

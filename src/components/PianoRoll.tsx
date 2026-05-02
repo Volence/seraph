@@ -66,6 +66,13 @@ export function PianoRoll({ region, onClose }: PianoRollProps) {
     setSelectedNotes(new Set([index]));
   }
 
+  async function handleNoteResize(index: number, newDurationTicks: number) {
+    const note = notes[index];
+    if (!note) return;
+    await ipc.updateNote(region.trackId, region.regionId, index, note.tick, note.pitch, note.velocity, newDurationTicks);
+    refresh();
+  }
+
   async function handleVelocityChange(index: number, velocity: number) {
     const note = notes[index];
     if (!note) return;
@@ -143,6 +150,7 @@ export function PianoRoll({ region, onClose }: PianoRollProps) {
           selectedNotes={selectedNotes}
           onNoteClick={handleNoteClick}
           onNoteAdd={handleNoteAdd}
+          onNoteResize={handleNoteResize}
           onScrollTopChange={setScrollTop}
         />
       </div>

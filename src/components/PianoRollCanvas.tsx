@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import type { Note } from "../types/model";
 import styles from "./PianoRollCanvas.module.css";
 
@@ -14,8 +14,11 @@ interface PianoRollCanvasProps {
   selectedNotes: Set<number>;
   onNoteClick: (index: number) => void;
   onNoteAdd: (tick: number, pitch: number) => void;
+  onNoteResize: (index: number, newDurationTicks: number) => void;
   onScrollTopChange: (scrollTop: number) => void;
 }
+
+const EDGE_THRESHOLD = 6;
 
 function isBlackKey(pitch: number): boolean {
   return [1, 3, 6, 8, 10].includes(pitch % 12);
@@ -33,10 +36,12 @@ export function PianoRollCanvas({
   selectedNotes,
   onNoteClick,
   onNoteAdd,
+  onNoteResize,
   onScrollTopChange,
 }: PianoRollCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ noteIndex: number; startX: number; origDuration: number } | null>(null);
 
   const totalNotes = maxPitch - minPitch + 1;
   const canvasWidth = durationTicks / ticksPerPixel;
@@ -98,14 +103,7 @@ export function PianoRollCanvas({
 
   useEffect(() => { draw(); }, [draw]);
 
-  function handleClick(e: React.MouseEvent) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const clickTick = x * ticksPerPixel;
+  function findNoteAtPos(x: number, y: number): { index: number; nearEdge: boolean } | null {
     const clickRow = Math.floor(y / rowHeight);
     const clickPitch = maxPitch - clickRow;
 
@@ -113,17 +111,83 @@ export function PianoRollCanvas({
       const n = notes[i];
       if (n.pitch !== clickPitch) continue;
       const nx = n.tick / ticksPerPixel;
-      const nw = n.durationTicks / ticksPerPixel;
+      const nw = Math.max(2, n.durationTicks / ticksPerPixel);
       if (x >= nx && x <= nx + nw) {
-        onNoteClick(i);
-        return;
+        const nearEdge = x >= nx + nw - EDGE_THRESHOLD;
+        return { index: i, nearEdge };
       }
     }
+    return null;
+  }
 
+  function handleMouseDown(e: React.MouseEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hit = findNoteAtPos(x, y);
+    if (hit && hit.nearEdge) {
+      e.preventDefault();
+      setDrag({ noteIndex: hit.index, startX: e.clientX, origDuration: notes[hit.index].durationTicks });
+      return;
+    }
+
+    if (hit) {
+      onNoteClick(hit.index);
+      return;
+    }
+
+    const clickTick = x * ticksPerPixel;
+    const clickRow = Math.floor(y / rowHeight);
+    const clickPitch = maxPitch - clickRow;
     const snapped = Math.floor(clickTick / gridSnapTicks) * gridSnapTicks;
     if (clickPitch >= minPitch && clickPitch <= maxPitch) {
       onNoteAdd(snapped, clickPitch);
     }
+  }
+
+  useEffect(() => {
+    if (!drag) return;
+
+    function handleMouseMove() {
+      if (!drag) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.style.cursor = "ew-resize";
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+      if (!drag) return;
+      const deltaX = e.clientX - drag.startX;
+      const deltaTicks = deltaX * ticksPerPixel;
+      const rawDuration = drag.origDuration + deltaTicks;
+      const snapped = Math.max(gridSnapTicks, Math.round(rawDuration / gridSnapTicks) * gridSnapTicks);
+      onNoteResize(drag.noteIndex, snapped);
+      setDrag(null);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = "";
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [drag, ticksPerPixel, gridSnapTicks, onNoteResize]);
+
+  function handleMouseMove(e: React.MouseEvent) {
+    if (drag) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hit = findNoteAtPos(x, y);
+    canvas.style.cursor = hit?.nearEdge ? "ew-resize" : "";
   }
 
   function handleScroll() {
@@ -134,7 +198,12 @@ export function PianoRollCanvas({
 
   return (
     <div ref={containerRef} className={styles.container} onScroll={handleScroll}>
-      <canvas ref={canvasRef} className={styles.canvas} onClick={handleClick} />
+      <canvas
+        ref={canvasRef}
+        className={styles.canvas}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+      />
     </div>
   );
 }

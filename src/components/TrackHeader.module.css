@@ -6,6 +6,17 @@
   border-bottom: 1px solid var(--border);
   height: 60px;
   justify-content: center;
+  cursor: pointer;
+}
+
+.header:hover {
+  background: var(--bg-surface);
+}
+
+.header.selected {
+  background: var(--bg-surface);
+  border-left: 3px solid var(--accent-fm);
+  padding-left: 5px;
 }
 
 .top {

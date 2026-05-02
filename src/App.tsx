@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import type { SongMetadata, SelectedInstrument, SelectedRegion } from "./types/model";
 import * as ipc from "./api/ipc";
 import { TopBar } from "./components/TopBar";
-import { Sidebar } from "./components/Sidebar";
 import { MainArea } from "./components/MainArea";
 import { BottomPanel } from "./components/BottomPanel";
 import { NewProjectDialog } from "./components/NewProjectDialog";
@@ -102,16 +101,6 @@ export default function App() {
         onLoopChange={setLoopEnabled}
       />
       <div className={styles.body}>
-        {projectOpen && (
-          <Sidebar
-            projectMeta={projectMeta}
-            selectedInstrument={selectedInstrument}
-            onSelectInstrument={(inst) => {
-              setSelectedInstrument(inst);
-              setSelectedRegion(null);
-            }}
-          />
-        )}
         <MainArea
           projectOpen={projectOpen}
           projectMeta={projectMeta}
@@ -123,6 +112,11 @@ export default function App() {
             if (region) setSelectedInstrument(null);
           }}
           selectedRegion={selectedRegion}
+          onSelectInstrument={(inst) => {
+            setSelectedInstrument(inst);
+            setSelectedRegion(null);
+          }}
+          selectedInstrument={selectedInstrument}
         />
       </div>
       {projectOpen && (

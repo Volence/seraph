@@ -4,7 +4,9 @@ import styles from "./TrackHeader.module.css";
 
 interface TrackHeaderProps {
   track: Track;
+  selected: boolean;
   onUpdate: () => void;
+  onClick: () => void;
 }
 
 function channelColor(track: Track): string {
@@ -24,8 +26,9 @@ function channelLabel(track: Track): string {
   return "?";
 }
 
-export function TrackHeader({ track, onUpdate }: TrackHeaderProps) {
-  async function toggleMute() {
+export function TrackHeader({ track, selected, onUpdate, onClick }: TrackHeaderProps) {
+  async function toggleMute(e: React.MouseEvent) {
+    e.stopPropagation();
     await ipc.updateTrack(
       track.id, track.name, track.channel, track.instrumentId,
       !track.muted, track.solo, track.volume, track.pan,
@@ -33,7 +36,8 @@ export function TrackHeader({ track, onUpdate }: TrackHeaderProps) {
     onUpdate();
   }
 
-  async function toggleSolo() {
+  async function toggleSolo(e: React.MouseEvent) {
+    e.stopPropagation();
     await ipc.updateTrack(
       track.id, track.name, track.channel, track.instrumentId,
       track.muted, !track.solo, track.volume, track.pan,
@@ -42,7 +46,10 @@ export function TrackHeader({ track, onUpdate }: TrackHeaderProps) {
   }
 
   return (
-    <div className={styles.header}>
+    <div
+      className={`${styles.header} ${selected ? styles.selected : ""}`}
+      onClick={onClick}
+    >
       <div className={styles.top}>
         <span className={styles.badge} style={{ background: channelColor(track) }}>
           {channelLabel(track)}

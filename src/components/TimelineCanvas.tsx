@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import type { Track, SelectedRegion } from "../types/model";
 import styles from "./TimelineCanvas.module.css";
 
@@ -7,12 +7,14 @@ interface TimelineCanvasProps {
   ticksPerPixel: number;
   scrollLeft: number;
   trackHeight: number;
+  ticksPerBeat: number;
+  beatsPerBar: number;
   playbackTick: number;
   playing: boolean;
   selectedRegion: SelectedRegion | null;
   onRegionClick: (trackId: string, regionId: string) => void;
   onRegionDoubleClick: (trackId: string, regionId: string) => void;
-  onEmptyDoubleClick: (trackId: string, startTick: number) => void;
+  onRegionCreate: (trackId: string, startTick: number, durationTicks: number) => void;
 }
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -29,21 +31,42 @@ function trackChannelType(track: Track): string {
   return "dac";
 }
 
+interface DragState {
+  trackIdx: number;
+  startX: number;
+  currentX: number;
+}
+
 export function TimelineCanvas({
   tracks,
   ticksPerPixel,
   scrollLeft,
   trackHeight,
+  ticksPerBeat,
+  beatsPerBar,
   playbackTick,
   playing,
   selectedRegion,
   onRegionClick,
   onRegionDoubleClick,
-  onEmptyDoubleClick,
+  onRegionCreate,
 }: TimelineCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animRef = useRef(0);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  dragRef.current = drag;
+
+  const ticksPerBar = ticksPerBeat * beatsPerBar;
+
+  function pixelToTick(px: number): number {
+    return px * ticksPerPixel + scrollLeft * ticksPerPixel;
+  }
+
+  function snapToBar(tick: number): number {
+    return Math.round(tick / ticksPerBar) * ticksPerBar;
+  }
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -116,6 +139,28 @@ export function TimelineCanvas({
       }
     }
 
+    // Draw drag preview
+    const d = dragRef.current;
+    if (d && d.trackIdx < tracks.length) {
+      const track = tracks[d.trackIdx];
+      const color = CHANNEL_COLORS[trackChannelType(track)] || "#888";
+      const rawStart = pixelToTick(Math.min(d.startX, d.currentX));
+      const rawEnd = pixelToTick(Math.max(d.startX, d.currentX));
+      const snapStart = snapToBar(rawStart);
+      const snapEnd = Math.max(snapStart + ticksPerBar, snapToBar(rawEnd));
+      const px1 = (snapStart - startTick) / ticksPerPixel;
+      const px2 = (snapEnd - startTick) / ticksPerPixel;
+      const dy = d.trackIdx * trackHeight + 2;
+      const dh = trackHeight - 4;
+      ctx.fillStyle = color + "55";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.fillRect(px1, dy, px2 - px1, dh);
+      ctx.strokeRect(px1, dy, px2 - px1, dh);
+      ctx.setLineDash([]);
+    }
+
     if (playing) {
       const cx = (playbackTick - startTick) / ticksPerPixel;
       if (cx >= 0 && cx <= w) {
@@ -127,7 +172,7 @@ export function TimelineCanvas({
         ctx.stroke();
       }
     }
-  }, [tracks, ticksPerPixel, scrollLeft, trackHeight, playbackTick, playing, selectedRegion]);
+  }, [tracks, ticksPerPixel, scrollLeft, trackHeight, playbackTick, playing, selectedRegion, ticksPerBar, drag]);
 
   useEffect(() => {
     function animate() {
@@ -143,25 +188,86 @@ export function TimelineCanvas({
     return () => cancelAnimationFrame(animRef.current);
   }, [draw, playing]);
 
+  function hitTestRegion(x: number, y: number): { trackId: string; regionId: string } | null {
+    const trackIdx = Math.floor(y / trackHeight);
+    if (trackIdx < 0 || trackIdx >= tracks.length) return null;
+    const startTick = scrollLeft * ticksPerPixel;
+    const track = tracks[trackIdx];
+    for (const region of track.regions) {
+      const rx = (region.startTick - startTick) / ticksPerPixel;
+      const rw = region.durationTicks / ticksPerPixel;
+      if (x >= rx && x <= rx + rw) {
+        return { trackId: track.id, regionId: region.id };
+      }
+    }
+    return null;
+  }
+
+  function handleMouseDown(e: React.MouseEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hit = hitTestRegion(x, y);
+    if (hit) return;
+
+    const trackIdx = Math.floor(y / trackHeight);
+    if (trackIdx < 0 || trackIdx >= tracks.length) return;
+
+    e.preventDefault();
+    setDrag({ trackIdx, startX: x, currentX: x });
+  }
+
+  useEffect(() => {
+    if (!drag) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      setDrag((prev) => prev ? { ...prev, currentX: x } : null);
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+      const d = dragRef.current;
+      if (!d) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+
+      const rawStart = pixelToTick(Math.min(d.startX, endX));
+      const rawEnd = pixelToTick(Math.max(d.startX, endX));
+      const snapStart = snapToBar(rawStart);
+      const snapEnd = Math.max(snapStart + ticksPerBar, snapToBar(rawEnd));
+
+      if (d.trackIdx < tracks.length) {
+        onRegionCreate(tracks[d.trackIdx].id, snapStart, snapEnd - snapStart);
+      }
+      setDrag(null);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, onRegionCreate]);
+
   function handleClick(e: React.MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const trackIdx = Math.floor(y / trackHeight);
-    if (trackIdx < 0 || trackIdx >= tracks.length) return;
 
-    const startTick = scrollLeft * ticksPerPixel;
-    const track = tracks[trackIdx];
-
-    for (const region of track.regions) {
-      const rx = (region.startTick - startTick) / ticksPerPixel;
-      const rw = region.durationTicks / ticksPerPixel;
-      if (x >= rx && x <= rx + rw) {
-        onRegionClick(track.id, region.id);
-        return;
-      }
+    const hit = hitTestRegion(x, y);
+    if (hit) {
+      onRegionClick(hit.trackId, hit.regionId);
     }
   }
 
@@ -171,23 +277,11 @@ export function TimelineCanvas({
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const trackIdx = Math.floor(y / trackHeight);
-    if (trackIdx < 0 || trackIdx >= tracks.length) return;
 
-    const startTick = scrollLeft * ticksPerPixel;
-    const tick = x * ticksPerPixel + startTick;
-    const track = tracks[trackIdx];
-
-    for (const region of track.regions) {
-      const rx = (region.startTick - startTick) / ticksPerPixel;
-      const rw = region.durationTicks / ticksPerPixel;
-      if (x >= rx && x <= rx + rw) {
-        onRegionDoubleClick(track.id, region.id);
-        return;
-      }
+    const hit = hitTestRegion(x, y);
+    if (hit) {
+      onRegionDoubleClick(hit.trackId, hit.regionId);
     }
-
-    onEmptyDoubleClick(track.id, tick);
   }
 
   return (
@@ -195,6 +289,7 @@ export function TimelineCanvas({
       <canvas
         ref={canvasRef}
         className={styles.canvas}
+        onMouseDown={handleMouseDown}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       />

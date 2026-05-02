@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Track, SongMetadata, SelectedRegion } from "../types/model";
+import type { Track, SongMetadata, SelectedRegion, SelectedInstrument, FmOperator } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { TrackHeader } from "./TrackHeader";
@@ -13,9 +13,32 @@ interface ArrangementViewProps {
   playing: boolean;
   onSelectRegion: (region: SelectedRegion | null) => void;
   selectedRegion: SelectedRegion | null;
+  onSelectInstrument: (inst: SelectedInstrument | null) => void;
+  selectedInstrument: SelectedInstrument | null;
 }
 
-export function ArrangementView({ projectMeta, playing, onSelectRegion, selectedRegion }: ArrangementViewProps) {
+const defaultOp: FmOperator = {
+  detune: 0, multiple: 0, rateScale: 0, attackRate: 0,
+  ampMod: false, d1r: 0, d2r: 0, sustainLevel: 0,
+  releaseRate: 0, totalLevel: 127,
+};
+
+function channelType(track: Track): "fm" | "psg" | "dac" {
+  const ch = track.channel;
+  if (ch === "PsgNoise") return "psg";
+  if (typeof ch === "object" && "Fm" in ch) return "fm";
+  if (typeof ch === "object" && "Psg" in ch) return "psg";
+  return "dac";
+}
+
+export function ArrangementView({
+  projectMeta,
+  playing,
+  onSelectRegion,
+  selectedRegion,
+  onSelectInstrument,
+  selectedInstrument,
+}: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const zoom = useArrangementZoom(projectMeta.ticksPerBeat);
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
@@ -38,29 +61,73 @@ export function ArrangementView({ projectMeta, playing, onSelectRegion, selected
     if (!track) return;
     const region = track.regions.find((r) => r.id === regionId);
     if (!region) return;
-    const ch = track.channel;
-    const ct = ch === "PsgNoise" ? "psg" as const :
-               typeof ch === "object" && "Fm" in ch ? "fm" as const :
-               typeof ch === "object" && "Psg" in ch ? "psg" as const : "dac" as const;
     onSelectRegion({
       trackId,
       trackName: track.name,
       regionId,
-      channelType: ct,
+      channelType: channelType(track),
       startTick: region.startTick,
       durationTicks: region.durationTicks,
     });
   }
 
-  async function handleCreateRegion(trackId: string, startTick: number) {
-    const ticksPerBar = projectMeta.ticksPerBeat * projectMeta.timeSignature[0];
-    const snapped = Math.floor(startTick / ticksPerBar) * ticksPerBar;
-    await ipc.addRegion(trackId, snapped, ticksPerBar);
+  async function handleRegionCreate(trackId: string, startTick: number, durationTicks: number) {
+    await ipc.addRegion(trackId, startTick, durationTicks);
     refresh();
   }
 
   async function handleSeek(tick: number) {
     await ipc.transportSeek(tick);
+  }
+
+  function handleTrackClick(track: Track) {
+    if (!track.instrumentId) return;
+    const ct = channelType(track);
+    onSelectInstrument({ type: ct, id: track.instrumentId });
+  }
+
+  async function addFm() {
+    await ipc.addFmInstrument({
+      id: "00000000-0000-0000-0000-000000000000",
+      name: "New FM Patch",
+      algorithm: 0,
+      feedback: 0,
+      operators: [defaultOp, defaultOp, defaultOp, defaultOp],
+      metadata: { category: "", author: "", tags: [] },
+    });
+    refresh();
+  }
+
+  async function addPsg() {
+    await ipc.addPsgInstrument({
+      id: "00000000-0000-0000-0000-000000000000",
+      name: "New PSG Envelope",
+      volumeSequence: [15, 14, 13, 12, 10, 8, 6, 4, 2, 0],
+      loopPoint: null,
+      noiseMode: null,
+      metadata: { category: "", author: "", tags: [] },
+    });
+    refresh();
+  }
+
+  async function addDac() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const selected = await open({
+      filters: [
+        { name: "Audio", extensions: ["wav"] },
+        { name: "Raw PCM", extensions: ["pcm", "raw"] },
+      ],
+      title: "Import DAC Sample",
+    });
+    if (!selected) return;
+    const path = selected as string;
+    const ext = path.split(".").pop()?.toLowerCase();
+    if (ext === "wav") {
+      await ipc.importDacWav(path, 16000);
+    } else {
+      await ipc.importDacRaw(path, 16000);
+    }
+    refresh();
   }
 
   return (
@@ -81,15 +148,24 @@ export function ArrangementView({ projectMeta, playing, onSelectRegion, selected
             <TrackHeader
               key={track.id}
               track={track}
+              selected={selectedInstrument?.id === track.instrumentId}
               onUpdate={refresh}
+              onClick={() => handleTrackClick(track)}
             />
           ))}
+          <div className={styles.addButtons}>
+            <button className={styles.addBtn} onClick={addFm}>+ FM</button>
+            <button className={styles.addBtn} onClick={addPsg}>+ PSG</button>
+            <button className={styles.addBtn} onClick={addDac}>+ DAC</button>
+          </div>
         </div>
         <TimelineCanvas
           tracks={tracks}
           ticksPerPixel={zoom.ticksPerPixel}
           scrollLeft={zoom.scrollLeft}
           trackHeight={trackHeight}
+          ticksPerBeat={projectMeta.ticksPerBeat}
+          beatsPerBar={projectMeta.timeSignature[0]}
           playbackTick={playing ? interpolatedTick : 0}
           playing={playing}
           selectedRegion={selectedRegion}
@@ -98,17 +174,13 @@ export function ArrangementView({ projectMeta, playing, onSelectRegion, selected
             if (!track) return;
             const region = track.regions.find((r) => r.id === regionId);
             if (!region) return;
-            const ch2 = track.channel;
-            const ct = ch2 === "PsgNoise" ? "psg" as const :
-                       typeof ch2 === "object" && "Fm" in ch2 ? "fm" as const :
-                       typeof ch2 === "object" && "Psg" in ch2 ? "psg" as const : "dac" as const;
             onSelectRegion({
-              trackId, trackName: track.name, regionId, channelType: ct,
+              trackId, trackName: track.name, regionId, channelType: channelType(track),
               startTick: region.startTick, durationTicks: region.durationTicks,
             });
           }}
           onRegionDoubleClick={handleRegionDoubleClick}
-          onEmptyDoubleClick={handleCreateRegion}
+          onRegionCreate={handleRegionCreate}
         />
       </div>
     </div>

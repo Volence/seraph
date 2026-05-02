@@ -33,3 +33,24 @@
   border-right: 1px solid var(--border);
 }
 
+.addButtons {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+}
+
+.addBtn {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.addBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+

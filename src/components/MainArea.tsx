@@ -1,4 +1,4 @@
-import type { SongMetadata, SelectedRegion } from "../types/model";
+import type { SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
 import { ArrangementView } from "./ArrangementView";
 import styles from "./MainArea.module.css";
 
@@ -10,6 +10,8 @@ interface MainAreaProps {
   onOpenProject: () => void;
   onSelectRegion: (region: SelectedRegion | null) => void;
   selectedRegion: SelectedRegion | null;
+  onSelectInstrument: (inst: SelectedInstrument | null) => void;
+  selectedInstrument: SelectedInstrument | null;
 }
 
 export function MainArea({
@@ -20,6 +22,8 @@ export function MainArea({
   onOpenProject,
   onSelectRegion,
   selectedRegion,
+  onSelectInstrument,
+  selectedInstrument,
 }: MainAreaProps) {
   if (!projectOpen || !projectMeta) {
     return (
@@ -40,6 +44,8 @@ export function MainArea({
       playing={playing}
       onSelectRegion={onSelectRegion}
       selectedRegion={selectedRegion}
+      onSelectInstrument={onSelectInstrument}
+      selectedInstrument={selectedInstrument}
     />
   );
 }

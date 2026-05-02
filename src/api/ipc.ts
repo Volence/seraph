@@ -281,3 +281,21 @@ export interface ExportError {
 export async function exportSong(outputDir: string): Promise<ExportResult> {
   return invoke<ExportResult>("export_song", { outputDir });
 }
+
+// --- Import ---
+
+export interface ImportWarning {
+  channel: string;
+  message: string;
+}
+
+export interface ImportResult {
+  metadata: SongMetadata;
+  trackCount: number;
+  instrumentCount: number;
+  warnings: ImportWarning[];
+}
+
+export async function importSong(sourcePath: string, projectDir: string): Promise<ImportResult> {
+  return invoke<ImportResult>("import_song", { sourcePath, projectDir });
+}

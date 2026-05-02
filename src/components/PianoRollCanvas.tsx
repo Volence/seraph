@@ -151,20 +151,21 @@ export function PianoRollCanvas({
   useEffect(() => {
     if (!drag) return;
 
-    function handleMouseMove() {
+    function handleMouseMove(e: MouseEvent) {
       if (!drag) return;
       const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.style.cursor = "ew-resize";
-    }
-
-    function handleMouseUp(e: MouseEvent) {
-      if (!drag) return;
+      if (canvas) canvas.style.cursor = "ew-resize";
       const deltaX = e.clientX - drag.startX;
       const deltaTicks = deltaX * ticksPerPixel;
       const rawDuration = drag.origDuration + deltaTicks;
-      const snapped = Math.max(gridSnapTicks, Math.round(rawDuration / gridSnapTicks) * gridSnapTicks);
-      onNoteResize(drag.noteIndex, snapped);
+      const minDuration = e.ctrlKey ? 1 : gridSnapTicks;
+      const duration = e.ctrlKey
+        ? Math.max(1, Math.round(rawDuration))
+        : Math.max(gridSnapTicks, Math.round(rawDuration / gridSnapTicks) * gridSnapTicks);
+      onNoteResize(drag.noteIndex, Math.max(minDuration, duration));
+    }
+
+    function handleMouseUp() {
       setDrag(null);
       const canvas = canvasRef.current;
       if (canvas) canvas.style.cursor = "";

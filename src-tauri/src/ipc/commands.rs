@@ -884,7 +884,7 @@ pub fn export_song(
 pub fn import_song(
     state: State<'_, ProjectState>,
     source_path: String,
-    project_dir: String,
+    parent_dir: String,
 ) -> Result<crate::import::ImportResult, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let registry = mgr.driver_registry();
@@ -892,7 +892,7 @@ pub fn import_song(
         .ok_or("Flamedriver driver not found")?;
 
     let source = std::path::PathBuf::from(&source_path);
-    let project = std::path::PathBuf::from(&project_dir);
+    let parent = std::path::PathBuf::from(&parent_dir);
 
-    crate::import::import_smps_file(&source, &project, driver)
+    crate::import::import_smps_file(&source, &parent, driver)
 }

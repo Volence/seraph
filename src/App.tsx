@@ -115,29 +115,25 @@ export default function App() {
   }
 
   async function handleImport() {
-    const { open, save } = await import("@tauri-apps/plugin-dialog");
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const sourcePath = await open({
       title: "Select SMPS Assembly File",
       filters: [{ name: "SMPS Assembly", extensions: ["asm"] }],
     });
     if (!sourcePath) return;
 
-    // Derive a default project name from the filename
-    const fileName = (sourcePath as string).split("/").pop() ?? "import";
-    const defaultName = fileName.replace(/\.asm$/i, "").replace(/^Mus - /, "");
-
-    const projectDir = await save({
-      title: "Save Imported Project As",
-      defaultPath: defaultName,
+    const parentDir = await open({
+      directory: true,
+      title: "Choose Where to Save Imported Project",
     });
-    if (!projectDir) return;
+    if (!parentDir) return;
 
     try {
       if (projectOpen) await ipc.closeProject();
       setPlaying(false);
 
-      const result = await ipc.importSong(sourcePath as string, projectDir as string);
-      const song = await ipc.openProject(projectDir as string);
+      const result = await ipc.importSong(sourcePath as string, parentDir as string);
+      const song = await ipc.openProject(result.projectDir);
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
       setSelectedRegions([]);

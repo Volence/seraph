@@ -7,6 +7,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportResult {
+    pub project_dir: String,
     pub metadata: crate::model::song::SongMetadata,
     pub track_count: usize,
     pub instrument_count: usize,
@@ -22,7 +23,7 @@ pub struct ImportWarning {
 
 pub fn import_smps_file(
     source_path: &std::path::Path,
-    project_dir: &std::path::Path,
+    parent_dir: &std::path::Path,
     driver: &dyn crate::model::driver::DriverProfile,
 ) -> Result<ImportResult, String> {
     let source = std::fs::read_to_string(source_path)
@@ -32,7 +33,14 @@ pub fn import_smps_file(
     let mapped = smps_mapper::map_smps_to_song(&smps, driver)?;
     let song = mapped.song;
 
-    std::fs::create_dir_all(project_dir).map_err(|e| e.to_string())?;
+    let dir_name = source_path.file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Import")
+        .trim_start_matches("Mus - ");
+    let project_dir = parent_dir.join(dir_name);
+
+    std::fs::create_dir_all(&project_dir)
+        .map_err(|e| format!("create dir {}: {e}", project_dir.display()))?;
     std::fs::create_dir_all(project_dir.join("instruments/fm")).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(project_dir.join("instruments/psg")).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(project_dir.join("instruments/dac")).map_err(|e| e.to_string())?;
@@ -78,6 +86,7 @@ pub fn import_smps_file(
     }
 
     Ok(ImportResult {
+        project_dir: project_dir.to_string_lossy().into_owned(),
         metadata: song.metadata,
         track_count: song.tracks.len(),
         instrument_count,
@@ -96,16 +105,17 @@ mod tests {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("test_data/Mus - DEZ1.asm");
         let tmp = tempfile::tempdir().unwrap();
-        let project_dir = tmp.path().join("DEZ1_Import");
 
         let driver = FlamedriverProfile;
-        let result = import_smps_file(&source, &project_dir, &driver).unwrap();
+        let result = import_smps_file(&source, tmp.path(), &driver).unwrap();
+        let project_dir = PathBuf::from(&result.project_dir);
 
         assert!(project_dir.join("project.json").exists());
         assert!(project_dir.join(".megadaw").exists());
         assert!(project_dir.join("instruments/fm").exists());
         assert_eq!(result.track_count, 9);
         assert!(result.instrument_count > 0);
+        assert!(result.project_dir.ends_with("DEZ1"));
     }
 
     #[test]
@@ -113,10 +123,10 @@ mod tests {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("test_data/Mus - DEZ1.asm");
         let tmp = tempfile::tempdir().unwrap();
-        let project_dir = tmp.path().join("DEZ1_Import2");
 
         let driver = FlamedriverProfile;
-        import_smps_file(&source, &project_dir, &driver).unwrap();
+        let result = import_smps_file(&source, tmp.path(), &driver).unwrap();
+        let project_dir = PathBuf::from(&result.project_dir);
 
         let fm_dir = project_dir.join("instruments/fm");
         let fm_files: Vec<_> = std::fs::read_dir(&fm_dir)
@@ -132,10 +142,10 @@ mod tests {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("test_data/Mus - DEZ1.asm");
         let tmp = tempfile::tempdir().unwrap();
-        let project_dir = tmp.path().join("DEZ1_RT");
 
         let driver = FlamedriverProfile;
-        let result = import_smps_file(&source, &project_dir, &driver).unwrap();
+        let result = import_smps_file(&source, tmp.path(), &driver).unwrap();
+        let project_dir = PathBuf::from(&result.project_dir);
 
         let json = std::fs::read_to_string(project_dir.join("project.json")).unwrap();
         let project_file: crate::model::song::ProjectFile =
@@ -168,10 +178,10 @@ mod tests {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("test_data/AIZ1.asm");
         let tmp = tempfile::tempdir().unwrap();
-        let project_dir = tmp.path().join("AIZ1_Import");
 
         let driver = FlamedriverProfile;
-        let result = import_smps_file(&source, &project_dir, &driver).unwrap();
+        let result = import_smps_file(&source, tmp.path(), &driver).unwrap();
+        let project_dir = PathBuf::from(&result.project_dir);
 
         assert!(result.warnings.iter().any(|w| w.message.contains("unresolved")));
         assert!(project_dir.join("project.json").exists());

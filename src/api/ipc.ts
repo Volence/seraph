@@ -290,12 +290,13 @@ export interface ImportWarning {
 }
 
 export interface ImportResult {
+  projectDir: string;
   metadata: SongMetadata;
   trackCount: number;
   instrumentCount: number;
   warnings: ImportWarning[];
 }
 
-export async function importSong(sourcePath: string, projectDir: string): Promise<ImportResult> {
-  return invoke<ImportResult>("import_song", { sourcePath, projectDir });
+export async function importSong(sourcePath: string, parentDir: string): Promise<ImportResult> {
+  return invoke<ImportResult>("import_song", { sourcePath, parentDir });
 }

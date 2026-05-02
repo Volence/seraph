@@ -115,16 +115,20 @@ export default function App() {
   }
 
   async function handleImport() {
-    const { open } = await import("@tauri-apps/plugin-dialog");
+    const { open, save } = await import("@tauri-apps/plugin-dialog");
     const sourcePath = await open({
       title: "Select SMPS Assembly File",
       filters: [{ name: "SMPS Assembly", extensions: ["asm"] }],
     });
     if (!sourcePath) return;
 
-    const projectDir = await open({
-      directory: true,
-      title: "Choose Project Directory",
+    // Derive a default project name from the filename
+    const fileName = (sourcePath as string).split("/").pop() ?? "import";
+    const defaultName = fileName.replace(/\.asm$/i, "").replace(/^Mus - /, "");
+
+    const projectDir = await save({
+      title: "Save Imported Project As",
+      defaultPath: defaultName,
     });
     if (!projectDir) return;
 
@@ -141,8 +145,9 @@ export default function App() {
       if (result.warnings.length > 0) {
         setImportWarnings(result.warnings);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Import failed:", e);
+      alert(`Import failed: ${e?.message ?? e}`);
     }
   }
 

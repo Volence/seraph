@@ -377,7 +377,9 @@ export function TimelineCanvas({
       const endX = e.clientX - rect.left;
       const endY = e.clientY - rect.top;
 
-      if (d.mode === "create") {
+      const movedEnough = Math.abs(endX - d.startX) > 4 || Math.abs(endY - (d.trackIdx * trackHeight + trackHeight / 2)) > trackHeight / 2;
+
+      if (d.mode === "create" && movedEnough) {
         const rawStart = pixelToTick(Math.min(d.startX, endX));
         const rawEnd = pixelToTick(Math.max(d.startX, endX));
         const sStart = snapToBar(rawStart);
@@ -387,7 +389,7 @@ export function TimelineCanvas({
         }
       }
 
-      if (d.mode === "move" && d.regionTrackId && d.regionId && d.regionStartTick != null) {
+      if (d.mode === "move" && movedEnough && d.regionTrackId && d.regionId && d.regionStartTick != null) {
         const deltaPx = endX - d.startX;
         const deltaTick = deltaPx * ticksPerPixel;
         const snappedTickDelta = snapToBar(Math.max(0, d.regionStartTick + deltaTick)) - d.regionStartTick;
@@ -398,7 +400,7 @@ export function TimelineCanvas({
         onRegionMove(d.regionTrackId, d.regionId, dstTrackId, newStart, snappedTickDelta, trackDelta);
       }
 
-      if ((d.mode === "resize-left" || d.mode === "resize-right") && d.regionTrackId && d.regionId && d.regionStartTick != null && d.regionDuration != null) {
+      if ((d.mode === "resize-left" || d.mode === "resize-right") && movedEnough && d.regionTrackId && d.regionId && d.regionStartTick != null && d.regionDuration != null) {
         const origStart = d.regionStartTick;
         const origEnd = origStart + d.regionDuration;
         const deltaPx = endX - d.startX;

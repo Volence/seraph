@@ -102,7 +102,6 @@ export function ArrangementView({
     } else {
       await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
     }
-    onSelectRegions([]);
     refresh();
   }
 

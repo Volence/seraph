@@ -1,13 +1,27 @@
+import type { SongMetadata, SelectedRegion } from "../types/model";
+import { ArrangementView } from "./ArrangementView";
 import styles from "./MainArea.module.css";
 
 interface MainAreaProps {
   projectOpen: boolean;
+  projectMeta: SongMetadata | null;
+  playing: boolean;
   onNewProject: () => void;
   onOpenProject: () => void;
+  onSelectRegion: (region: SelectedRegion | null) => void;
+  selectedRegion: SelectedRegion | null;
 }
 
-export function MainArea({ projectOpen, onNewProject, onOpenProject }: MainAreaProps) {
-  if (!projectOpen) {
+export function MainArea({
+  projectOpen,
+  projectMeta,
+  playing,
+  onNewProject,
+  onOpenProject,
+  onSelectRegion,
+  selectedRegion,
+}: MainAreaProps) {
+  if (!projectOpen || !projectMeta) {
     return (
       <div className={styles.welcome}>
         <h1 className={styles.title}>MegaDAW</h1>
@@ -21,8 +35,11 @@ export function MainArea({ projectOpen, onNewProject, onOpenProject }: MainAreaP
   }
 
   return (
-    <div className={styles.placeholder}>
-      <p className={styles.placeholderText}>Arrangement View — Phase 4</p>
-    </div>
+    <ArrangementView
+      projectMeta={projectMeta}
+      playing={playing}
+      onSelectRegion={onSelectRegion}
+      selectedRegion={selectedRegion}
+    />
   );
 }

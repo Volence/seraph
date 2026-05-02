@@ -1,0 +1,50 @@
+.arrangement {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.rulerRow {
+  display: flex;
+  flex-shrink: 0;
+  height: 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.headerSpacer {
+  width: 180px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.headers {
+  width: 180px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+}
+
+.addTrackBtn {
+  width: 100%;
+  padding: 8px;
+  background: none;
+  color: var(--text-secondary);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 12px;
+}
+
+.addTrackBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}

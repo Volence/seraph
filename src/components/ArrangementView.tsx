@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Track, SongMetadata, FmInstrument, PsgInstrument, DacInstrument, SelectedRegion } from "../types/model";
+import type { Track, SongMetadata, SelectedRegion } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { TrackHeader } from "./TrackHeader";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineCanvas } from "./TimelineCanvas";
-import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
 import styles from "./ArrangementView.module.css";
 
@@ -18,33 +17,21 @@ interface ArrangementViewProps {
 
 export function ArrangementView({ projectMeta, playing, onSelectRegion, selectedRegion }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [fmInstruments, setFmInstruments] = useState<FmInstrument[]>([]);
-  const [psgInstruments, setPsgInstruments] = useState<PsgInstrument[]>([]);
-  const [dacInstruments, setDacInstruments] = useState<DacInstrument[]>([]);
-  const [showAddTrack, setShowAddTrack] = useState(false);
   const zoom = useArrangementZoom(projectMeta.ticksPerBeat);
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const trackHeight = 60;
 
   const refresh = useCallback(async () => {
-    const [t, fm, psg, dac] = await Promise.all([
-      ipc.listTracks(),
-      ipc.listFmInstruments(),
-      ipc.listPsgInstruments(),
-      ipc.listDacInstruments(),
-    ]);
+    const t = await ipc.listTracks();
     setTracks(t);
-    setFmInstruments(fm);
-    setPsgInstruments(psg);
-    setDacInstruments(dac);
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  async function handleDeleteTrack(id: string) {
-    await ipc.deleteTrack(id);
-    refresh();
-  }
+  useEffect(() => {
+    const interval = setInterval(refresh, 1000);
+    return () => clearInterval(interval);
+  }, [refresh]);
 
   function handleRegionDoubleClick(trackId: string, regionId: string) {
     const track = tracks.find((t) => t.id === trackId);
@@ -94,16 +81,9 @@ export function ArrangementView({ projectMeta, playing, onSelectRegion, selected
             <TrackHeader
               key={track.id}
               track={track}
-              fmInstruments={fmInstruments}
-              psgInstruments={psgInstruments}
-              dacInstruments={dacInstruments}
               onUpdate={refresh}
-              onDelete={() => handleDeleteTrack(track.id)}
             />
           ))}
-          <button className={styles.addTrackBtn} onClick={() => setShowAddTrack(true)}>
-            + Add Track
-          </button>
         </div>
         <TimelineCanvas
           tracks={tracks}
@@ -131,13 +111,6 @@ export function ArrangementView({ projectMeta, playing, onSelectRegion, selected
           onEmptyDoubleClick={handleCreateRegion}
         />
       </div>
-      {showAddTrack && (
-        <AddTrackDialog
-          driverId={projectMeta.driverId}
-          onClose={() => setShowAddTrack(false)}
-          onCreated={() => { setShowAddTrack(false); refresh(); }}
-        />
-      )}
     </div>
   );
 }

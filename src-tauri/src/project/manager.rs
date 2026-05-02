@@ -231,17 +231,34 @@ impl ProjectManager {
     pub fn add_fm_instrument(&mut self, mut inst: FmInstrument) -> Uuid {
         let id = Uuid::new_v4();
         inst.id = id;
+        let channel = self.next_available_fm_channel();
+        let track_name = inst.name.clone();
         self.instruments.fm.push(inst);
         self.dirty_instruments.insert(id);
+        self.add_track(track_name, channel, Some(id));
         id
+    }
+
+    fn next_available_fm_channel(&self) -> ChannelAssignment {
+        let used: HashSet<u8> = self.tracks.iter().filter_map(|t| {
+            if let ChannelAssignment::Fm(n) = t.channel { Some(n) } else { None }
+        }).collect();
+        for i in 0..6u8 {
+            if !used.contains(&i) { return ChannelAssignment::Fm(i); }
+        }
+        ChannelAssignment::Fm(0)
     }
 
     pub fn update_fm_instrument(&mut self, id: Uuid, mut inst: FmInstrument) -> Result<(), String> {
         let existing = self.instruments.fm.iter_mut().find(|i| i.id == id)
             .ok_or("FM instrument not found")?;
         inst.id = id;
+        let new_name = inst.name.clone();
         *existing = inst;
         self.dirty_instruments.insert(id);
+        if let Some(track) = self.tracks.iter_mut().find(|t| t.instrument_id == Some(id)) {
+            track.name = new_name;
+        }
         Ok(())
     }
 
@@ -250,6 +267,7 @@ impl ProjectManager {
             .ok_or("FM instrument not found")?;
         self.instruments.fm.remove(pos);
         self.dirty_instruments.remove(&id);
+        self.tracks.retain(|t| t.instrument_id != Some(id));
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/fm/{id}.json"));
             if file.exists() { let _ = fs::remove_file(file); }
@@ -270,17 +288,37 @@ impl ProjectManager {
     pub fn add_psg_instrument(&mut self, mut inst: PsgInstrument) -> Uuid {
         let id = Uuid::new_v4();
         inst.id = id;
+        let channel = self.next_available_psg_channel(&inst);
+        let track_name = inst.name.clone();
         self.instruments.psg.push(inst);
         self.dirty_instruments.insert(id);
+        self.add_track(track_name, channel, Some(id));
         id
+    }
+
+    fn next_available_psg_channel(&self, inst: &PsgInstrument) -> ChannelAssignment {
+        if inst.noise_mode.is_some() {
+            return ChannelAssignment::PsgNoise;
+        }
+        let used: HashSet<u8> = self.tracks.iter().filter_map(|t| {
+            if let ChannelAssignment::Psg(n) = t.channel { Some(n) } else { None }
+        }).collect();
+        for i in 0..3u8 {
+            if !used.contains(&i) { return ChannelAssignment::Psg(i); }
+        }
+        ChannelAssignment::Psg(0)
     }
 
     pub fn update_psg_instrument(&mut self, id: Uuid, mut inst: PsgInstrument) -> Result<(), String> {
         let existing = self.instruments.psg.iter_mut().find(|i| i.id == id)
             .ok_or("PSG instrument not found")?;
         inst.id = id;
+        let new_name = inst.name.clone();
         *existing = inst;
         self.dirty_instruments.insert(id);
+        if let Some(track) = self.tracks.iter_mut().find(|t| t.instrument_id == Some(id)) {
+            track.name = new_name;
+        }
         Ok(())
     }
 
@@ -289,6 +327,7 @@ impl ProjectManager {
             .ok_or("PSG instrument not found")?;
         self.instruments.psg.remove(pos);
         self.dirty_instruments.remove(&id);
+        self.tracks.retain(|t| t.instrument_id != Some(id));
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/psg/{id}.json"));
             if file.exists() { let _ = fs::remove_file(file); }
@@ -308,9 +347,11 @@ impl ProjectManager {
 
     pub fn add_dac_instrument(&mut self, inst: DacInstrument, pcm_data: Vec<u8>) -> Uuid {
         let id = inst.id;
+        let track_name = inst.name.clone();
         self.dac_pcm_cache.insert(id, Arc::new(pcm_data));
         self.instruments.dac.push(inst);
         self.dirty_instruments.insert(id);
+        self.add_track(track_name, ChannelAssignment::Dac(0), Some(id));
         id
     }
 
@@ -318,8 +359,12 @@ impl ProjectManager {
         let existing = self.instruments.dac.iter_mut().find(|i| i.id == id)
             .ok_or("DAC instrument not found")?;
         inst.id = id;
+        let new_name = inst.name.clone();
         *existing = inst;
         self.dirty_instruments.insert(id);
+        if let Some(track) = self.tracks.iter_mut().find(|t| t.instrument_id == Some(id)) {
+            track.name = new_name;
+        }
         Ok(())
     }
 
@@ -329,6 +374,7 @@ impl ProjectManager {
         let inst = self.instruments.dac.remove(pos);
         self.dirty_instruments.remove(&id);
         self.dac_pcm_cache.remove(&id);
+        self.tracks.retain(|t| t.instrument_id != Some(id));
         if let Some(path) = &self.project_path {
             for name in [
                 format!("instruments/dac/{id}.json"),
@@ -954,21 +1000,14 @@ mod tests {
         };
         let fm_id = mgr.add_fm_instrument(fm_inst);
 
-        mgr.tracks.push(Track {
+        // add_fm_instrument auto-creates a track; find it and set it up
+        let track = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id)).unwrap();
+        track.muted = true;
+        track.regions.push(Region {
             id: Uuid::new_v4(),
-            name: "FM1".into(),
-            channel: ChannelAssignment::Fm(0),
-            instrument_id: Some(fm_id),
-            regions: vec![Region {
-                id: Uuid::new_v4(),
-                start_tick: 0,
-                duration_ticks: 480,
-                notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 }],
-            }],
-            muted: true,
-            solo: false,
-            volume: 100,
-            pan: Pan::Center,
+            start_tick: 0,
+            duration_ticks: 480,
+            notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 }],
         });
 
         let snap = mgr.build_snapshot();
@@ -983,50 +1022,45 @@ mod tests {
         let mut mgr = ProjectManager::new(test_registry());
         mgr.create(&path, "Solo Test", "flamedriver", 120.0, (4, 4)).unwrap();
 
-        let fm_inst = FmInstrument {
+        let fm_inst1 = FmInstrument {
             id: Uuid::nil(),
-            name: "Test".into(),
+            name: "Solo".into(),
             algorithm: 0,
             feedback: 0,
             operators: [FmOperator::default(); 4],
             metadata: InstrumentMetadata::default(),
         };
-        let fm_id = mgr.add_fm_instrument(fm_inst);
+        let fm_id1 = mgr.add_fm_instrument(fm_inst1);
+
+        let fm_inst2 = FmInstrument {
+            id: Uuid::nil(),
+            name: "NotSolo".into(),
+            algorithm: 0,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        let fm_id2 = mgr.add_fm_instrument(fm_inst2);
 
         let note = Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 };
-        let region = Region {
+
+        // Set up first auto-created track as solo'd with a region
+        let track1 = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id1)).unwrap();
+        track1.solo = true;
+        track1.regions.push(Region {
             id: Uuid::new_v4(),
             start_tick: 0,
             duration_ticks: 480,
             notes: vec![note.clone()],
-        };
-
-        mgr.tracks.push(Track {
-            id: Uuid::new_v4(),
-            name: "FM1-Solo".into(),
-            channel: ChannelAssignment::Fm(0),
-            instrument_id: Some(fm_id),
-            regions: vec![region.clone()],
-            muted: false,
-            solo: true,
-            volume: 100,
-            pan: Pan::Center,
         });
-        mgr.tracks.push(Track {
+
+        // Set up second auto-created track (not solo'd) with a region
+        let track2 = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id2)).unwrap();
+        track2.regions.push(Region {
             id: Uuid::new_v4(),
-            name: "FM2-NotSolo".into(),
-            channel: ChannelAssignment::Fm(1),
-            instrument_id: Some(fm_id),
-            regions: vec![Region {
-                id: Uuid::new_v4(),
-                start_tick: 0,
-                duration_ticks: 480,
-                notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 }],
-            }],
-            muted: false,
-            solo: false,
-            volume: 100,
-            pan: Pan::Center,
+            start_tick: 0,
+            duration_ticks: 480,
+            notes: vec![note],
         });
 
         let snap = mgr.build_snapshot();
@@ -1041,47 +1075,43 @@ mod tests {
         let mut mgr = ProjectManager::new(test_registry());
         mgr.create(&path, "Overlap Test", "flamedriver", 120.0, (4, 4)).unwrap();
 
-        let fm_inst = FmInstrument {
+        let fm_inst1 = FmInstrument {
             id: Uuid::nil(),
-            name: "Test".into(),
+            name: "A".into(),
             algorithm: 0,
             feedback: 0,
             operators: [FmOperator::default(); 4],
             metadata: InstrumentMetadata::default(),
         };
-        let fm_id = mgr.add_fm_instrument(fm_inst);
+        let fm_id1 = mgr.add_fm_instrument(fm_inst1);
 
-        mgr.tracks.push(Track {
+        let fm_inst2 = FmInstrument {
+            id: Uuid::nil(),
+            name: "B".into(),
+            algorithm: 0,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        let fm_id2 = mgr.add_fm_instrument(fm_inst2);
+
+        // Force both tracks onto the same channel to create overlap
+        let track1 = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id1)).unwrap();
+        track1.channel = ChannelAssignment::Fm(0);
+        track1.regions.push(Region {
             id: Uuid::new_v4(),
-            name: "FM1-A".into(),
-            channel: ChannelAssignment::Fm(0),
-            instrument_id: Some(fm_id),
-            regions: vec![Region {
-                id: Uuid::new_v4(),
-                start_tick: 0,
-                duration_ticks: 960,
-                notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480 }],
-            }],
-            muted: false,
-            solo: false,
-            volume: 100,
-            pan: Pan::Center,
+            start_tick: 0,
+            duration_ticks: 960,
+            notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480 }],
         });
-        mgr.tracks.push(Track {
+
+        let track2 = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id2)).unwrap();
+        track2.channel = ChannelAssignment::Fm(0);
+        track2.regions.push(Region {
             id: Uuid::new_v4(),
-            name: "FM1-B".into(),
-            channel: ChannelAssignment::Fm(0),
-            instrument_id: Some(fm_id),
-            regions: vec![Region {
-                id: Uuid::new_v4(),
-                start_tick: 0,
-                duration_ticks: 960,
-                notes: vec![Note { tick: 240, pitch: 64, velocity: 100, duration_ticks: 480 }],
-            }],
-            muted: false,
-            solo: false,
-            volume: 100,
-            pan: Pan::Center,
+            start_tick: 0,
+            duration_ticks: 960,
+            notes: vec![Note { tick: 240, pitch: 64, velocity: 100, duration_ticks: 480 }],
         });
 
         let snap = mgr.build_snapshot();
@@ -1107,24 +1137,16 @@ mod tests {
         };
         let fm_id = mgr.add_fm_instrument(fm_inst);
 
-        mgr.tracks.push(Track {
+        // Use the auto-created track
+        let track = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id)).unwrap();
+        track.regions.push(Region {
             id: Uuid::new_v4(),
-            name: "FM1".into(),
-            channel: ChannelAssignment::Fm(0),
-            instrument_id: Some(fm_id),
-            regions: vec![Region {
-                id: Uuid::new_v4(),
-                start_tick: 0,
-                duration_ticks: 1920,
-                notes: vec![
-                    Note { tick: 480, pitch: 60, velocity: 100, duration_ticks: 240 },
-                    Note { tick: 0, pitch: 48, velocity: 100, duration_ticks: 480 },
-                ],
-            }],
-            muted: false,
-            solo: false,
-            volume: 100,
-            pan: Pan::Center,
+            start_tick: 0,
+            duration_ticks: 1920,
+            notes: vec![
+                Note { tick: 480, pitch: 60, velocity: 100, duration_ticks: 240 },
+                Note { tick: 0, pitch: 48, velocity: 100, duration_ticks: 480 },
+            ],
         });
 
         let snap = mgr.build_snapshot();

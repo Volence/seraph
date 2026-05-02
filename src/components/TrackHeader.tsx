@@ -1,15 +1,10 @@
-import { useState } from "react";
-import type { Track, FmInstrument, PsgInstrument, DacInstrument } from "../types/model";
+import type { Track } from "../types/model";
 import * as ipc from "../api/ipc";
 import styles from "./TrackHeader.module.css";
 
 interface TrackHeaderProps {
   track: Track;
-  fmInstruments: FmInstrument[];
-  psgInstruments: PsgInstrument[];
-  dacInstruments: DacInstrument[];
   onUpdate: () => void;
-  onDelete: () => void;
 }
 
 function channelColor(track: Track): string {
@@ -29,31 +24,7 @@ function channelLabel(track: Track): string {
   return "?";
 }
 
-function channelType(track: Track): "fm" | "psg" | "dac" {
-  const ch = track.channel;
-  if (ch === "PsgNoise") return "psg";
-  if (typeof ch === "object" && "Fm" in ch) return "fm";
-  if (typeof ch === "object" && "Psg" in ch) return "psg";
-  return "dac";
-}
-
-export function TrackHeader({
-  track,
-  fmInstruments,
-  psgInstruments,
-  dacInstruments,
-  onUpdate,
-  onDelete,
-}: TrackHeaderProps) {
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(track.name);
-
-  const ct = channelType(track);
-  const instruments =
-    ct === "fm" ? fmInstruments :
-    ct === "psg" ? psgInstruments :
-    dacInstruments;
-
+export function TrackHeader({ track, onUpdate }: TrackHeaderProps) {
   async function toggleMute() {
     await ipc.updateTrack(
       track.id, track.name, track.channel, track.instrumentId,
@@ -70,45 +41,13 @@ export function TrackHeader({
     onUpdate();
   }
 
-  async function commitRename() {
-    setEditing(false);
-    if (name.trim() && name !== track.name) {
-      await ipc.updateTrack(
-        track.id, name.trim(), track.channel, track.instrumentId,
-        track.muted, track.solo, track.volume, track.pan,
-      );
-      onUpdate();
-    }
-  }
-
-  async function changeInstrument(instId: string) {
-    await ipc.updateTrack(
-      track.id, track.name, track.channel, instId || null,
-      track.muted, track.solo, track.volume, track.pan,
-    );
-    onUpdate();
-  }
-
   return (
-    <div className={styles.header} onContextMenu={(e) => { e.preventDefault(); onDelete(); }}>
+    <div className={styles.header}>
       <div className={styles.top}>
         <span className={styles.badge} style={{ background: channelColor(track) }}>
           {channelLabel(track)}
         </span>
-        {editing ? (
-          <input
-            className={styles.nameInput}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={(e) => e.key === "Enter" && commitRename()}
-            autoFocus
-          />
-        ) : (
-          <span className={styles.name} onDoubleClick={() => setEditing(true)}>
-            {track.name}
-          </span>
-        )}
+        <span className={styles.name}>{track.name}</span>
       </div>
       <div className={styles.controls}>
         <button
@@ -123,16 +62,6 @@ export function TrackHeader({
         >
           S
         </button>
-        <select
-          className={styles.instSelect}
-          value={track.instrumentId ?? ""}
-          onChange={(e) => changeInstrument(e.target.value)}
-        >
-          <option value="">-- None --</option>
-          {instruments.map((inst) => (
-            <option key={inst.id} value={inst.id}>{inst.name}</option>
-          ))}
-        </select>
       </div>
     </div>
   );

@@ -33,18 +33,3 @@
   border-right: 1px solid var(--border);
 }
 
-.addTrackBtn {
-  width: 100%;
-  padding: 8px;
-  background: none;
-  color: var(--text-secondary);
-  border: none;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  font-size: 12px;
-}
-
-.addTrackBtn:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface);
-}

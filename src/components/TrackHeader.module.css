@@ -31,16 +31,6 @@
   cursor: default;
 }
 
-.nameInput {
-  font-size: 12px;
-  padding: 1px 4px;
-  width: 100%;
-  background: var(--bg-input);
-  color: var(--text-primary);
-  border: 1px solid var(--border-focus);
-  border-radius: 2px;
-}
-
 .controls {
   display: flex;
   align-items: center;
@@ -74,9 +64,3 @@
   border-color: var(--carrier-highlight);
 }
 
-.instSelect {
-  flex: 1;
-  font-size: 11px;
-  min-width: 0;
-  padding: 1px 4px;
-}

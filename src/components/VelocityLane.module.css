@@ -1,0 +1,7 @@
+.lane {
+  height: 60px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+}

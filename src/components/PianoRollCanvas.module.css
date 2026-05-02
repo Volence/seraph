@@ -1,0 +1,8 @@
+.container {
+  flex: 1;
+  overflow: auto;
+}
+
+.canvas {
+  display: block;
+}

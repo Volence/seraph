@@ -1,0 +1,5 @@
+.keys {
+  width: 48px;
+  flex-shrink: 0;
+  overflow: hidden;
+}

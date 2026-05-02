@@ -1,4 +1,10 @@
+use std::collections::HashMap;
+use uuid::Uuid;
+use crate::driver::flamedriver::FlamedriverProfile;
 use crate::export::ExportError;
+use crate::model::driver::DriverProfile;
+use crate::model::instrument::{FmInstrument, InstrumentBank};
+use crate::model::song::{ChannelAssignment, Pan, Track};
 
 /// SMPS tempo parameters chosen to best represent the song's BPM.
 #[derive(Debug, Clone, Copy)]
@@ -173,6 +179,79 @@ fn emit_duration_events(out: &mut Vec<SmpsEvent>, pitch_name: Option<String>, to
     }
 }
 
+// --- Voice Bank ---
+
+/// Build a deduplicated voice index from active FM tracks.
+pub fn build_voice_index<'a>(tracks: &[Track], instruments: &'a InstrumentBank) -> (HashMap<Uuid, u8>, Vec<&'a FmInstrument>) {
+    let mut map = HashMap::new();
+    let mut voices: Vec<&FmInstrument> = Vec::new();
+
+    for track in tracks {
+        if track.muted { continue; }
+        if !matches!(track.channel, ChannelAssignment::Fm(_)) { continue; }
+        if let Some(inst_id) = &track.instrument_id {
+            if map.contains_key(inst_id) { continue; }
+            if let Some(inst) = instruments.fm.iter().find(|i| &i.id == inst_id) {
+                let idx = voices.len() as u8;
+                map.insert(*inst_id, idx);
+                voices.push(inst);
+            }
+        }
+    }
+
+    (map, voices)
+}
+
+/// Generate the voice bank assembly text.
+pub fn generate_voice_bank_asm(song_label: &str, voices: &[&FmInstrument], driver: &FlamedriverProfile) -> String {
+    let mut asm = String::new();
+    asm.push_str("; ============================================================\n");
+    asm.push_str(&format!("; Voice Bank: {song_label}\n"));
+    asm.push_str("; Exported from MegaDAW\n");
+    asm.push_str("; ============================================================\n\n");
+    asm.push_str(&format!("Snd_{song_label}_Voices:\n"));
+
+    for (i, inst) in voices.iter().enumerate() {
+        let bytes = driver.fm_to_bytes(inst);
+
+        let alg = bytes[24] & 0x07;
+        let fb = (bytes[24] >> 3) & 0x07;
+
+        asm.push_str(&format!("\n; Voice {i} - \"{}\"\n", inst.name));
+        asm.push_str(&format!("\tsmpsVcAlgorithm\t\t${alg:02X}\n"));
+        asm.push_str(&format!("\tsmpsVcFeedback\t\t${fb:02X}\n"));
+        asm.push_str("\tsmpsVcUnusedBits\t$00\n");
+
+        let dt: Vec<String> = (0..4).map(|j| format!("${:02X}", (bytes[j] >> 4) & 0x07)).collect();
+        let mul: Vec<String> = (0..4).map(|j| format!("${:02X}", bytes[j] & 0x0F)).collect();
+        asm.push_str(&format!("\tsmpsVcDetune\t\t{}\n", dt.join(", ")));
+        asm.push_str(&format!("\tsmpsVcCoarseFreq\t{}\n", mul.join(", ")));
+
+        let rs: Vec<String> = (4..8).map(|j| format!("${:02X}", (bytes[j] >> 6) & 0x03)).collect();
+        let ar: Vec<String> = (4..8).map(|j| format!("${:02X}", bytes[j] & 0x1F)).collect();
+        asm.push_str(&format!("\tsmpsVcRateScale\t\t{}\n", rs.join(", ")));
+        asm.push_str(&format!("\tsmpsVcAttackRate\t{}\n", ar.join(", ")));
+
+        let am: Vec<String> = (8..12).map(|j| format!("${:02X}", (bytes[j] >> 7) & 0x01)).collect();
+        let d1r: Vec<String> = (8..12).map(|j| format!("${:02X}", bytes[j] & 0x1F)).collect();
+        asm.push_str(&format!("\tsmpsVcAmpMod\t\t{}\n", am.join(", ")));
+        asm.push_str(&format!("\tsmpsVcDecayRate1\t{}\n", d1r.join(", ")));
+
+        let d2r: Vec<String> = (12..16).map(|j| format!("${:02X}", bytes[j] & 0x1F)).collect();
+        asm.push_str(&format!("\tsmpsVcDecayRate2\t{}\n", d2r.join(", ")));
+
+        let sl: Vec<String> = (16..20).map(|j| format!("${:02X}", (bytes[j] >> 4) & 0x0F)).collect();
+        let rr: Vec<String> = (16..20).map(|j| format!("${:02X}", bytes[j] & 0x0F)).collect();
+        asm.push_str(&format!("\tsmpsVcDecayLevel\t{}\n", sl.join(", ")));
+        asm.push_str(&format!("\tsmpsVcReleaseRate\t{}\n", rr.join(", ")));
+
+        let tl: Vec<String> = (20..24).map(|j| format!("${:02X}", bytes[j] & 0x7F)).collect();
+        asm.push_str(&format!("\tsmpsVcTotalLevel\t{}\n", tl.join(", ")));
+    }
+
+    asm
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,5 +335,58 @@ mod tests {
         let notes = vec![(0u64, 60u8, 200u64)];
         let events = encode_channel_events(&notes, 200, &params).unwrap();
         assert!(events.iter().any(|e| matches!(e, SmpsEvent::Tie)));
+    }
+
+    #[test]
+    fn test_build_voice_index_deduplicates() {
+        use crate::model::instrument::*;
+
+        let inst_id = Uuid::new_v4();
+        let tracks = vec![
+            Track {
+                id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
+                instrument_id: Some(inst_id), regions: vec![], muted: false, solo: false,
+                volume: 100, pan: Pan::Center,
+            },
+            Track {
+                id: Uuid::new_v4(), name: "FM2".into(), channel: ChannelAssignment::Fm(1),
+                instrument_id: Some(inst_id), regions: vec![], muted: false, solo: false,
+                volume: 100, pan: Pan::Center,
+            },
+        ];
+        let bank = InstrumentBank {
+            fm: vec![FmInstrument {
+                id: inst_id, name: "Test".into(), algorithm: 0, feedback: 0,
+                operators: [FmOperator::default(); 4],
+                metadata: InstrumentMetadata::default(),
+            }],
+            psg: vec![], dac: vec![],
+        };
+        let (map, voices) = build_voice_index(&tracks, &bank);
+        assert_eq!(voices.len(), 1);
+        assert_eq!(map[&inst_id], 0);
+    }
+
+    #[test]
+    fn test_muted_tracks_excluded_from_voice_index() {
+        use crate::model::instrument::*;
+
+        let inst_id = Uuid::new_v4();
+        let tracks = vec![Track {
+            id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
+            instrument_id: Some(inst_id), regions: vec![], muted: true, solo: false,
+            volume: 100, pan: Pan::Center,
+        }];
+        let bank = InstrumentBank {
+            fm: vec![FmInstrument {
+                id: inst_id, name: "Test".into(), algorithm: 0, feedback: 0,
+                operators: [FmOperator::default(); 4],
+                metadata: InstrumentMetadata::default(),
+            }],
+            psg: vec![], dac: vec![],
+        };
+        let (map, voices) = build_voice_index(&tracks, &bank);
+        assert!(voices.is_empty());
+        assert!(map.is_empty());
     }
 }

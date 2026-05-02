@@ -20,6 +20,7 @@ export default function App() {
     | { type: "error"; errors: ipc.ExportError[] }
     | null
   >(null);
+  const [importWarnings, setImportWarnings] = useState<ipc.ImportWarning[] | null>(null);
 
   const projectOpen = projectMeta !== null;
 
@@ -113,6 +114,38 @@ export default function App() {
     }
   }
 
+  async function handleImport() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const sourcePath = await open({
+      title: "Select SMPS Assembly File",
+      filters: [{ name: "SMPS Assembly", extensions: ["asm"] }],
+    });
+    if (!sourcePath) return;
+
+    const projectDir = await open({
+      directory: true,
+      title: "Choose Project Directory",
+    });
+    if (!projectDir) return;
+
+    try {
+      if (projectOpen) await ipc.closeProject();
+      setPlaying(false);
+
+      const result = await ipc.importSong(sourcePath as string, projectDir as string);
+      const song = await ipc.openProject(projectDir as string);
+      setProjectMeta(song.metadata);
+      setSelectedInstrument(null);
+      setSelectedRegions([]);
+
+      if (result.warnings.length > 0) {
+        setImportWarnings(result.warnings);
+      }
+    } catch (e) {
+      console.error("Import failed:", e);
+    }
+  }
+
   return (
     <div className={styles.app}>
       <TopBar
@@ -121,6 +154,7 @@ export default function App() {
         onOpenProject={handleOpenProject}
         onSave={handleSave}
         onExport={projectOpen ? handleExport : undefined}
+        onImport={handleImport}
         showSaved={showSaved}
         playing={playing}
         loopEnabled={loopEnabled}
@@ -141,6 +175,19 @@ export default function App() {
           <ul>
             {exportStatus.errors.map((e, i) => (
               <li key={i}>{e.trackName ? `${e.trackName}: ` : ""}{e.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {importWarnings && (
+        <div className={styles.importWarning}>
+          <div className={styles.importWarningHeader}>
+            <span>Import complete ({importWarnings.length} warning{importWarnings.length !== 1 ? "s" : ""})</span>
+            <button onClick={() => setImportWarnings(null)}>x</button>
+          </div>
+          <ul>
+            {importWarnings.map((w, i) => (
+              <li key={i}>{w.channel ? `${w.channel}: ` : ""}{w.message}</li>
             ))}
           </ul>
         </div>

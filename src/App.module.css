@@ -65,3 +65,44 @@
 .exportError li {
   margin: 4px 0;
 }
+
+.importWarning {
+  position: fixed;
+  top: 48px;
+  right: 16px;
+  background: #2a2a1a;
+  border: 1px solid #ccaa44;
+  color: #eedd88;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  max-width: 400px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.importWarningHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.importWarningHeader button {
+  background: none;
+  border: none;
+  color: #eedd88;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.importWarning ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.importWarning li {
+  margin: 4px 0;
+}

@@ -19,3 +19,111 @@ pub struct ImportWarning {
     pub channel: String,
     pub message: String,
 }
+
+pub fn import_smps_file(
+    source_path: &std::path::Path,
+    project_dir: &std::path::Path,
+    driver: &dyn crate::model::driver::DriverProfile,
+) -> Result<ImportResult, String> {
+    let source = std::fs::read_to_string(source_path)
+        .map_err(|e| format!("failed to read {}: {e}", source_path.display()))?;
+
+    let smps = smps_parser::parse_smps(&source)?;
+    let mapped = smps_mapper::map_smps_to_song(&smps, driver)?;
+    let song = mapped.song;
+
+    std::fs::create_dir_all(project_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("instruments/fm")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("instruments/psg")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("instruments/dac")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("exports")).map_err(|e| e.to_string())?;
+
+    let version = serde_json::json!({ "version": "0.1.0" });
+    std::fs::write(
+        project_dir.join(".megadaw"),
+        serde_json::to_string_pretty(&version).unwrap(),
+    ).map_err(|e| e.to_string())?;
+
+    let project_file = crate::model::song::ProjectFile {
+        metadata: song.metadata.clone(),
+        tracks: song.tracks.clone(),
+    };
+    let json = serde_json::to_string_pretty(&project_file).map_err(|e| e.to_string())?;
+    std::fs::write(project_dir.join("project.json"), json).map_err(|e| e.to_string())?;
+
+    let mut instrument_count = 0;
+    for inst in &song.instruments.fm {
+        let json = serde_json::to_string_pretty(inst).map_err(|e| e.to_string())?;
+        std::fs::write(
+            project_dir.join(format!("instruments/fm/{}.json", inst.id)),
+            json,
+        ).map_err(|e| e.to_string())?;
+        instrument_count += 1;
+    }
+    for inst in &song.instruments.psg {
+        let json = serde_json::to_string_pretty(inst).map_err(|e| e.to_string())?;
+        std::fs::write(
+            project_dir.join(format!("instruments/psg/{}.json", inst.id)),
+            json,
+        ).map_err(|e| e.to_string())?;
+        instrument_count += 1;
+    }
+    for inst in &song.instruments.dac {
+        let json = serde_json::to_string_pretty(inst).map_err(|e| e.to_string())?;
+        std::fs::write(
+            project_dir.join(format!("instruments/dac/{}.json", inst.id)),
+            json,
+        ).map_err(|e| e.to_string())?;
+        instrument_count += 1;
+    }
+
+    Ok(ImportResult {
+        metadata: song.metadata,
+        track_count: song.tracks.len(),
+        instrument_count,
+        warnings: mapped.warnings,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::driver::flamedriver::FlamedriverProfile;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_import_creates_project_directory() {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data/Mus - DEZ1.asm");
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("DEZ1_Import");
+
+        let driver = FlamedriverProfile;
+        let result = import_smps_file(&source, &project_dir, &driver).unwrap();
+
+        assert!(project_dir.join("project.json").exists());
+        assert!(project_dir.join(".megadaw").exists());
+        assert!(project_dir.join("instruments/fm").exists());
+        assert_eq!(result.track_count, 9);
+        assert!(result.instrument_count > 0);
+    }
+
+    #[test]
+    fn test_import_saves_fm_instruments() {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data/Mus - DEZ1.asm");
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("DEZ1_Import2");
+
+        let driver = FlamedriverProfile;
+        import_smps_file(&source, &project_dir, &driver).unwrap();
+
+        let fm_dir = project_dir.join("instruments/fm");
+        let fm_files: Vec<_> = std::fs::read_dir(&fm_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "json"))
+            .collect();
+        assert_eq!(fm_files.len(), 4);
+    }
+}

@@ -29,3 +29,6 @@ rtrb = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
 hound = "3.5"
 
+[dev-dependencies]
+tempfile = "3.27.0"
+

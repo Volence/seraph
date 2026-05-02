@@ -7,6 +7,11 @@ import type {
   SongMetadata,
   DriverInfo,
   DriverDetail,
+  Track,
+  ChannelAssignment,
+  Pan,
+  PlaybackState,
+  OverlapWarning,
 } from "../types/model";
 
 export async function playFmTestTone(): Promise<string> {
@@ -126,4 +131,123 @@ export async function previewDac(id: string): Promise<void> {
 
 export async function getDacPcmData(id: string): Promise<number[]> {
   return invoke<number[]>("get_dac_pcm_data", { id });
+}
+
+// --- Track CRUD ---
+
+export async function addTrack(
+  name: string,
+  channel: ChannelAssignment,
+  instrumentId: string | null,
+): Promise<string> {
+  return invoke<string>("add_track", { name, channel, instrumentId });
+}
+
+export async function updateTrack(
+  id: string,
+  name: string,
+  channel: ChannelAssignment,
+  instrumentId: string | null,
+  muted: boolean,
+  solo: boolean,
+  volume: number,
+  pan: Pan,
+): Promise<void> {
+  return invoke("update_track", { id, name, channel, instrumentId, muted, solo, volume, pan });
+}
+
+export async function deleteTrack(id: string): Promise<void> {
+  return invoke("delete_track", { id });
+}
+
+export async function listTracks(): Promise<Track[]> {
+  return invoke<Track[]>("list_tracks");
+}
+
+// --- Region CRUD ---
+
+export async function addRegion(
+  trackId: string,
+  startTick: number,
+  durationTicks: number,
+): Promise<string> {
+  return invoke<string>("add_region", { trackId, startTick, durationTicks });
+}
+
+export async function updateRegion(
+  trackId: string,
+  regionId: string,
+  startTick: number,
+  durationTicks: number,
+): Promise<void> {
+  return invoke("update_region", { trackId, regionId, startTick, durationTicks });
+}
+
+export async function deleteRegion(trackId: string, regionId: string): Promise<void> {
+  return invoke("delete_region", { trackId, regionId });
+}
+
+// --- Note CRUD ---
+
+export async function addNote(
+  trackId: string,
+  regionId: string,
+  tick: number,
+  pitch: number,
+  velocity: number,
+  durationTicks: number,
+): Promise<number> {
+  return invoke<number>("add_note", { trackId, regionId, tick, pitch, velocity, durationTicks });
+}
+
+export async function updateNote(
+  trackId: string,
+  regionId: string,
+  noteIndex: number,
+  tick: number,
+  pitch: number,
+  velocity: number,
+  durationTicks: number,
+): Promise<void> {
+  return invoke("update_note", { trackId, regionId, noteIndex, tick, pitch, velocity, durationTicks });
+}
+
+export async function deleteNote(
+  trackId: string,
+  regionId: string,
+  noteIndex: number,
+): Promise<void> {
+  return invoke("delete_note", { trackId, regionId, noteIndex });
+}
+
+// --- Transport ---
+
+export async function transportPlay(): Promise<void> {
+  return invoke("transport_play");
+}
+
+export async function transportStop(): Promise<void> {
+  return invoke("transport_stop");
+}
+
+export async function transportSeek(tick: number): Promise<void> {
+  return invoke("transport_seek", { tick });
+}
+
+export async function transportSetLoop(startTick: number, endTick: number): Promise<void> {
+  return invoke("transport_set_loop", { startTick, endTick });
+}
+
+export async function transportClearLoop(): Promise<void> {
+  return invoke("transport_clear_loop");
+}
+
+export async function getPlaybackState(): Promise<PlaybackState> {
+  return invoke<PlaybackState>("get_playback_state");
+}
+
+// --- Validation ---
+
+export async function getChannelOverlaps(): Promise<OverlapWarning[]> {
+  return invoke<OverlapWarning[]>("get_channel_overlaps");
 }

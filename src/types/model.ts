@@ -170,3 +170,26 @@ export const CARRIER_MASKS = [
 export function isCarrier(algorithm: number, opIndex: number): boolean {
   return (CARRIER_MASKS[algorithm] & (1 << opIndex)) !== 0;
 }
+
+export interface PlaybackState {
+  playing: boolean;
+  tick: number;
+  loopStart: number | null;
+  loopEnd: number | null;
+}
+
+export interface OverlapWarning {
+  channelName: string;
+  tickStart: number;
+  tickEnd: number;
+  trackIds: string[];
+}
+
+export interface SelectedRegion {
+  trackId: string;
+  trackName: string;
+  regionId: string;
+  channelType: "fm" | "psg" | "dac";
+  startTick: number;
+  durationTicks: number;
+}

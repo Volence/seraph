@@ -55,6 +55,20 @@ impl Sequencer {
         self.snapshot = snapshot;
     }
 
+    pub fn reload_snapshot(&mut self, snapshot: SequencerSnapshot, output: &mut Vec<SequencerOutput>) {
+        let was_playing = self.playing;
+        let saved_tick = self.current_tick;
+        let loop_start = self.snapshot.loop_start;
+        let loop_end = self.snapshot.loop_end;
+        self.silence_all(output);
+        self.load_snapshot(snapshot);
+        self.snapshot.loop_start = loop_start;
+        self.snapshot.loop_end = loop_end;
+        self.current_tick = saved_tick;
+        self.seek_cursors();
+        self.playing = was_playing;
+    }
+
     pub fn play(&mut self) {
         if self.snapshot.channels.is_empty() && self.snapshot.tempo_bpm == 120.0 {
             return;

@@ -34,6 +34,7 @@ export function TrackHeader({ track, selected, onUpdate, onClick }: TrackHeaderP
       !track.muted, track.solo, track.volume, track.pan,
     );
     onUpdate();
+    ipc.reloadSequence();
   }
 
   async function toggleSolo(e: React.MouseEvent) {
@@ -43,6 +44,7 @@ export function TrackHeader({ track, selected, onUpdate, onClick }: TrackHeaderP
       track.muted, !track.solo, track.volume, track.pan,
     );
     onUpdate();
+    ipc.reloadSequence();
   }
 
   return (

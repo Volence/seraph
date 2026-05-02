@@ -798,6 +798,19 @@ pub fn transport_seek(audio_state: State<'_, AudioState>, tick: u64) -> Result<(
 }
 
 #[tauri::command]
+pub fn reload_sequence(
+    audio_state: State<'_, AudioState>,
+    project_state: State<'_, ProjectState>,
+) -> Result<(), String> {
+    let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let snapshot = mgr.build_snapshot();
+    drop(mgr);
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::ReloadSequence { snapshot });
+    Ok(())
+}
+
+#[tauri::command]
 pub fn transport_set_loop(audio_state: State<'_, AudioState>, start_tick: u64, end_tick: u64) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::TransportSetLoop { start_tick, end_tick });

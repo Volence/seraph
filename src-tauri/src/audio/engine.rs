@@ -158,6 +158,11 @@ impl AudioEngine {
             AudioCommand::LoadSequence { snapshot } => {
                 self.sequencer.load_snapshot(snapshot);
             }
+            AudioCommand::ReloadSequence { snapshot } => {
+                let mut output = Vec::new();
+                self.sequencer.reload_snapshot(snapshot, &mut output);
+                self.apply_sequencer_output(&mut output);
+            }
         }
     }
 

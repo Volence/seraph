@@ -255,6 +255,10 @@ export async function transportClearLoop(): Promise<void> {
   return invoke("transport_clear_loop");
 }
 
+export async function reloadSequence(): Promise<void> {
+  return invoke("reload_sequence");
+}
+
 export async function getPlaybackState(): Promise<PlaybackState> {
   return invoke<PlaybackState>("get_playback_state");
 }

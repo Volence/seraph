@@ -26,7 +26,7 @@ pub use commands::{
     add_note, update_note, delete_note,
     // Transport
     transport_play, transport_stop, transport_seek,
-    transport_set_loop, transport_clear_loop, get_playback_state,
+    transport_set_loop, transport_clear_loop, get_playback_state, reload_sequence,
     // Validation
     get_channel_overlaps,
     // Export

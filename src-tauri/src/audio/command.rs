@@ -16,6 +16,7 @@ pub enum AudioCommand {
     TransportSetLoop { start_tick: u64, end_tick: u64 },
     TransportClearLoop,
     LoadSequence { snapshot: crate::sequencer::SequencerSnapshot },
+    ReloadSequence { snapshot: crate::sequencer::SequencerSnapshot },
 }
 
 #[cfg(test)]

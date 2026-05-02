@@ -521,6 +521,152 @@ impl ProjectManager {
         }
     }
 
+    // --- Track CRUD ---
+
+    pub fn add_track(&mut self, name: String, channel: ChannelAssignment, instrument_id: Option<Uuid>) -> Uuid {
+        let id = Uuid::new_v4();
+        self.tracks.push(Track {
+            id,
+            name,
+            channel,
+            instrument_id,
+            regions: Vec::new(),
+            muted: false,
+            solo: false,
+            volume: 100,
+            pan: Pan::Center,
+        });
+        id
+    }
+
+    pub fn update_track(
+        &mut self,
+        id: Uuid,
+        name: String,
+        channel: ChannelAssignment,
+        instrument_id: Option<Uuid>,
+        muted: bool,
+        solo: bool,
+        volume: u8,
+        pan: Pan,
+    ) -> Result<(), String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == id)
+            .ok_or("track not found")?;
+        track.name = name;
+        track.channel = channel;
+        track.instrument_id = instrument_id;
+        track.muted = muted;
+        track.solo = solo;
+        track.volume = volume;
+        track.pan = pan;
+        Ok(())
+    }
+
+    pub fn delete_track(&mut self, id: Uuid) -> Result<(), String> {
+        let pos = self.tracks.iter().position(|t| t.id == id)
+            .ok_or("track not found")?;
+        self.tracks.remove(pos);
+        Ok(())
+    }
+
+    pub fn list_tracks(&self) -> &[Track] {
+        &self.tracks
+    }
+
+    // --- Region CRUD ---
+
+    pub fn add_region(&mut self, track_id: Uuid, start_tick: u64, duration_ticks: u64) -> Result<Uuid, String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let id = Uuid::new_v4();
+        track.regions.push(Region {
+            id,
+            start_tick,
+            duration_ticks,
+            notes: Vec::new(),
+        });
+        Ok(id)
+    }
+
+    pub fn update_region(&mut self, track_id: Uuid, region_id: Uuid, start_tick: u64, duration_ticks: u64) -> Result<(), String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        region.start_tick = start_tick;
+        region.duration_ticks = duration_ticks;
+        Ok(())
+    }
+
+    pub fn delete_region(&mut self, track_id: Uuid, region_id: Uuid) -> Result<(), String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let pos = track.regions.iter().position(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        track.regions.remove(pos);
+        Ok(())
+    }
+
+    // --- Note CRUD ---
+
+    pub fn add_note(
+        &mut self,
+        track_id: Uuid,
+        region_id: Uuid,
+        tick: u64,
+        pitch: u8,
+        velocity: u8,
+        duration_ticks: u64,
+    ) -> Result<usize, String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        let idx = region.notes.len();
+        region.notes.push(Note { tick, pitch, velocity, duration_ticks });
+        Ok(idx)
+    }
+
+    pub fn update_note(
+        &mut self,
+        track_id: Uuid,
+        region_id: Uuid,
+        note_index: usize,
+        tick: u64,
+        pitch: u8,
+        velocity: u8,
+        duration_ticks: u64,
+    ) -> Result<(), String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        let note = region.notes.get_mut(note_index)
+            .ok_or("note index out of range")?;
+        note.tick = tick;
+        note.pitch = pitch;
+        note.velocity = velocity;
+        note.duration_ticks = duration_ticks;
+        Ok(())
+    }
+
+    pub fn delete_note(
+        &mut self,
+        track_id: Uuid,
+        region_id: Uuid,
+        note_index: usize,
+    ) -> Result<(), String> {
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        if note_index >= region.notes.len() {
+            return Err("note index out of range".into());
+        }
+        region.notes.remove(note_index);
+        Ok(())
+    }
+
     pub fn get_all_overlaps(&self) -> Vec<OverlapWarning> {
         let snapshot = self.build_snapshot();
         snapshot.channels.into_iter().flat_map(|ch| ch.overlaps).collect()
@@ -693,6 +839,90 @@ mod tests {
     }
 
     // --- Snapshot builder tests ---
+
+    #[test]
+    fn test_track_crud() {
+        let path = temp_project_path("track_crud");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Track Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let id = mgr.add_track("FM1-Bass".into(), ChannelAssignment::Fm(0), None);
+        assert_eq!(mgr.list_tracks().len(), 1);
+        assert_eq!(mgr.list_tracks()[0].name, "FM1-Bass");
+
+        mgr.update_track(id, "FM1-Lead".into(), ChannelAssignment::Fm(0), None, true, false, 80, Pan::Left).unwrap();
+        assert_eq!(mgr.list_tracks()[0].name, "FM1-Lead");
+        assert!(mgr.list_tracks()[0].muted);
+
+        mgr.delete_track(id).unwrap();
+        assert!(mgr.list_tracks().is_empty());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_region_crud() {
+        let path = temp_project_path("region_crud");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Region Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        assert_eq!(mgr.list_tracks()[0].regions.len(), 1);
+
+        mgr.update_region(track_id, region_id, 480, 960).unwrap();
+        assert_eq!(mgr.list_tracks()[0].regions[0].start_tick, 480);
+
+        mgr.delete_region(track_id, region_id).unwrap();
+        assert!(mgr.list_tracks()[0].regions.is_empty());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_note_crud() {
+        let path = temp_project_path("note_crud");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Note Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+
+        let idx = mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        assert_eq!(idx, 0);
+        assert_eq!(mgr.list_tracks()[0].regions[0].notes.len(), 1);
+
+        mgr.update_note(track_id, region_id, 0, 120, 64, 80, 480).unwrap();
+        assert_eq!(mgr.list_tracks()[0].regions[0].notes[0].pitch, 64);
+
+        mgr.delete_note(track_id, region_id, 0).unwrap();
+        assert!(mgr.list_tracks()[0].regions[0].notes.is_empty());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_track_save_load_round_trip() {
+        let path = temp_project_path("track_save");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Save Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 480).unwrap();
+        mgr.add_note(track_id, region_id, 480, 64, 80, 240).unwrap();
+
+        mgr.save().unwrap();
+        mgr.close();
+
+        let song = mgr.open(&path).unwrap();
+        assert_eq!(song.tracks.len(), 1);
+        assert_eq!(song.tracks[0].regions.len(), 1);
+        assert_eq!(song.tracks[0].regions[0].notes.len(), 2);
+        assert_eq!(song.tracks[0].regions[0].notes[0].pitch, 60);
+
+        cleanup(&path);
+    }
 
     #[test]
     fn test_build_snapshot_empty_project() {

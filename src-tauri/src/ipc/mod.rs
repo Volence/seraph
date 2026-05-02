@@ -18,4 +18,15 @@ pub use commands::{
     import_dac_wav, import_dac_raw, update_dac_instrument, reconvert_dac,
     delete_dac_instrument, list_dac_instruments, preview_dac,
     get_dac_pcm_data,
+    // Track CRUD
+    add_track, update_track, delete_track, list_tracks,
+    // Region CRUD
+    add_region, update_region, delete_region,
+    // Note CRUD
+    add_note, update_note, delete_note,
+    // Transport
+    transport_play, transport_stop, transport_seek,
+    transport_set_loop, transport_clear_loop, get_playback_state,
+    // Validation
+    get_channel_overlaps,
 };

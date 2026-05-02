@@ -30,13 +30,26 @@ use ipc::{
     import_dac_wav, import_dac_raw, update_dac_instrument, reconvert_dac,
     delete_dac_instrument, list_dac_instruments, preview_dac,
     get_dac_pcm_data,
+    // Track CRUD
+    add_track, update_track, delete_track, list_tracks,
+    // Region CRUD
+    add_region, update_region, delete_region,
+    // Note CRUD
+    add_note, update_note, delete_note,
+    // Transport
+    transport_play, transport_stop, transport_seek,
+    transport_set_loop, transport_clear_loop, get_playback_state,
+    // Validation
+    get_channel_overlaps,
 };
 use model::driver::DriverRegistry;
 use project::ProjectManager;
+use tauri::Emitter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let audio_thread = AudioThread::new().expect("failed to initialize audio thread");
+    let position_tick = audio_thread.position_tick().clone();
 
     let mut registry = DriverRegistry::new();
     registry.register(Box::new(FlamedriverProfile));
@@ -49,6 +62,17 @@ pub fn run() {
         })
         .manage(ProjectState {
             manager: Mutex::new(project_manager),
+        })
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(33));
+                    let tick = position_tick.load(std::sync::atomic::Ordering::Relaxed);
+                    let _ = handle.emit("playback-position", tick);
+                }
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             play_fm_test_tone,
@@ -79,6 +103,28 @@ pub fn run() {
             list_dac_instruments,
             preview_dac,
             get_dac_pcm_data,
+            // Track CRUD
+            add_track,
+            update_track,
+            delete_track,
+            list_tracks,
+            // Region CRUD
+            add_region,
+            update_region,
+            delete_region,
+            // Note CRUD
+            add_note,
+            update_note,
+            delete_note,
+            // Transport
+            transport_play,
+            transport_stop,
+            transport_seek,
+            transport_set_loop,
+            transport_clear_loop,
+            get_playback_state,
+            // Validation
+            get_channel_overlaps,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -10,6 +10,7 @@ use crate::model::driver::{ChannelLayout, DriverFeature};
 use crate::model::instrument::*;
 use crate::model::song::{Song, SongMetadata};
 use crate::project::ProjectManager;
+use crate::sequencer::OverlapWarning;
 
 pub struct AudioState {
     pub thread: Mutex<AudioThread>,
@@ -597,4 +598,217 @@ pub fn get_dac_pcm_data(
         .get_dac_pcm(&uuid)
         .ok_or("DAC PCM data not loaded")?;
     Ok(pcm.as_ref().clone())
+}
+
+// --- Track CRUD ---
+
+#[tauri::command]
+pub fn add_track(
+    state: State<'_, ProjectState>,
+    name: String,
+    channel: crate::model::song::ChannelAssignment,
+    instrument_id: Option<String>,
+) -> Result<String, String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let inst_uuid = instrument_id
+        .map(|s| Uuid::parse_str(&s))
+        .transpose()
+        .map_err(|e| format!("invalid UUID: {e}"))?;
+    let id = mgr.add_track(name, channel, inst_uuid);
+    Ok(id.to_string())
+}
+
+#[tauri::command]
+pub fn update_track(
+    state: State<'_, ProjectState>,
+    id: String,
+    name: String,
+    channel: crate::model::song::ChannelAssignment,
+    instrument_id: Option<String>,
+    muted: bool,
+    solo: bool,
+    volume: u8,
+    pan: crate::model::song::Pan,
+) -> Result<(), String> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let inst_uuid = instrument_id
+        .map(|s| Uuid::parse_str(&s))
+        .transpose()
+        .map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.update_track(uuid, name, channel, inst_uuid, muted, solo, volume, pan)
+}
+
+#[tauri::command]
+pub fn delete_track(state: State<'_, ProjectState>, id: String) -> Result<(), String> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.delete_track(uuid)
+}
+
+#[tauri::command]
+pub fn list_tracks(state: State<'_, ProjectState>) -> Result<Vec<crate::model::song::Track>, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr.list_tracks().to_vec())
+}
+
+// --- Region CRUD ---
+
+#[tauri::command]
+pub fn add_region(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    start_tick: u64,
+    duration_ticks: u64,
+) -> Result<String, String> {
+    let uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let id = mgr.add_region(uuid, start_tick, duration_ticks)?;
+    Ok(id.to_string())
+}
+
+#[tauri::command]
+pub fn update_region(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+    start_tick: u64,
+    duration_ticks: u64,
+) -> Result<(), String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.update_region(t_uuid, r_uuid, start_tick, duration_ticks)
+}
+
+#[tauri::command]
+pub fn delete_region(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+) -> Result<(), String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.delete_region(t_uuid, r_uuid)
+}
+
+// --- Note CRUD ---
+
+#[tauri::command]
+pub fn add_note(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+    tick: u64,
+    pitch: u8,
+    velocity: u8,
+    duration_ticks: u64,
+) -> Result<usize, String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.add_note(t_uuid, r_uuid, tick, pitch, velocity, duration_ticks)
+}
+
+#[tauri::command]
+pub fn update_note(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+    note_index: usize,
+    tick: u64,
+    pitch: u8,
+    velocity: u8,
+    duration_ticks: u64,
+) -> Result<(), String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.update_note(t_uuid, r_uuid, note_index, tick, pitch, velocity, duration_ticks)
+}
+
+#[tauri::command]
+pub fn delete_note(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+    note_index: usize,
+) -> Result<(), String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.delete_note(t_uuid, r_uuid, note_index)
+}
+
+// --- Transport ---
+
+#[tauri::command]
+pub fn transport_play(
+    audio_state: State<'_, AudioState>,
+    project_state: State<'_, ProjectState>,
+) -> Result<(), String> {
+    let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let snapshot = mgr.build_snapshot();
+    drop(mgr);
+
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::LoadSequence { snapshot });
+    thread.send(AudioCommand::TransportPlay);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn transport_stop(audio_state: State<'_, AudioState>) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::TransportStop);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn transport_seek(audio_state: State<'_, AudioState>, tick: u64) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::TransportSeek { tick });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn transport_set_loop(audio_state: State<'_, AudioState>, start_tick: u64, end_tick: u64) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::TransportSetLoop { start_tick, end_tick });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn transport_clear_loop(audio_state: State<'_, AudioState>) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::TransportClearLoop);
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackState {
+    pub playing: bool,
+    pub tick: u64,
+    pub loop_start: Option<u64>,
+    pub loop_end: Option<u64>,
+}
+
+#[tauri::command]
+pub fn get_playback_state(audio_state: State<'_, AudioState>) -> Result<PlaybackState, String> {
+    let thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let tick = thread.position_tick().load(std::sync::atomic::Ordering::Relaxed);
+    Ok(PlaybackState {
+        playing: false,
+        tick,
+        loop_start: None,
+        loop_end: None,
+    })
+}
+
+#[tauri::command]
+pub fn get_channel_overlaps(state: State<'_, ProjectState>) -> Result<Vec<OverlapWarning>, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr.get_all_overlaps())
 }

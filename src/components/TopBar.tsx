@@ -1,4 +1,5 @@
 import type { SongMetadata } from "../types/model";
+import { TransportControls } from "./TransportControls";
 import styles from "./TopBar.module.css";
 
 interface TopBarProps {
@@ -7,9 +8,23 @@ interface TopBarProps {
   onOpenProject: () => void;
   onSave: () => void;
   showSaved: boolean;
+  playing: boolean;
+  loopEnabled: boolean;
+  onPlayingChange: (playing: boolean) => void;
+  onLoopChange: (enabled: boolean) => void;
 }
 
-export function TopBar({ projectMeta, onNewProject, onOpenProject, onSave, showSaved }: TopBarProps) {
+export function TopBar({
+  projectMeta,
+  onNewProject,
+  onOpenProject,
+  onSave,
+  showSaved,
+  playing,
+  loopEnabled,
+  onPlayingChange,
+  onLoopChange,
+}: TopBarProps) {
   return (
     <div className={styles.topBar}>
       <div className={styles.projectInfo}>
@@ -33,11 +48,21 @@ export function TopBar({ projectMeta, onNewProject, onOpenProject, onSave, showS
         )}
         {showSaved && <span className={styles.saved}>Saved</span>}
       </div>
-      <div className={styles.transport}>
-        <button className={styles.transportBtn} disabled title="Play (Phase 4)">&#9654;</button>
-        <button className={styles.transportBtn} disabled title="Stop (Phase 4)">&#9632;</button>
-        <button className={styles.transportBtn} disabled title="Loop (Phase 4)">&#8635;</button>
-      </div>
+      {projectMeta ? (
+        <TransportControls
+          projectMeta={projectMeta}
+          playing={playing}
+          loopEnabled={loopEnabled}
+          onPlayingChange={onPlayingChange}
+          onLoopChange={onLoopChange}
+        />
+      ) : (
+        <div className={styles.transport}>
+          <button className={styles.transportBtn} disabled>&#9654;</button>
+          <button className={styles.transportBtn} disabled>&#9632;</button>
+          <button className={styles.transportBtn} disabled>&#8635;</button>
+        </div>
+      )}
     </div>
   );
 }

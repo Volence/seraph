@@ -1,0 +1,36 @@
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn {
+  width: 32px;
+  height: 28px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:hover {
+  background: var(--border);
+}
+
+.btn.active {
+  background: var(--accent-fm);
+  color: #fff;
+  border-color: var(--accent-fm);
+}
+
+.position {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 0 8px;
+  min-width: 80px;
+}

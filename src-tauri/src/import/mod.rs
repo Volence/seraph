@@ -126,4 +126,54 @@ mod tests {
             .collect();
         assert_eq!(fm_files.len(), 4);
     }
+
+    #[test]
+    fn test_import_dez1_round_trip_opens() {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data/Mus - DEZ1.asm");
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("DEZ1_RT");
+
+        let driver = FlamedriverProfile;
+        let result = import_smps_file(&source, &project_dir, &driver).unwrap();
+
+        let json = std::fs::read_to_string(project_dir.join("project.json")).unwrap();
+        let project_file: crate::model::song::ProjectFile =
+            serde_json::from_str(&json).unwrap();
+
+        assert_eq!(project_file.metadata.driver_id, "flamedriver");
+        assert_eq!(project_file.tracks.len(), result.track_count);
+
+        let fm_dir = project_dir.join("instruments/fm");
+        for entry in std::fs::read_dir(&fm_dir).unwrap() {
+            let entry = entry.unwrap();
+            if entry.path().extension().map_or(false, |ext| ext == "json") {
+                let data = std::fs::read_to_string(entry.path()).unwrap();
+                let _inst: crate::model::instrument::FmInstrument =
+                    serde_json::from_str(&data).unwrap();
+            }
+        }
+
+        let fm_tracks: Vec<_> = project_file.tracks.iter()
+            .filter(|t| matches!(t.channel, crate::model::song::ChannelAssignment::Fm(_)))
+            .collect();
+        assert!(!fm_tracks.is_empty());
+        let fm1 = fm_tracks.iter().find(|t| t.name == "FM1").unwrap();
+        assert!(!fm1.regions.is_empty());
+        assert!(!fm1.regions[0].notes.is_empty());
+    }
+
+    #[test]
+    fn test_import_aiz1_uvb_song() {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data/AIZ1.asm");
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("AIZ1_Import");
+
+        let driver = FlamedriverProfile;
+        let result = import_smps_file(&source, &project_dir, &driver).unwrap();
+
+        assert!(result.warnings.iter().any(|w| w.message.contains("unresolved")));
+        assert!(project_dir.join("project.json").exists());
+    }
 }

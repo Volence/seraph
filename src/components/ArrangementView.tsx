@@ -85,8 +85,15 @@ export function ArrangementView({
     }]);
   }
 
-  async function handleRegionCreate(trackId: string, startTick: number, durationTicks: number) {
-    await ipc.addRegion(trackId, startTick, durationTicks);
+  async function handleEmptyDoubleClick(trackId: string, tick: number) {
+    const ticksPerBar = projectMeta.ticksPerBeat * projectMeta.timeSignature[0];
+    const track = tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    const overlaps = track.regions.some((r) =>
+      tick < r.startTick + r.durationTicks && tick + ticksPerBar > r.startTick
+    );
+    if (overlaps) return;
+    await ipc.addRegion(trackId, tick, ticksPerBar);
     refresh();
   }
 
@@ -224,7 +231,8 @@ export function ArrangementView({
             }
           }}
           onRegionDoubleClick={handleRegionDoubleClick}
-          onRegionCreate={handleRegionCreate}
+          onEmptyDoubleClick={handleEmptyDoubleClick}
+          onSelectRegions={onSelectRegions}
           onRegionMove={handleRegionMove}
           onRegionResize={handleRegionResize}
         />

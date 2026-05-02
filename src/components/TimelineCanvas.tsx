@@ -14,7 +14,8 @@ interface TimelineCanvasProps {
   selectedRegions: SelectedRegion[];
   onRegionClick: (trackId: string, regionId: string, ctrlKey: boolean) => void;
   onRegionDoubleClick: (trackId: string, regionId: string) => void;
-  onRegionCreate: (trackId: string, startTick: number, durationTicks: number) => void;
+  onEmptyDoubleClick: (trackId: string, tick: number) => void;
+  onSelectRegions: (regions: SelectedRegion[]) => void;
   onRegionMove: (srcTrackId: string, regionId: string, dstTrackId: string, startTick: number, tickDelta: number, trackDelta: number) => void;
   onRegionResize: (trackId: string, regionId: string, startTick: number, durationTicks: number) => void;
 }
@@ -35,7 +36,7 @@ function trackChannelType(track: Track): string {
   return "dac";
 }
 
-type DragMode = "create" | "move" | "resize-left" | "resize-right";
+type DragMode = "select" | "move" | "resize-left" | "resize-right";
 
 interface DragState {
   mode: DragMode;
@@ -62,7 +63,8 @@ export function TimelineCanvas({
   selectedRegions,
   onRegionClick,
   onRegionDoubleClick,
-  onRegionCreate,
+  onEmptyDoubleClick,
+  onSelectRegions,
   onRegionMove,
   onRegionResize,
 }: TimelineCanvasProps) {
@@ -193,23 +195,17 @@ export function TimelineCanvas({
     }
 
     if (d) {
-      if (d.mode === "create" && d.trackIdx < tracks.length) {
-        const track = tracks[d.trackIdx];
-        const color = CHANNEL_COLORS[trackChannelType(track)] || "#888";
-        const rawStart = pixelToTick(Math.min(d.startX, d.currentX));
-        const rawEnd = pixelToTick(Math.max(d.startX, d.currentX));
-        const sStart = snapToBar(rawStart);
-        const sEnd = Math.max(sStart + ticksPerBar, snapToBar(rawEnd));
-        const px1 = (sStart - startTick) / ticksPerPixel;
-        const px2 = (sEnd - startTick) / ticksPerPixel;
-        const dy = d.trackIdx * trackHeight + 2;
-        const dh = trackHeight - 4;
-        ctx.fillStyle = color + "55";
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.fillRect(px1, dy, px2 - px1, dh);
-        ctx.strokeRect(px1, dy, px2 - px1, dh);
+      if (d.mode === "select") {
+        const x1 = Math.min(d.startX, d.currentX);
+        const x2 = Math.max(d.startX, d.currentX);
+        const sy1 = Math.min(d.startY, d.currentTrackIdx * trackHeight);
+        const sy2 = Math.max(d.startY, (d.currentTrackIdx + 1) * trackHeight);
+        ctx.fillStyle = "rgba(74, 158, 255, 0.1)";
+        ctx.strokeStyle = "rgba(74, 158, 255, 0.6)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.fillRect(x1, sy1, x2 - x1, sy2 - sy1);
+        ctx.strokeRect(x1, sy1, x2 - x1, sy2 - sy1);
         ctx.setLineDash([]);
       }
 
@@ -343,11 +339,9 @@ export function TimelineCanvas({
       return;
     }
 
-    const trackIdx = Math.floor(y / trackHeight);
-    if (trackIdx < 0 || trackIdx >= tracks.length) return;
-
     e.preventDefault();
-    setDrag({ mode: "create", trackIdx, startX: x, startY: y, currentX: x, currentTrackIdx: trackIdx });
+    const trackIdx = Math.max(0, Math.floor(y / trackHeight));
+    setDrag({ mode: "select", trackIdx, startX: x, startY: y, currentX: x, currentTrackIdx: trackIdx });
   }
 
   useEffect(() => {
@@ -356,7 +350,7 @@ export function TimelineCanvas({
     if (canvas) {
       if (drag.mode === "move") canvas.style.cursor = "grabbing";
       else if (drag.mode === "resize-left" || drag.mode === "resize-right") canvas.style.cursor = "col-resize";
-      else canvas.style.cursor = "crosshair";
+      else canvas.style.cursor = "default";
     }
 
     function handleMouseMove(e: MouseEvent) {
@@ -380,20 +374,25 @@ export function TimelineCanvas({
 
       const movedEnough = Math.abs(endX - d.startX) > 4 || Math.abs(endY - d.startY) > 4;
 
-      if (d.mode === "create" && movedEnough) {
-        const rawStart = pixelToTick(Math.min(d.startX, endX));
-        const rawEnd = pixelToTick(Math.max(d.startX, endX));
-        const sStart = snapToBar(rawStart);
-        const sEnd = Math.max(sStart + ticksPerBar, snapToBar(rawEnd));
-        if (d.trackIdx < tracks.length) {
-          const track = tracks[d.trackIdx];
-          const overlaps = track.regions.some((r) =>
-            sStart < r.startTick + r.durationTicks && sStart + (sEnd - sStart) > r.startTick
-          );
-          if (!overlaps) {
-            onRegionCreate(track.id, sStart, sEnd - sStart);
+      if (d.mode === "select" && movedEnough) {
+        const tickLeft = pixelToTick(Math.min(d.startX, endX));
+        const tickRight = pixelToTick(Math.max(d.startX, endX));
+        const minTrack = Math.min(d.trackIdx, Math.max(0, Math.floor(endY / trackHeight)));
+        const maxTrack = Math.max(d.trackIdx, Math.max(0, Math.floor(endY / trackHeight)));
+        const hits: SelectedRegion[] = [];
+        for (let i = minTrack; i <= maxTrack && i < tracks.length; i++) {
+          const track = tracks[i];
+          for (const region of track.regions) {
+            if (region.startTick + region.durationTicks > tickLeft && region.startTick < tickRight) {
+              hits.push({
+                trackId: track.id, trackName: track.name, regionId: region.id,
+                channelType: trackChannelType(track) as "fm" | "psg" | "dac",
+                startTick: region.startTick, durationTicks: region.durationTicks,
+              });
+            }
           }
         }
+        if (hits.length > 0) onSelectRegions(hits);
       }
 
       if (d.mode === "move" && movedEnough && d.regionTrackId && d.regionId && d.regionStartTick != null) {
@@ -434,7 +433,7 @@ export function TimelineCanvas({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, trackHeight, onRegionCreate, onRegionMove, onRegionResize]);
+  }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, trackHeight, onSelectRegions, onRegionMove, onRegionResize]);
 
   function handleClick(e: React.MouseEvent) {
     if (drag) return;
@@ -460,6 +459,13 @@ export function TimelineCanvas({
     const hit = hitTestRegion(x, y);
     if (hit) {
       onRegionDoubleClick(hit.trackId, hit.regionId);
+    } else {
+      const trackIdx = Math.floor(y / trackHeight);
+      if (trackIdx >= 0 && trackIdx < tracks.length) {
+        const tick = pixelToTick(x);
+        const snapped = snapToBar(tick);
+        onEmptyDoubleClick(tracks[trackIdx].id, snapped);
+      }
     }
   }
 
@@ -477,7 +483,7 @@ export function TimelineCanvas({
     } else if (hit) {
       canvas.style.cursor = "grab";
     } else {
-      canvas.style.cursor = "crosshair";
+      canvas.style.cursor = "default";
     }
   }
 

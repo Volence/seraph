@@ -1,0 +1,108 @@
+.fmEditor {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  height: 100%;
+  align-items: flex-start;
+  overflow-x: auto;
+}
+
+.leftSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.fbKnob {
+  margin-top: 4px;
+}
+
+.opPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  flex-shrink: 0;
+  min-width: 190px;
+}
+
+.opPanel.carrier {
+  border-color: var(--carrier-highlight);
+}
+
+.opHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.carrierBadge {
+  font-size: 9px;
+  padding: 1px 4px;
+  background: var(--carrier-highlight);
+  color: #000;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+.knobGrid {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 6px;
+  justify-items: center;
+}
+
+.tlRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.tlLabel {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  width: 18px;
+}
+
+.tlSlider {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent-fm);
+}
+
+.tlValue {
+  font-size: 10px;
+  color: var(--text-primary);
+  width: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.amToggle {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.amToggle input {
+  accent-color: var(--accent-fm);
+}
+
+.previewSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}

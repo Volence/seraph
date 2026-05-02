@@ -79,7 +79,7 @@ export function TimelineCanvas({
   }
 
   function snapToBar(tick: number): number {
-    return Math.round(tick / ticksPerBar) * ticksPerBar;
+    return Math.floor(tick / ticksPerBar) * ticksPerBar;
   }
 
   function hitTestRegion(x: number, y: number): {

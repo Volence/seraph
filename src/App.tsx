@@ -106,7 +106,10 @@ export default function App() {
           <Sidebar
             projectMeta={projectMeta}
             selectedInstrument={selectedInstrument}
-            onSelectInstrument={setSelectedInstrument}
+            onSelectInstrument={(inst) => {
+              setSelectedInstrument(inst);
+              setSelectedRegion(null);
+            }}
           />
         )}
         <MainArea
@@ -115,12 +118,19 @@ export default function App() {
           playing={playing}
           onNewProject={() => setShowNewProject(true)}
           onOpenProject={handleOpenProject}
-          onSelectRegion={setSelectedRegion}
+          onSelectRegion={(region) => {
+            setSelectedRegion(region);
+            if (region) setSelectedInstrument(null);
+          }}
           selectedRegion={selectedRegion}
         />
       </div>
       {projectOpen && (
-        <BottomPanel selectedInstrument={selectedInstrument} />
+        <BottomPanel
+          selectedInstrument={selectedInstrument}
+          selectedRegion={selectedRegion}
+          onCloseRegion={() => setSelectedRegion(null)}
+        />
       )}
       {showNewProject && (
         <NewProjectDialog

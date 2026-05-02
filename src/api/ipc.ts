@@ -264,3 +264,20 @@ export async function getPlaybackState(): Promise<PlaybackState> {
 export async function getChannelOverlaps(): Promise<OverlapWarning[]> {
   return invoke<OverlapWarning[]>("get_channel_overlaps");
 }
+
+// --- Export ---
+
+export interface ExportResult {
+  files: string[];
+}
+
+export interface ExportError {
+  trackName: string;
+  regionIndex: number | null;
+  noteIndex: number | null;
+  message: string;
+}
+
+export async function exportSong(outputDir: string): Promise<ExportResult> {
+  return invoke<ExportResult>("export_song", { outputDir });
+}

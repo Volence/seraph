@@ -15,6 +15,11 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [selectedRegions, setSelectedRegions] = useState<SelectedRegion[]>([]);
+  const [exportStatus, setExportStatus] = useState<
+    | { type: "success"; files: string[] }
+    | { type: "error"; errors: ipc.ExportError[] }
+    | null
+  >(null);
 
   const projectOpen = projectMeta !== null;
 
@@ -87,6 +92,27 @@ export default function App() {
     setSelectedRegions([]);
   }
 
+  async function handleExport() {
+    if (!projectMeta) return;
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const selected = await open({ directory: true, title: "Export Song" });
+    if (!selected) return;
+    try {
+      const result = await ipc.exportSong(selected as string);
+      setExportStatus({ type: "success", files: result.files });
+      setTimeout(() => setExportStatus(null), 4000);
+    } catch (e: any) {
+      if (e?.errors) {
+        setExportStatus({ type: "error", errors: e.errors });
+      } else {
+        setExportStatus({
+          type: "error",
+          errors: [{ trackName: "", regionIndex: null, noteIndex: null, message: String(e) }],
+        });
+      }
+    }
+  }
+
   return (
     <div className={styles.app}>
       <TopBar
@@ -94,12 +120,31 @@ export default function App() {
         onNewProject={() => setShowNewProject(true)}
         onOpenProject={handleOpenProject}
         onSave={handleSave}
+        onExport={projectOpen ? handleExport : undefined}
         showSaved={showSaved}
         playing={playing}
         loopEnabled={loopEnabled}
         onPlayingChange={setPlaying}
         onLoopChange={setLoopEnabled}
       />
+      {exportStatus?.type === "success" && (
+        <div className={styles.exportSuccess}>
+          Exported {exportStatus.files.length} files
+        </div>
+      )}
+      {exportStatus?.type === "error" && (
+        <div className={styles.exportError}>
+          <div className={styles.exportErrorHeader}>
+            <span>Export failed ({exportStatus.errors.length} error{exportStatus.errors.length !== 1 ? "s" : ""})</span>
+            <button onClick={() => setExportStatus(null)}>x</button>
+          </div>
+          <ul>
+            {exportStatus.errors.map((e, i) => (
+              <li key={i}>{e.trackName ? `${e.trackName}: ` : ""}{e.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className={styles.body}>
         <MainArea
           projectOpen={projectOpen}

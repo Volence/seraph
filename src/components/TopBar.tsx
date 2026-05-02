@@ -7,6 +7,7 @@ interface TopBarProps {
   onNewProject: () => void;
   onOpenProject: () => void;
   onSave: () => void;
+  onExport?: () => void;
   showSaved: boolean;
   playing: boolean;
   loopEnabled: boolean;
@@ -19,6 +20,7 @@ export function TopBar({
   onNewProject,
   onOpenProject,
   onSave,
+  onExport,
   showSaved,
   playing,
   loopEnabled,
@@ -45,6 +47,9 @@ export function TopBar({
         <button className={styles.btn} onClick={onOpenProject}>Open</button>
         {projectMeta && (
           <button className={styles.btn} onClick={onSave}>Save</button>
+        )}
+        {onExport && (
+          <button className={styles.btn} onClick={onExport}>Export</button>
         )}
         {showSaved && <span className={styles.saved}>Saved</span>}
       </div>

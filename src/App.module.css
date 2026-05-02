@@ -11,3 +11,57 @@
   flex: 1;
   overflow: hidden;
 }
+
+.exportSuccess {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a5a2a;
+  color: #88ff88;
+  padding: 8px 20px;
+  border-radius: 4px;
+  font-size: 13px;
+  z-index: 100;
+}
+
+.exportError {
+  position: fixed;
+  top: 48px;
+  right: 16px;
+  background: #3a1a1a;
+  border: 1px solid #ff4444;
+  color: #ffaaaa;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  max-width: 400px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.exportErrorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.exportErrorHeader button {
+  background: none;
+  border: none;
+  color: #ffaaaa;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.exportError ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.exportError li {
+  margin: 4px 0;
+}

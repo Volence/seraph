@@ -74,6 +74,7 @@ export function TimelineCanvas({
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
   dragRef.current = drag;
+  const lastEmptyClickRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   const ticksPerBar = ticksPerBeat * beatsPerBar;
 
@@ -380,6 +381,16 @@ export function TimelineCanvas({
 
     e.preventDefault();
     const trackIdx = Math.max(0, Math.floor(y / trackHeight));
+    const now = Date.now();
+    const last = lastEmptyClickRef.current;
+    if (last && now - last.time < 400 && Math.abs(x - last.x) < 10 && Math.abs(y - last.y) < 10) {
+      lastEmptyClickRef.current = null;
+      if (trackIdx < tracks.length) {
+        setDrag({ mode: "create", trackIdx, startX: x, startY: y, currentX: x, currentTrackIdx: trackIdx });
+        return;
+      }
+    }
+    lastEmptyClickRef.current = { x, y, time: now };
     setDrag({ mode: "select", trackIdx, startX: x, startY: y, currentX: x, currentTrackIdx: trackIdx });
   }
 
@@ -507,12 +518,6 @@ export function TimelineCanvas({
     const hit = hitTestRegion(x, y);
     if (hit) {
       onRegionDoubleClick(hit.trackId, hit.regionId);
-    } else {
-      const trackIdx = Math.floor(y / trackHeight);
-      if (trackIdx >= 0 && trackIdx < tracks.length) {
-        e.preventDefault();
-        setDrag({ mode: "create", trackIdx, startX: x, startY: y, currentX: x, currentTrackIdx: trackIdx });
-      }
     }
   }
 

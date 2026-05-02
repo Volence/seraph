@@ -1,7 +1,3 @@
-import { TestPanel } from "./components/TestPanel";
-
-function App() {
-  return <TestPanel />;
+export default function App() {
+  return <div style={{ padding: "2rem" }}>MegaDAW — building UI...</div>;
 }
-
-export default App;

@@ -877,3 +877,22 @@ pub fn export_song(
     let path = std::path::PathBuf::from(&output_dir);
     driver.export_song(&song, &song.instruments, &path).map_err(|errors| ExportFailure { errors })
 }
+
+// --- Import ---
+
+#[tauri::command]
+pub fn import_song(
+    state: State<'_, ProjectState>,
+    source_path: String,
+    project_dir: String,
+) -> Result<crate::import::ImportResult, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let registry = mgr.driver_registry();
+    let driver = registry.get("flamedriver")
+        .ok_or("Flamedriver driver not found")?;
+
+    let source = std::path::PathBuf::from(&source_path);
+    let project = std::path::PathBuf::from(&project_dir);
+
+    crate::import::import_smps_file(&source, &project, driver)
+}

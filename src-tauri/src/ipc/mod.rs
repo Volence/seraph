@@ -31,4 +31,6 @@ pub use commands::{
     get_channel_overlaps,
     // Export
     export_song,
+    // Import
+    import_song,
 };

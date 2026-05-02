@@ -17,4 +17,5 @@ pub use commands::{
     // DAC instruments
     import_dac_wav, import_dac_raw, update_dac_instrument, reconvert_dac,
     delete_dac_instrument, list_dac_instruments, preview_dac,
+    get_dac_pcm_data,
 };

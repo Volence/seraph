@@ -493,4 +493,32 @@ mod tests {
         assert!(mgr.list_fm_instruments().is_empty());
         cleanup(&path);
     }
+
+    #[test]
+    fn test_get_dac_pcm_returns_cached_data() {
+        let path = temp_project_path("dac_pcm");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "PCM Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let inst = DacInstrument {
+            id: Uuid::new_v4(),
+            name: "Test".into(),
+            target_sample_rate: 16000,
+            loop_start: None,
+            loop_length: None,
+            original_file: "test.raw".into(),
+            pcm_file: "test.pcm".into(),
+            source_is_raw: true,
+            metadata: InstrumentMetadata::default(),
+        };
+        let pcm_data = vec![128u8, 130, 132, 134];
+        let id = mgr.add_dac_instrument(inst, pcm_data.clone());
+
+        let cached = mgr.get_dac_pcm(&id).unwrap();
+        assert_eq!(cached.as_ref(), &pcm_data);
+
+        assert!(mgr.get_dac_pcm(&Uuid::new_v4()).is_none());
+
+        cleanup(&path);
+    }
 }

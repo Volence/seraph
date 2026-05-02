@@ -585,3 +585,16 @@ pub fn preview_dac(
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn get_dac_pcm_data(
+    state: State<'_, ProjectState>,
+    id: String,
+) -> Result<Vec<u8>, String> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let pcm = mgr
+        .get_dac_pcm(&uuid)
+        .ok_or("DAC PCM data not loaded")?;
+    Ok(pcm.as_ref().clone())
+}

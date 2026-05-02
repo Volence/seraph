@@ -28,6 +28,7 @@ use ipc::{
     // DAC instruments
     import_dac_wav, import_dac_raw, update_dac_instrument, reconvert_dac,
     delete_dac_instrument, list_dac_instruments, preview_dac,
+    get_dac_pcm_data,
 };
 use model::driver::DriverRegistry;
 use project::ProjectManager;
@@ -41,6 +42,7 @@ pub fn run() {
     let project_manager = ProjectManager::new(registry);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AudioState {
             thread: Mutex::new(audio_thread),
         })
@@ -75,6 +77,7 @@ pub fn run() {
             delete_dac_instrument,
             list_dac_instruments,
             preview_dac,
+            get_dac_pcm_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

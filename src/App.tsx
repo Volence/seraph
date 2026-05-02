@@ -14,7 +14,7 @@ export default function App() {
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loopEnabled, setLoopEnabled] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState<SelectedRegion | null>(null);
+  const [selectedRegions, setSelectedRegions] = useState<SelectedRegion[]>([]);
 
   const projectOpen = projectMeta !== null;
 
@@ -73,7 +73,7 @@ export default function App() {
       const song = await ipc.openProject(selected as string);
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
-      setSelectedRegion(null);
+      setSelectedRegions([]);
     } catch (e) {
       console.error("Open failed:", e);
     }
@@ -84,7 +84,7 @@ export default function App() {
     setProjectMeta(meta);
     setShowNewProject(false);
     setSelectedInstrument(null);
-    setSelectedRegion(null);
+    setSelectedRegions([]);
   }
 
   return (
@@ -107,14 +107,14 @@ export default function App() {
           playing={playing}
           onNewProject={() => setShowNewProject(true)}
           onOpenProject={handleOpenProject}
-          onSelectRegion={(region) => {
-            setSelectedRegion(region);
-            if (region) setSelectedInstrument(null);
+          onSelectRegions={(regions) => {
+            setSelectedRegions(regions);
+            if (regions.length > 0) setSelectedInstrument(null);
           }}
-          selectedRegion={selectedRegion}
+          selectedRegions={selectedRegions}
           onSelectInstrument={(inst) => {
             setSelectedInstrument(inst);
-            setSelectedRegion(null);
+            setSelectedRegions([]);
           }}
           selectedInstrument={selectedInstrument}
         />
@@ -122,8 +122,8 @@ export default function App() {
       {projectOpen && (
         <BottomPanel
           selectedInstrument={selectedInstrument}
-          selectedRegion={selectedRegion}
-          onCloseRegion={() => setSelectedRegion(null)}
+          selectedRegion={selectedRegions[selectedRegions.length - 1] ?? null}
+          onCloseRegion={() => setSelectedRegions([])}
         />
       )}
       {showNewProject && (

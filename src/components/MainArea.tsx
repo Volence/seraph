@@ -8,8 +8,8 @@ interface MainAreaProps {
   playing: boolean;
   onNewProject: () => void;
   onOpenProject: () => void;
-  onSelectRegion: (region: SelectedRegion | null) => void;
-  selectedRegion: SelectedRegion | null;
+  onSelectRegions: (regions: SelectedRegion[]) => void;
+  selectedRegions: SelectedRegion[];
   onSelectInstrument: (inst: SelectedInstrument | null) => void;
   selectedInstrument: SelectedInstrument | null;
 }
@@ -20,8 +20,8 @@ export function MainArea({
   playing,
   onNewProject,
   onOpenProject,
-  onSelectRegion,
-  selectedRegion,
+  onSelectRegions,
+  selectedRegions,
   onSelectInstrument,
   selectedInstrument,
 }: MainAreaProps) {
@@ -42,8 +42,8 @@ export function MainArea({
     <ArrangementView
       projectMeta={projectMeta}
       playing={playing}
-      onSelectRegion={onSelectRegion}
-      selectedRegion={selectedRegion}
+      onSelectRegions={onSelectRegions}
+      selectedRegions={selectedRegions}
       onSelectInstrument={onSelectInstrument}
       selectedInstrument={selectedInstrument}
     />

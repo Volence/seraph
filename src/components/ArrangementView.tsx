@@ -11,8 +11,8 @@ import styles from "./ArrangementView.module.css";
 interface ArrangementViewProps {
   projectMeta: SongMetadata;
   playing: boolean;
-  onSelectRegion: (region: SelectedRegion | null) => void;
-  selectedRegion: SelectedRegion | null;
+  onSelectRegions: (regions: SelectedRegion[]) => void;
+  selectedRegions: SelectedRegion[];
   onSelectInstrument: (inst: SelectedInstrument | null) => void;
   selectedInstrument: SelectedInstrument | null;
 }
@@ -34,8 +34,8 @@ function channelType(track: Track): "fm" | "psg" | "dac" {
 export function ArrangementView({
   projectMeta,
   playing,
-  onSelectRegion,
-  selectedRegion,
+  onSelectRegions,
+  selectedRegions,
   onSelectInstrument,
   selectedInstrument,
 }: ArrangementViewProps) {
@@ -58,31 +58,31 @@ export function ArrangementView({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedRegion) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.length > 0) {
         e.preventDefault();
-        ipc.deleteRegion(selectedRegion.trackId, selectedRegion.regionId).then(() => {
-          onSelectRegion(null);
+        Promise.all(selectedRegions.map((r) => ipc.deleteRegion(r.trackId, r.regionId))).then(() => {
+          onSelectRegions([]);
           refresh();
         });
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedRegion, onSelectRegion, refresh]);
+  }, [selectedRegions, onSelectRegions, refresh]);
 
   function handleRegionDoubleClick(trackId: string, regionId: string) {
     const track = tracks.find((t) => t.id === trackId);
     if (!track) return;
     const region = track.regions.find((r) => r.id === regionId);
     if (!region) return;
-    onSelectRegion({
+    onSelectRegions([{
       trackId,
       trackName: track.name,
       regionId,
       channelType: channelType(track),
       startTick: region.startTick,
       durationTicks: region.durationTicks,
-    });
+    }]);
   }
 
   async function handleRegionCreate(trackId: string, startTick: number, durationTicks: number) {
@@ -90,8 +90,19 @@ export function ArrangementView({
     refresh();
   }
 
-  async function handleRegionMove(srcTrackId: string, regionId: string, dstTrackId: string, startTick: number) {
-    await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
+  async function handleRegionMove(srcTrackId: string, regionId: string, dstTrackId: string, startTick: number, tickDelta: number, trackDelta: number) {
+    if (selectedRegions.length > 1 && selectedRegions.some((r) => r.regionId === regionId)) {
+      await Promise.all(selectedRegions.map((r) => {
+        const srcIdx = tracks.findIndex((t) => t.id === r.trackId);
+        const dstIdx = Math.max(0, Math.min(tracks.length - 1, srcIdx + trackDelta));
+        const dst = tracks[dstIdx].id;
+        const newStart = Math.max(0, r.startTick + tickDelta);
+        return ipc.moveRegion(r.trackId, r.regionId, dst, newStart);
+      }));
+    } else {
+      await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
+    }
+    onSelectRegions([]);
     refresh();
   }
 
@@ -192,16 +203,26 @@ export function ArrangementView({
           beatsPerBar={projectMeta.timeSignature[0]}
           playbackTick={playing ? interpolatedTick : 0}
           playing={playing}
-          selectedRegion={selectedRegion}
-          onRegionClick={(trackId, regionId) => {
+          selectedRegions={selectedRegions}
+          onRegionClick={(trackId, regionId, ctrlKey) => {
             const track = tracks.find((t) => t.id === trackId);
             if (!track) return;
             const region = track.regions.find((r) => r.id === regionId);
             if (!region) return;
-            onSelectRegion({
+            const sel: SelectedRegion = {
               trackId, trackName: track.name, regionId, channelType: channelType(track),
               startTick: region.startTick, durationTicks: region.durationTicks,
-            });
+            };
+            if (ctrlKey) {
+              const exists = selectedRegions.some((r) => r.regionId === regionId);
+              if (exists) {
+                onSelectRegions(selectedRegions.filter((r) => r.regionId !== regionId));
+              } else {
+                onSelectRegions([...selectedRegions, sel]);
+              }
+            } else {
+              onSelectRegions([sel]);
+            }
           }}
           onRegionDoubleClick={handleRegionDoubleClick}
           onRegionCreate={handleRegionCreate}

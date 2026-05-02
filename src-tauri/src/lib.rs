@@ -2,6 +2,7 @@ mod audio;
 mod dac;
 mod driver;
 mod export;
+mod import;
 mod ipc;
 mod model;
 mod project;

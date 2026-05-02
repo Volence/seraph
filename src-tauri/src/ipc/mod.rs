@@ -29,4 +29,6 @@ pub use commands::{
     transport_set_loop, transport_clear_loop, get_playback_state,
     // Validation
     get_channel_overlaps,
+    // Export
+    export_song,
 };

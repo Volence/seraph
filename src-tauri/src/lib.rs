@@ -42,6 +42,8 @@ use ipc::{
     transport_set_loop, transport_clear_loop, get_playback_state,
     // Validation
     get_channel_overlaps,
+    // Export
+    export_song,
 };
 use model::driver::DriverRegistry;
 use project::ProjectManager;
@@ -128,6 +130,8 @@ pub fn run() {
             get_playback_state,
             // Validation
             get_channel_overlaps,
+            // Export
+            export_song,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

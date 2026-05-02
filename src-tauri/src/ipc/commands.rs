@@ -6,7 +6,8 @@ use uuid::Uuid;
 use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
 use crate::audio::{AudioCommand, AudioThread};
 use crate::dac;
-use crate::model::driver::{ChannelLayout, DriverFeature};
+use crate::export::{ExportResult, ExportError};
+use crate::model::driver::{ChannelLayout, DriverFeature, DriverProfile};
 use crate::model::instrument::*;
 use crate::model::song::{Song, SongMetadata};
 use crate::project::ProjectManager;
@@ -835,4 +836,44 @@ pub fn get_playback_state(audio_state: State<'_, AudioState>) -> Result<Playback
 pub fn get_channel_overlaps(state: State<'_, ProjectState>) -> Result<Vec<OverlapWarning>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.get_all_overlaps())
+}
+
+// --- Export ---
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportFailure {
+    pub errors: Vec<ExportError>,
+}
+
+#[tauri::command]
+pub fn export_song(
+    state: State<'_, ProjectState>,
+    output_dir: String,
+) -> Result<ExportResult, ExportFailure> {
+    let mgr = state.manager.lock().map_err(|e| ExportFailure {
+        errors: vec![ExportError {
+            track_name: String::new(), region_index: None, note_index: None,
+            message: format!("mutex poisoned: {e}"),
+        }],
+    })?;
+
+    let song = mgr.song().ok_or_else(|| ExportFailure {
+        errors: vec![ExportError {
+            track_name: String::new(), region_index: None, note_index: None,
+            message: "No project open".into(),
+        }],
+    })?;
+
+    let driver_id = &song.metadata.driver_id;
+    let registry = mgr.driver_registry();
+    let driver = registry.get(driver_id).ok_or_else(|| ExportFailure {
+        errors: vec![ExportError {
+            track_name: String::new(), region_index: None, note_index: None,
+            message: format!("Driver '{driver_id}' not found"),
+        }],
+    })?;
+
+    let path = std::path::PathBuf::from(&output_dir);
+    driver.export_song(&song, &song.instruments, &path).map_err(|errors| ExportFailure { errors })
 }

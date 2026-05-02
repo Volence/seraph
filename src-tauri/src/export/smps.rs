@@ -565,6 +565,86 @@ pub fn validate_for_export(
     errors
 }
 
+// --- File Writing ---
+
+use crate::export::ExportResult;
+use std::fs;
+use std::path::Path;
+
+/// Write all export files to the output directory.
+pub fn write_export(
+    song: &Song,
+    instruments: &InstrumentBank,
+    driver: &FlamedriverProfile,
+    output_dir: &Path,
+) -> Result<ExportResult, Vec<ExportError>> {
+    let params = compute_tempo_params(song.metadata.tempo, song.metadata.ticks_per_beat);
+
+    let errors = validate_for_export(song, instruments, &params);
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    let (voice_map, voices) = build_voice_index(&song.tracks, instruments);
+
+    let music_asm = generate_music_asm(song, instruments, &voice_map, &params)?;
+    let voice_asm = generate_voice_bank_asm(&sanitize_label(&song.metadata.name), &voices, driver);
+
+    fs::create_dir_all(output_dir).map_err(|e| vec![ExportError {
+        track_name: String::new(), region_index: None, note_index: None,
+        message: format!("Failed to create output directory: {e}"),
+    }])?;
+
+    let music_path = output_dir.join(format!("Mus - {}.asm", song.metadata.name));
+    let voice_path = output_dir.join(format!("Voices - {}.asm", song.metadata.name));
+
+    fs::write(&music_path, &music_asm).map_err(|e| vec![ExportError {
+        track_name: String::new(), region_index: None, note_index: None,
+        message: format!("Failed to write music file: {e}"),
+    }])?;
+    fs::write(&voice_path, &voice_asm).map_err(|e| vec![ExportError {
+        track_name: String::new(), region_index: None, note_index: None,
+        message: format!("Failed to write voice bank file: {e}"),
+    }])?;
+
+    let mut files = vec![
+        music_path.to_string_lossy().into_owned(),
+        voice_path.to_string_lossy().into_owned(),
+    ];
+
+    let dac_tracks: Vec<&Track> = song.tracks.iter()
+        .filter(|t| !t.muted && matches!(t.channel, ChannelAssignment::Dac(_)))
+        .filter(|t| t.regions.iter().any(|r| !r.notes.is_empty()))
+        .collect();
+    if !dac_tracks.is_empty() {
+        let dac_dir = output_dir.join("dac");
+        fs::create_dir_all(&dac_dir).map_err(|e| vec![ExportError {
+            track_name: String::new(), region_index: None, note_index: None,
+            message: format!("Failed to create dac directory: {e}"),
+        }])?;
+
+        for track in dac_tracks {
+            if let Some(inst_id) = &track.instrument_id {
+                if let Some(inst) = instruments.dac.iter().find(|i| &i.id == inst_id) {
+                    let pcm_src = Path::new(&inst.pcm_file);
+                    if pcm_src.exists() {
+                        let dest = dac_dir.join(pcm_src.file_name().unwrap_or_default());
+                        if let Err(e) = fs::copy(pcm_src, &dest) {
+                            return Err(vec![ExportError {
+                                track_name: track.name.clone(), region_index: None, note_index: None,
+                                message: format!("Failed to copy DAC sample: {e}"),
+                            }]);
+                        }
+                        files.push(dest.to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ExportResult { files })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

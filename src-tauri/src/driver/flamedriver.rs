@@ -194,16 +194,11 @@ impl DriverProfile for FlamedriverProfile {
 
     fn export_song(
         &self,
-        _song: &Song,
-        _instruments: &InstrumentBank,
-        _output_dir: &Path,
+        song: &Song,
+        instruments: &InstrumentBank,
+        output_dir: &Path,
     ) -> Result<ExportResult, Vec<ExportError>> {
-        Err(vec![ExportError {
-            track_name: String::new(),
-            region_index: None,
-            note_index: None,
-            message: "Export not yet implemented".into(),
-        }])
+        crate::export::smps::write_export(song, instruments, self, output_dir)
     }
 }
 

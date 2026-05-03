@@ -6,6 +6,7 @@ use crate::ym2612::Ym2612;
 use crate::sn76489::Sn76489;
 
 const YM2612_MASTER_CLOCK: f64 = 7_670_453.0;
+const PSG_INPUT_CLOCK: f64 = 3_579_545.0;
 const SN76489_CLOCK_DIVIDER: f64 = 16.0;
 
 struct PsgEnvelopePlayer {
@@ -74,7 +75,7 @@ impl AudioEngine {
     pub fn new(sample_rate: u32) -> Self {
         let sample_rate_f = sample_rate as f64;
         let ym_cycles_per_sample = YM2612_MASTER_CLOCK / 144.0 / sample_rate_f;
-        let psg_clocks_per_sample = YM2612_MASTER_CLOCK / SN76489_CLOCK_DIVIDER / sample_rate_f;
+        let psg_clocks_per_sample = PSG_INPUT_CLOCK / SN76489_CLOCK_DIVIDER / sample_rate_f;
 
         AudioEngine {
             ym2612: Ym2612::new(),
@@ -547,7 +548,7 @@ impl AudioEngine {
             }
 
             // --- Mix and normalize ---
-            let psg_mix = psg_sample / 5;
+            let psg_mix = psg_sample / 4;
             let scaled_l = ym_l * fm_scale + psg_mix + dac_sample;
             let scaled_r = ym_r * fm_scale + psg_mix + dac_sample;
 

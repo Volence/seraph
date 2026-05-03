@@ -265,14 +265,19 @@ mod tests {
         let mapped = smps_mapper::map_smps_to_song(&smps, &driver).unwrap();
 
         eprintln!("\n=== MAPPED TRACKS (BPM={:.1}) ===", mapped.song.metadata.tempo);
+        let note_names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
         for t in &mapped.song.tracks {
             let all_notes: Vec<_> = t.regions.iter().flat_map(|r| {
-                r.notes.iter().map(move |n| (r.start_tick + n.tick, n.pitch, n.duration_ticks))
+                r.notes.iter().map(move |n| (r.start_tick + n.tick, n.pitch, n.duration_ticks, n.detune))
             }).collect();
-            let first_3 = &all_notes[..all_notes.len().min(3)];
-            let last_tick = all_notes.iter().map(|(t, _, d)| t + d).max().unwrap_or(0);
-            eprintln!("  {} ({:?}) pitch_off={}: {} regions, {} notes, last_tick={}\n    first 3 notes (abs_tick, pitch, dur): {:?}",
-                t.name, t.channel, t.pitch_offset, t.regions.len(), all_notes.len(), last_tick, first_3);
+            let first_8: Vec<String> = all_notes.iter().take(8).map(|(tick, p, dur, det)| {
+                let name = note_names[(*p % 12) as usize];
+                let oct = (*p / 12) as i8 - 1;
+                format!("({tick}: {name}{oct} [midi={p}] dur={dur} det={det})")
+            }).collect();
+            let last_tick = all_notes.iter().map(|(t, _, d, _)| t + d).max().unwrap_or(0);
+            eprintln!("  {} ({:?}) pitch_off={}: {} regions, {} notes, last_tick={}\n    first 8: {:?}",
+                t.name, t.channel, t.pitch_offset, t.regions.len(), all_notes.len(), last_tick, first_8);
         }
 
         eprintln!("\n=== WARNINGS ===");

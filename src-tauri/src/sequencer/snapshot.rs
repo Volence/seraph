@@ -18,7 +18,7 @@ pub enum InstrumentData {
 
 #[derive(Debug, Clone)]
 pub enum SequencerEvent {
-    NoteOn { tick: u64, pitch: u8, velocity: u8, duration_ticks: u64, instrument: InstrumentData, modulation: Option<ModulationParams>, pan_override: Option<u8> },
+    NoteOn { tick: u64, pitch: u8, velocity: u8, detune: i8, duration_ticks: u64, instrument: InstrumentData, modulation: Option<ModulationParams>, pan_override: Option<u8> },
     NoteOff { tick: u64, pitch: u8 },
 }
 
@@ -97,6 +97,7 @@ mod tests {
             tick: 480,
             pitch: 60,
             velocity: 100,
+            detune: 0,
             duration_ticks: 240,
             instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
             modulation: None,

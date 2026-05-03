@@ -464,7 +464,7 @@ impl ProjectManager {
                         let pitched = if matches!(track.channel, ChannelAssignment::Dac(_)) {
                             note.pitch
                         } else {
-                            (note.pitch as i16 + pitch_off + note.detune as i16).clamp(0, 127) as u8
+                            (note.pitch as i16 + pitch_off).clamp(0, 127) as u8
                         };
                         let note_inst = if let Some(nid) = note.instrument_id {
                             self.resolve_instrument_data_by_id(nid, &track.channel, driver)
@@ -484,6 +484,7 @@ impl ProjectManager {
                                 tick: abs_tick,
                                 pitch: pitched,
                                 velocity: note.velocity,
+                                detune: note.detune,
                                 duration_ticks: note.duration_ticks,
                                 instrument: data.clone(),
                                 modulation: note_mod,

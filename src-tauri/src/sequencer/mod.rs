@@ -5,9 +5,10 @@ pub use snapshot::*;
 use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
 use std::sync::Arc;
 
-// operators[0..3] correspond to SMPS macro op1..op4.
-// Flamedriver maps: op1→$3C(slot4), op2→$38(slot2), op3→$34(slot3), op4→$30(slot1).
-const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x08, 0x04, 0x00];
+// operators[0..3] = SMPS op1..op4 (macro arg order, NOT binary byte order).
+// S3K binary is [op4,op3,op2,op1]; Z80 register table [$30,$38,$34,$3C] maps:
+//   op1→$3C(+$0C), op2→$34(+$04), op3→$38(+$08), op4→$30(+$00).
+const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
 
 pub struct Sequencer {
     snapshot: SequencerSnapshot,
@@ -186,7 +187,7 @@ impl Sequencer {
         output: &mut Vec<SequencerOutput>,
     ) {
         match event {
-            SequencerEvent::NoteOn { pitch, velocity, instrument, modulation, pan_override, .. } => {
+            SequencerEvent::NoteOn { pitch, velocity, detune, instrument, modulation, pan_override, .. } => {
                 if self.active_notes[ch_idx].is_some() {
                     self.key_off_channel(ch_idx, channel_type, output);
                 }
@@ -194,12 +195,11 @@ impl Sequencer {
                 match channel_type {
                     ChannelType::Fm(hw_ch) => {
                         let pan = pan_override.unwrap_or(self.snapshot.channels[ch_idx].pan);
-                        self.program_fm(*hw_ch, *pitch, volume, *velocity, pan, instrument, output);
+                        self.program_fm(*hw_ch, *pitch, volume, *velocity, *detune, pan, instrument, output);
                         if let Some(ref mod_params) = modulation {
                             let (block, fnum) = midi_to_fm_freq(*pitch);
-                            let freq_msb = (block << 3) | ((fnum >> 8) as u8 & 0x07);
-                            let freq_lsb = (fnum & 0xFF) as u8;
-                            let base_freq = ((freq_msb as u16) << 8) | freq_lsb as u16;
+                            let freq_word = ((block as u16) << 11) | fnum;
+                            let base_freq = (freq_word as i32 + *detune as i32).clamp(0, 0x3FFF) as u16;
                             output.push(SequencerOutput::FmModulationStart {
                                 hw_ch: *hw_ch,
                                 wait: mod_params.wait,
@@ -213,9 +213,10 @@ impl Sequencer {
                         }
                     }
                     ChannelType::Psg(hw_ch) => {
-                        self.program_psg(*hw_ch, *pitch, volume, instrument, output);
+                        self.program_psg(*hw_ch, *pitch, volume, *velocity, *detune, instrument, output);
                         if let Some(ref mod_params) = modulation {
-                            let base_period = midi_to_psg_period(*pitch);
+                            let raw_period = midi_to_psg_period(*pitch);
+                            let base_period = (raw_period as i32 + *detune as i32).clamp(0, 1023) as u16;
                             output.push(SequencerOutput::PsgModulationStart {
                                 hw_ch: *hw_ch,
                                 wait: mod_params.wait,
@@ -230,7 +231,7 @@ impl Sequencer {
                     }
                     ChannelType::PsgNoise => {
                         let noise_reg = self.snapshot.channels[ch_idx].noise_reg;
-                        self.program_psg_noise(noise_reg, volume, instrument, output);
+                        self.program_psg_noise(noise_reg, volume, *velocity, instrument, output);
                     }
                     ChannelType::Dac(_) => {
                         if let InstrumentData::DacSample { samples, sample_rate } = instrument {
@@ -250,7 +251,7 @@ impl Sequencer {
         }
     }
 
-    fn program_fm(&mut self, hw_ch: u8, pitch: u8, volume: u8, velocity: u8, pan: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+    fn program_fm(&mut self, hw_ch: u8, pitch: u8, volume: u8, velocity: u8, detune: i8, pan: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
         let (port_base, ch_offset) = if hw_ch < 3 { (0u32, hw_ch) } else { (2u32, hw_ch - 3) };
 
         if let InstrumentData::FmPatch { bytes: patch, ssg_eg } = instrument {
@@ -302,8 +303,10 @@ impl Sequencer {
         }
 
         let (block, fnum) = midi_to_fm_freq(pitch);
-        let freq_msb = (block << 3) | ((fnum >> 8) as u8 & 0x07);
-        let freq_lsb = (fnum & 0xFF) as u8;
+        let freq_word = ((block as u16) << 11) | fnum;
+        let detuned = (freq_word as i32 + detune as i32).clamp(0, 0x3FFF) as u16;
+        let freq_msb = (detuned >> 8) as u8;
+        let freq_lsb = (detuned & 0xFF) as u8;
         self.fm_write(port_base, 0xA4 + ch_offset, freq_msb, output);
         self.fm_write(port_base, 0xA0 + ch_offset, freq_lsb, output);
 
@@ -312,16 +315,19 @@ impl Sequencer {
         output.push(SequencerOutput::FmWrite(FmRegisterWrite { port: 1, data: 0xF0 | ch_encoded }));
     }
 
-    fn program_psg(&self, hw_ch: u8, pitch: u8, volume: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
-        let period = midi_to_psg_period(pitch);
+    fn program_psg(&self, hw_ch: u8, pitch: u8, volume: u8, velocity: u8, detune: i8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+        let base_period = midi_to_psg_period(pitch);
+        let period = (base_period as i32 + detune as i32).clamp(0, 1023) as u16;
         let low_nibble = (period & 0x0F) as u8;
         let high_bits = ((period >> 4) & 0x3F) as u8;
         output.push(SequencerOutput::PsgWrite(0x80 | (hw_ch << 5) | low_nibble));
         output.push(SequencerOutput::PsgWrite(high_bits));
 
+        let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127
+            + (127u16.saturating_sub(velocity as u16)) * 15 / 127).min(15) as u8;
+
         if let InstrumentData::PsgEnvelope { envelope, loop_point, .. } = instrument {
             if !envelope.is_empty() {
-                let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127) as u8;
                 output.push(SequencerOutput::PsgEnvelopeStart {
                     hw_ch,
                     envelope: envelope.clone(),
@@ -331,16 +337,17 @@ impl Sequencer {
                 return;
             }
         }
-        let atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127) as u8;
-        output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | (atten & 0x0F)));
+        output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | (vol_atten & 0x0F)));
     }
 
-    fn program_psg_noise(&self, noise_reg: u8, volume: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+    fn program_psg_noise(&self, noise_reg: u8, volume: u8, velocity: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
         output.push(SequencerOutput::PsgWrite(noise_reg));
+
+        let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127
+            + (127u16.saturating_sub(velocity as u16)) * 15 / 127).min(15) as u8;
 
         if let InstrumentData::PsgEnvelope { envelope, loop_point, .. } = instrument {
             if !envelope.is_empty() {
-                let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127) as u8;
                 output.push(SequencerOutput::PsgEnvelopeStart {
                     hw_ch: 3,
                     envelope: envelope.clone(),
@@ -350,8 +357,7 @@ impl Sequencer {
                 return;
             }
         }
-        let atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127) as u8;
-        output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | (atten & 0x0F)));
+        output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | (vol_atten & 0x0F)));
     }
 
     fn key_off_channel(&self, _ch_idx: usize, channel_type: &ChannelType, output: &mut Vec<SequencerOutput>) {
@@ -422,6 +428,7 @@ mod tests {
                         tick: 0,
                         pitch: 60,
                         velocity: 100,
+                        detune: 0,
                         duration_ticks: 480,
                         instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
                         modulation: None,
@@ -530,7 +537,7 @@ mod tests {
                 noise_reg: 0xE4,
                 events: vec![
                     SequencerEvent::NoteOn {
-                        tick: 0, pitch: 60, velocity: 127, duration_ticks: 480,
+                        tick: 0, pitch: 60, velocity: 127, detune: 0, duration_ticks: 480,
                         instrument: inst,
                         modulation: None,
                         pan_override: None,
@@ -564,13 +571,11 @@ mod tests {
         }
 
         // Verify Flamedriver register mapping for channel 0:
-        // Op1 DT/MUL (0x41) → $3C (slot +0x0C)
+        // S3K binary byte order is [op4,op3,op2,op1], Z80 register table [$30,$38,$34,$3C].
+        // Our parser stores [op1,op2,op3,op4], so: op1→$3C, op2→$34, op3→$38, op4→$30.
         assert!(regs.contains(&(0x3C, 0x41)), "Op1 DT/MUL → $3C: {:?}", regs);
-        // Op2 DT/MUL (0x64) → $38 (slot +0x08)
-        assert!(regs.contains(&(0x38, 0x64)), "Op2 DT/MUL → $38");
-        // Op3 DT/MUL (0x50) → $34 (slot +0x04)
-        assert!(regs.contains(&(0x34, 0x50)), "Op3 DT/MUL → $34");
-        // Op4 DT/MUL (0x45) → $30 (slot +0x00)
+        assert!(regs.contains(&(0x34, 0x64)), "Op2 DT/MUL → $34");
+        assert!(regs.contains(&(0x38, 0x50)), "Op3 DT/MUL → $38");
         assert!(regs.contains(&(0x30, 0x45)), "Op4 DT/MUL → $30");
 
         // Op1 TL (carrier, vol=127 → offset=0, raw=5) → $4C
@@ -645,7 +650,7 @@ mod tests {
                 noise_reg: 0xE4,
                 events: vec![
                     SequencerEvent::NoteOn {
-                        tick: 0, pitch: 60, velocity: 100, duration_ticks: 480,
+                        tick: 0, pitch: 60, velocity: 100, detune: 0, duration_ticks: 480,
                         instrument,
                         modulation: None,
                         pan_override: None,
@@ -677,10 +682,10 @@ mod tests {
             i += 2;
         }
 
-        // Flamedriver register mapping: Op1→$3C, Op2→$38, Op3→$34, Op4→$30
+        // Flamedriver register mapping: Op1→$3C, Op2→$34, Op3→$38, Op4→$30
         assert!(regs.contains(&(0x3C, 0x41)), "Op1 DT/MUL=0x41 at $3C");
-        assert!(regs.contains(&(0x38, 0x64)), "Op2 DT/MUL=0x64 at $38");
-        assert!(regs.contains(&(0x34, 0x50)), "Op3 DT/MUL=0x50 at $34");
+        assert!(regs.contains(&(0x34, 0x64)), "Op2 DT/MUL=0x64 at $34");
+        assert!(regs.contains(&(0x38, 0x50)), "Op3 DT/MUL=0x50 at $38");
         assert!(regs.contains(&(0x30, 0x45)), "Op4 DT/MUL=0x45 at $30");
 
         // Op1 carrier TL: raw=5, vol_offset=(127-112)+(127-100)=42, tl=5+42=47

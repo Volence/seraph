@@ -474,13 +474,14 @@ fn map_channel_events(
                 let daw_dur = (*duration as f64 * daw_per_smps).round() as u64;
 
                 if ch.kind == SmpsChannelKind::Dac {
-                    let _sample_id = resolve_dac_sample(*pitch, dac_sample_to_id, instruments);
+                    let sample_id = resolve_dac_sample(*pitch, dac_sample_to_id, instruments);
+                    let dac_note_index = (*pitch).saturating_sub(0x81);
                     notes.push(Note {
                         tick: cursor.round() as u64,
-                        pitch: *pitch,
+                        pitch: 36 + dac_note_index,
                         velocity: 100,
                         duration_ticks: daw_dur.max(1),
-                        instrument_id: None,
+                        instrument_id: Some(sample_id),
                         detune: 0,
                         pan_override: current_pan,
                         modulation: None,
@@ -985,11 +986,9 @@ mod tests {
     }
 
     #[test]
-    fn test_aiz1_psg_periods_match_flamedriver() {
+    fn test_psg_periods_exactly_match_flamedriver() {
         use crate::audio::frequency::midi_to_psg_period;
-        use crate::import::smps_parser::parse_smps;
 
-        // Flamedriver PSG frequency table (periods for note indices 0-83)
         let fd_psg_table: [u16; 84] = [
             0x3FF,0x3FF,0x3FF,0x3FF,0x3FF,0x3FF,0x3FF,0x3FF,0x3FF,0x3F7,0x3BE,0x388,
             0x356,0x326,0x2F9,0x2CE,0x2A5,0x280,0x25C,0x23A,0x21A,0x1FB,0x1DF,0x1C4,
@@ -1000,19 +999,14 @@ mod tests {
             0x01B,0x01A,0x018,0x017,0x016,0x015,0x013,0x012,0x011,0x010,0x000,0x000,
         ];
 
-        // Check that our midi_to_psg_period values are close to Flamedriver's table
-        let mut max_diff: u16 = 0;
-        for note_idx in 9u8..82 { // Skip clamped entries at start and end
-            let midi = note_idx as u8 + 36;
+        for note_idx in 0u8..84 {
+            let midi = note_idx + 36;
             let our_period = midi_to_psg_period(midi);
             let fd_period = fd_psg_table[note_idx as usize];
-            let diff = (our_period as i32 - fd_period as i32).unsigned_abs() as u16;
-            if diff > max_diff { max_diff = diff; }
-            assert!(diff <= 2,
-                "PSG note {} (MIDI {}): ours={}, Flamedriver={}, diff={}",
-                note_idx, midi, our_period, fd_period, diff);
+            assert_eq!(our_period, fd_period,
+                "PSG note {} (MIDI {}): ours={}, Flamedriver={}",
+                note_idx, midi, our_period, fd_period);
         }
-        eprintln!("PSG max period difference: {}", max_diff);
     }
 
     #[test]

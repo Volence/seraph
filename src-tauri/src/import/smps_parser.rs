@@ -262,14 +262,14 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
     if trimmed.starts_with("smpsPan") {
         let args = extract_macro_args(trimmed, "smpsPan");
         if let Some(direction) = args.first() {
-            let pan = tables
+            let dir_val = tables
                 .pan
                 .get(direction.as_str())
                 .copied()
-                .or_else(|| parse_hex(direction));
-            if let Some(p) = pan {
-                return Some(vec![SmpsEvent::SetPan(p)]);
-            }
+                .or_else(|| parse_hex(direction))
+                .unwrap_or(0xC0);
+            let amsfms = args.get(1).and_then(|a| parse_hex(a)).unwrap_or(0);
+            return Some(vec![SmpsEvent::SetPan(dir_val | amsfms)]);
         }
         return Some(vec![]);
     }
@@ -282,10 +282,19 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
         return Some(vec![]);
     }
 
-    if trimmed.starts_with("smpsAlterNote") {
-        let args = extract_macro_args(trimmed, "smpsAlterNote");
+    if trimmed.starts_with("smpsAlterNote") || trimmed.starts_with("smpsDetune") {
+        let name = if trimmed.starts_with("smpsAlterNote") { "smpsAlterNote" } else { "smpsDetune" };
+        let args = extract_macro_args(trimmed, name);
         if let Some(v) = args.first().and_then(|a| parse_hex_i8(a)) {
             return Some(vec![SmpsEvent::Detune(v)]);
+        }
+        return Some(vec![]);
+    }
+
+    if trimmed.starts_with("smpsAlterPitch") {
+        let args = extract_macro_args(trimmed, "smpsAlterPitch");
+        if let Some(v) = args.first().and_then(|a| parse_hex_i8(a)) {
+            return Some(vec![SmpsEvent::Transpose(v)]);
         }
         return Some(vec![]);
     }
@@ -343,8 +352,6 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
     let known_skips: &[&str] = &[
         "smpsModChange",
         "smpsModOn",
-        "smpsAlterPitch",
-        "smpsDetune",
         "smpsNoteFill",
         "smpsSetTempoMod",
         "smpsSetTempoDiv",

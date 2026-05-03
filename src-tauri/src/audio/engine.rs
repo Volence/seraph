@@ -547,11 +547,9 @@ impl AudioEngine {
             }
 
             // --- Mix and normalize ---
-            // PSG VOLUME_TABLE max per channel = 8191, 4 channels = ~32k.
-            // YM2612 raw ~250 * fm_scale(48) = ~12k per channel.
-            // On real hardware PSG is roughly 1/4 to 1/5 FM amplitude.
-            let scaled_l = ym_l * fm_scale + psg_sample / 4 + dac_sample;
-            let scaled_r = ym_r * fm_scale + psg_sample / 4 + dac_sample;
+            let psg_mix = psg_sample / 5;
+            let scaled_l = ym_l * fm_scale + psg_mix + dac_sample;
+            let scaled_r = ym_r * fm_scale + psg_mix + dac_sample;
 
             buffer[frame * 2]     = (scaled_l as f32 / 32768.0).clamp(-1.0, 1.0);
             buffer[frame * 2 + 1] = (scaled_r as f32 / 32768.0).clamp(-1.0, 1.0);

@@ -130,6 +130,25 @@ export function PianoRollCanvas({
       ctx.strokeStyle = selected ? "#ffffff" : channelColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(drawX + 0.5, y + 0.5, w - 1, h - 1);
+
+      if (note.modulation && w > 8) {
+        ctx.strokeStyle = "#ffffff44";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const midY = y + h / 2;
+        for (let px = drawX + 2; px < drawX + w - 2; px += 3) {
+          const wy = midY + Math.sin((px - drawX) * 0.8) * (h * 0.2);
+          if (px === drawX + 2) ctx.moveTo(px, wy);
+          else ctx.lineTo(px, wy);
+        }
+        ctx.stroke();
+      }
+
+      if (note.detune && note.detune !== 0 && w > 14 && h >= 10) {
+        ctx.fillStyle = "#ffffffaa";
+        ctx.font = `${Math.min(9, h - 2)}px monospace`;
+        ctx.fillText(note.detune > 0 ? `+${note.detune}` : `${note.detune}`, drawX + 2, y + h - 2);
+      }
     }
 
     const dr = drawingRef.current;

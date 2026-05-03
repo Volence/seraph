@@ -17,6 +17,7 @@ interface PianoRollCanvasProps {
   onNoteAdd: (tick: number, pitch: number, durationTicks: number) => void;
   onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
+  onNoteMove: (index: number, newTick: number, newPitch: number) => void;
   onScrollTopChange: (scrollTop: number) => void;
   onScrollLeftChange: (scrollLeft: number) => void;
   onZoom: (delta: number, centerX: number) => void;
@@ -45,6 +46,7 @@ export function PianoRollCanvas({
   onNoteAdd,
   onAudition,
   onNoteResize,
+  onNoteMove,
   onScrollTopChange,
   onScrollLeftChange,
   onZoom,
@@ -54,6 +56,7 @@ export function PianoRollCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ noteIndex: number; startX: number; origDuration: number } | null>(null);
+  const [moveDrag, setMoveDrag] = useState<{ noteIndex: number; startX: number; startY: number; origTick: number; origPitch: number } | null>(null);
   const drawingRef = useRef<{ startTick: number; pitch: number; endTick: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
@@ -229,8 +232,17 @@ export function PianoRollCanvas({
     }
 
     if (hit) {
+      e.preventDefault();
       onNoteClick(hit.index);
       onAudition(notes[hit.index].pitch);
+      const note = notes[hit.index];
+      setMoveDrag({
+        noteIndex: hit.index,
+        startX: e.clientX,
+        startY: e.clientY,
+        origTick: note.tick,
+        origPitch: note.pitch,
+      });
       return;
     }
 
@@ -365,8 +377,44 @@ export function PianoRollCanvas({
     };
   }, [drag, ticksPerPixel, gridSnapTicks, onNoteResize]);
 
+  useEffect(() => {
+    if (!moveDrag) return;
+    let moved = false;
+
+    function handleMouseMove(e: MouseEvent) {
+      if (!moveDrag) return;
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = "grabbing";
+      const deltaX = e.clientX - moveDrag.startX;
+      const deltaY = e.clientY - moveDrag.startY;
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) moved = true;
+      if (!moved) return;
+      const deltaTicks = deltaX * ticksPerPixel;
+      const deltaRows = Math.round(deltaY / rowHeight);
+      const rawTick = moveDrag.origTick + deltaTicks;
+      const snappedTick = e.ctrlKey
+        ? Math.max(0, Math.round(rawTick))
+        : Math.max(0, Math.round(rawTick / gridSnapTicks) * gridSnapTicks);
+      const newPitch = Math.max(minPitch, Math.min(maxPitch, moveDrag.origPitch - deltaRows));
+      onNoteMove(moveDrag.noteIndex, snappedTick, newPitch);
+    }
+
+    function handleMouseUp() {
+      setMoveDrag(null);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = "";
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [moveDrag, ticksPerPixel, gridSnapTicks, rowHeight, minPitch, maxPitch, onNoteMove]);
+
   function handleMouseMove(e: React.MouseEvent) {
-    if (drag || isDrawing || isPanning) return;
+    if (drag || moveDrag || isDrawing || isPanning) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -374,7 +422,7 @@ export function PianoRollCanvas({
     const y = e.clientY - rect.top;
 
     const hit = findNoteAtPos(x, y);
-    canvas.style.cursor = hit?.nearEdge ? "ew-resize" : "";
+    canvas.style.cursor = hit?.nearEdge ? "ew-resize" : hit ? "grab" : "";
   }
 
   useEffect(() => {

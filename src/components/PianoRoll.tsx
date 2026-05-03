@@ -94,6 +94,13 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     refresh();
   }
 
+  async function handleNoteMove(index: number, newTick: number, newPitch: number) {
+    const note = notes[index];
+    if (!note) return;
+    await ipc.updateNote(region.trackId, region.regionId, index, newTick, newPitch, note.velocity, note.durationTicks);
+    refresh();
+  }
+
   async function handleVelocityChange(index: number, velocity: number) {
     const note = notes[index];
     if (!note) return;
@@ -112,6 +119,10 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           setSelectedNotes(new Set());
           refresh();
         })();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        setSelectedNotes(new Set(notes.map((_, i) => i)));
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -178,6 +189,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           onNoteAdd={handleNoteAdd}
           onAudition={handleAudition}
           onNoteResize={handleNoteResize}
+          onNoteMove={handleNoteMove}
           onScrollTopChange={setScrollTop}
           onScrollLeftChange={setPianoScrollLeft}
           onZoom={handleZoom}

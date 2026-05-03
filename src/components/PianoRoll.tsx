@@ -124,6 +124,26 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
         e.preventDefault();
         setSelectedNotes(new Set(notes.map((_, i) => i)));
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "d" && selectedNotes.size > 0) {
+        e.preventDefault();
+        (async () => {
+          const sorted = Array.from(selectedNotes).sort((a, b) => a - b);
+          const maxEnd = sorted.reduce((m, idx) => {
+            const n = notes[idx];
+            return Math.max(m, n.tick + n.durationTicks);
+          }, 0);
+          const minStart = sorted.reduce((m, idx) => Math.min(m, notes[idx].tick), Infinity);
+          const offset = maxEnd - minStart;
+          const newIndices: number[] = [];
+          for (const idx of sorted) {
+            const n = notes[idx];
+            const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks);
+            newIndices.push(newIdx);
+          }
+          await refresh();
+          setSelectedNotes(new Set(newIndices));
+        })();
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);

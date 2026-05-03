@@ -7,19 +7,20 @@ use uuid::Uuid;
 
 pub struct FlamedriverProfile;
 
-/// Bit i = 1 means operator (i+1) is a carrier for that algorithm.
+/// Bit i = 1 means operators[i] is a carrier for that algorithm.
+/// Matches Flamedriver vcTLMask: op1=always, op2=algo≥5, op3=algo≥4, op4=algo==7.
 const CARRIER_MASKS: [u8; 8] = [
-    0b1000, // algo 0: op4
-    0b1000, // algo 1: op4
-    0b1000, // algo 2: op4
-    0b1000, // algo 3: op4
-    0b1010, // algo 4: op2, op4
-    0b1110, // algo 5: op2, op3, op4
-    0b1110, // algo 6: op2, op3, op4
+    0b0001, // algo 0: op1
+    0b0001, // algo 1: op1
+    0b0001, // algo 2: op1
+    0b0001, // algo 3: op1
+    0b0101, // algo 4: op1, op3
+    0b0111, // algo 5: op1, op2, op3
+    0b0111, // algo 6: op1, op2, op3
     0b1111, // algo 7: all
 ];
 
-const OP_ORDER: [usize; 4] = [3, 2, 1, 0]; // ops 4,3,2,1
+const OP_ORDER: [usize; 4] = [0, 1, 2, 3];
 
 impl DriverProfile for FlamedriverProfile {
     fn name(&self) -> &str {
@@ -239,30 +240,25 @@ mod tests {
     }
 
     #[test]
-    fn test_fm_to_bytes_operator_order_is_4321() {
+    fn test_fm_to_bytes_operator_order() {
         let driver = FlamedriverProfile;
         let inst = make_test_instrument();
         let bytes = driver.fm_to_bytes(&inst);
-        // Op4 (idx 3): detune=7, mul=8 → (7<<4)|8 = 0x78
-        assert_eq!(bytes[0], (7 << 4) | 8);
-        // Op3 (idx 2): detune=5, mul=6 → (5<<4)|6 = 0x56
-        assert_eq!(bytes[1], (5 << 4) | 6);
-        // Op2 (idx 1): detune=3, mul=4 → (3<<4)|4 = 0x34
-        assert_eq!(bytes[2], (3 << 4) | 4);
-        // Op1 (idx 0): detune=1, mul=2 → (1<<4)|2 = 0x12
-        assert_eq!(bytes[3], (1 << 4) | 2);
+        assert_eq!(bytes[0], (1 << 4) | 2);
+        assert_eq!(bytes[1], (3 << 4) | 4);
+        assert_eq!(bytes[2], (5 << 4) | 6);
+        assert_eq!(bytes[3], (7 << 4) | 8);
     }
 
     #[test]
     fn test_fm_to_bytes_carrier_flags_algo4() {
         let driver = FlamedriverProfile;
-        let inst = make_test_instrument(); // algorithm 4: carriers = op2, op4
+        let inst = make_test_instrument(); // algorithm 4: carriers = op1 (operators[0]), op3 (operators[2])
         let bytes = driver.fm_to_bytes(&inst);
-        // TL bytes 20-23: ops 4,3,2,1
-        assert_eq!(bytes[20], 40 | 0x80); // Op4 (carrier)
-        assert_eq!(bytes[21], 30);         // Op3 (modulator)
-        assert_eq!(bytes[22], 20 | 0x80); // Op2 (carrier)
-        assert_eq!(bytes[23], 10);         // Op1 (modulator)
+        assert_eq!(bytes[20], 10 | 0x80);  // operators[0] = op1 (carrier)
+        assert_eq!(bytes[21], 20);          // operators[1] = op2 (modulator)
+        assert_eq!(bytes[22], 30 | 0x80);  // operators[2] = op3 (carrier)
+        assert_eq!(bytes[23], 40);          // operators[3] = op4 (modulator)
     }
 
     #[test]
@@ -319,6 +315,7 @@ mod tests {
             volume_sequence: vec![],
             loop_point: None,
             noise_mode: None,
+            smps_envelope_index: None,
             metadata: InstrumentMetadata::default(),
         };
         let err = driver.validate_psg(&inst).unwrap_err();

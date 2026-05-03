@@ -27,7 +27,7 @@ export function useArrangementZoom(ticksPerBeat: number): ZoomState {
       } else if (e.shiftKey) {
         setScrollLeft((prev) => Math.max(0, prev + e.deltaY));
       } else {
-        setScrollLeft((prev) => Math.max(0, prev + e.deltaX));
+        setScrollLeft((prev) => Math.max(0, prev + (e.deltaX || e.deltaY)));
       }
     },
     [ticksPerBar],

@@ -9,6 +9,7 @@ use crate::model::instrument::*;
 use crate::model::song::*;
 use crate::sequencer::{
     SequencerSnapshot, ChannelSequence, ChannelType, SequencerEvent, InstrumentData, OverlapWarning,
+    ModulationParams,
 };
 
 pub struct ProjectManager {
@@ -448,23 +449,49 @@ impl ProjectManager {
             let mut overlap_sources: Vec<(u64, u64, String)> = Vec::new();
 
             for track in tracks {
-                let inst_data = self.resolve_instrument_data(track, driver);
+                let track_inst_data = self.resolve_instrument_data(track, driver);
+                let pitch_off = track.pitch_offset as i16;
                 for region in &track.regions {
+                    let inst_data = if region.instrument_id.is_some() {
+                        self.resolve_instrument_data_for_region(region, &track.channel, driver)
+                            .or_else(|| track_inst_data.clone())
+                    } else {
+                        track_inst_data.clone()
+                    };
                     for note in &region.notes {
                         let abs_tick = region.start_tick + note.tick;
                         let end_tick = abs_tick + note.duration_ticks;
-                        if let Some(ref data) = inst_data {
+                        let pitched = if matches!(track.channel, ChannelAssignment::Dac(_)) {
+                            note.pitch
+                        } else {
+                            (note.pitch as i16 + pitch_off).clamp(0, 127) as u8
+                        };
+                        let note_inst = if let Some(nid) = note.instrument_id {
+                            self.resolve_instrument_data_by_id(nid, &track.channel, driver)
+                                .or_else(|| inst_data.clone())
+                        } else {
+                            inst_data.clone()
+                        };
+                        if let Some(ref data) = note_inst {
+                            let note_mod = if let Some(ref m) = note.modulation {
+                                Some(ModulationParams { wait: m.wait, speed: m.speed, delta: m.delta, steps: m.steps })
+                            } else if let Some(ref m) = track.modulation {
+                                Some(ModulationParams { wait: m.wait, speed: m.speed, delta: m.delta, steps: m.steps })
+                            } else {
+                                None
+                            };
                             events.push(SequencerEvent::NoteOn {
                                 tick: abs_tick,
-                                pitch: note.pitch,
+                                pitch: pitched,
                                 velocity: note.velocity,
                                 duration_ticks: note.duration_ticks,
                                 instrument: data.clone(),
+                                modulation: note_mod,
                             });
                         }
                         events.push(SequencerEvent::NoteOff {
                             tick: end_tick,
-                            pitch: note.pitch,
+                            pitch: pitched,
                         });
                         overlap_sources.push((abs_tick, end_tick, track.id.to_string()));
                     }
@@ -513,9 +540,21 @@ impl ProjectManager {
             }
 
             let volume = tracks[0].volume;
+            let pan_byte = match tracks[0].pan {
+                crate::model::song::Pan::Left => 0x80u8,
+                crate::model::song::Pan::Right => 0x40,
+                crate::model::song::Pan::Center => 0xC0,
+            };
+            let modulation = tracks[0].modulation.as_ref().map(|m| {
+                crate::sequencer::snapshot::ModulationParams {
+                    wait: m.wait, speed: m.speed, delta: m.delta, steps: m.steps,
+                }
+            });
             channels.push(ChannelSequence {
                 channel_type,
                 volume,
+                pan: pan_byte,
+                modulation,
                 events,
                 overlaps,
             });
@@ -527,6 +566,97 @@ impl ProjectManager {
             loop_start: None,
             loop_end: None,
             channels,
+        }
+    }
+
+    fn resolve_instrument_data_for_region(
+        &self,
+        region: &Region,
+        channel: &ChannelAssignment,
+        driver: Option<&dyn crate::model::driver::DriverProfile>,
+    ) -> Option<InstrumentData> {
+        let inst_id = region.instrument_id.as_ref()?;
+        match channel {
+            ChannelAssignment::Fm(_) => {
+                let inst = self.instruments.fm.iter().find(|i| &i.id == inst_id)?;
+                let bytes: [u8; 25] = if let Some(drv) = driver {
+                    let vec = drv.fm_to_bytes(inst);
+                    let mut arr = [0u8; 25];
+                    let len = vec.len().min(25);
+                    arr[..len].copy_from_slice(&vec[..len]);
+                    arr
+                } else {
+                    [0u8; 25]
+                };
+                let ssg_eg = [
+                    inst.operators[0].ssg_eg,
+                    inst.operators[1].ssg_eg,
+                    inst.operators[2].ssg_eg,
+                    inst.operators[3].ssg_eg,
+                ];
+                Some(InstrumentData::FmPatch { bytes, ssg_eg })
+            }
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
+                let inst = self.instruments.psg.iter().find(|i| &i.id == inst_id)?;
+                Some(InstrumentData::PsgEnvelope {
+                    period: 0,
+                    envelope: Arc::new(inst.volume_sequence.clone()),
+                    loop_point: inst.loop_point,
+                })
+            }
+            ChannelAssignment::Dac(_) => {
+                let inst = self.instruments.dac.iter().find(|i| &i.id == inst_id)?;
+                let pcm = self.dac_pcm_cache.get(inst_id)?;
+                Some(InstrumentData::DacSample {
+                    samples: pcm.clone(),
+                    sample_rate: inst.target_sample_rate,
+                })
+            }
+        }
+    }
+
+    fn resolve_instrument_data_by_id(
+        &self,
+        inst_id: Uuid,
+        channel: &ChannelAssignment,
+        driver: Option<&dyn crate::model::driver::DriverProfile>,
+    ) -> Option<InstrumentData> {
+        match channel {
+            ChannelAssignment::Fm(_) => {
+                let inst = self.instruments.fm.iter().find(|i| i.id == inst_id)?;
+                let bytes: [u8; 25] = if let Some(drv) = driver {
+                    let vec = drv.fm_to_bytes(inst);
+                    let mut arr = [0u8; 25];
+                    let len = vec.len().min(25);
+                    arr[..len].copy_from_slice(&vec[..len]);
+                    arr
+                } else {
+                    [0u8; 25]
+                };
+                let ssg_eg = [
+                    inst.operators[0].ssg_eg,
+                    inst.operators[1].ssg_eg,
+                    inst.operators[2].ssg_eg,
+                    inst.operators[3].ssg_eg,
+                ];
+                Some(InstrumentData::FmPatch { bytes, ssg_eg })
+            }
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
+                let inst = self.instruments.psg.iter().find(|i| i.id == inst_id)?;
+                Some(InstrumentData::PsgEnvelope {
+                    period: 0,
+                    envelope: Arc::new(inst.volume_sequence.clone()),
+                    loop_point: inst.loop_point,
+                })
+            }
+            ChannelAssignment::Dac(_) => {
+                let inst = self.instruments.dac.iter().find(|i| i.id == inst_id)?;
+                let pcm = self.dac_pcm_cache.get(&inst_id)?;
+                Some(InstrumentData::DacSample {
+                    samples: pcm.clone(),
+                    sample_rate: inst.target_sample_rate,
+                })
+            }
         }
     }
 
@@ -549,10 +679,10 @@ impl ProjectManager {
                     [0u8; 25]
                 };
                 let ssg_eg = [
-                    inst.operators[3].ssg_eg,
-                    inst.operators[2].ssg_eg,
-                    inst.operators[1].ssg_eg,
                     inst.operators[0].ssg_eg,
+                    inst.operators[1].ssg_eg,
+                    inst.operators[2].ssg_eg,
+                    inst.operators[3].ssg_eg,
                 ];
                 Some(InstrumentData::FmPatch { bytes, ssg_eg })
             }
@@ -589,6 +719,8 @@ impl ProjectManager {
             solo: false,
             volume: 100,
             pan: Pan::Center,
+            pitch_offset: 0,
+            modulation: None,
         });
         id
     }
@@ -603,6 +735,7 @@ impl ProjectManager {
         solo: bool,
         volume: u8,
         pan: Pan,
+        pitch_offset: i8,
     ) -> Result<(), String> {
         let track = self.tracks.iter_mut().find(|t| t.id == id)
             .ok_or("track not found")?;
@@ -613,6 +746,7 @@ impl ProjectManager {
         track.solo = solo;
         track.volume = volume;
         track.pan = pan;
+        track.pitch_offset = pitch_offset;
         Ok(())
     }
 
@@ -638,6 +772,7 @@ impl ProjectManager {
             start_tick,
             duration_ticks,
             notes: Vec::new(),
+            instrument_id: None,
         });
         Ok(id)
     }
@@ -698,7 +833,7 @@ impl ProjectManager {
         let region = track.regions.iter_mut().find(|r| r.id == region_id)
             .ok_or("region not found")?;
         let idx = region.notes.len();
-        region.notes.push(Note { tick, pitch, velocity, duration_ticks });
+        region.notes.push(Note { tick, pitch, velocity, duration_ticks, instrument_id: None, detune: 0, pan_override: None, modulation: None });
         Ok(idx)
     }
 
@@ -828,6 +963,7 @@ mod tests {
             volume_sequence: vec![15, 12, 8, 4, 0],
             loop_point: None,
             noise_mode: None,
+            smps_envelope_index: None,
             metadata: InstrumentMetadata::default(),
         };
         let psg_id = mgr.add_psg_instrument(psg_inst);
@@ -925,7 +1061,7 @@ mod tests {
         assert_eq!(mgr.list_tracks().len(), 1);
         assert_eq!(mgr.list_tracks()[0].name, "FM1-Bass");
 
-        mgr.update_track(id, "FM1-Lead".into(), ChannelAssignment::Fm(0), None, true, false, 80, Pan::Left).unwrap();
+        mgr.update_track(id, "FM1-Lead".into(), ChannelAssignment::Fm(0), None, true, false, 80, Pan::Left, 0).unwrap();
         assert_eq!(mgr.list_tracks()[0].name, "FM1-Lead");
         assert!(mgr.list_tracks()[0].muted);
 
@@ -1036,7 +1172,8 @@ mod tests {
             id: Uuid::new_v4(),
             start_tick: 0,
             duration_ticks: 480,
-            notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 }],
+            notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240, instrument_id: None, detune: 0, pan_override: None, modulation: None }],
+            instrument_id: None,
         });
 
         let snap = mgr.build_snapshot();
@@ -1071,7 +1208,7 @@ mod tests {
         };
         let fm_id2 = mgr.add_fm_instrument(fm_inst2);
 
-        let note = Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240 };
+        let note = Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 240, instrument_id: None, detune: 0, pan_override: None, modulation: None };
 
         // Set up first auto-created track as solo'd with a region
         let track1 = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id1)).unwrap();
@@ -1081,6 +1218,7 @@ mod tests {
             start_tick: 0,
             duration_ticks: 480,
             notes: vec![note.clone()],
+            instrument_id: None,
         });
 
         // Set up second auto-created track (not solo'd) with a region
@@ -1090,6 +1228,7 @@ mod tests {
             start_tick: 0,
             duration_ticks: 480,
             notes: vec![note],
+            instrument_id: None,
         });
 
         let snap = mgr.build_snapshot();
@@ -1131,7 +1270,8 @@ mod tests {
             id: Uuid::new_v4(),
             start_tick: 0,
             duration_ticks: 960,
-            notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480 }],
+            notes: vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480, instrument_id: None, detune: 0, pan_override: None, modulation: None }],
+            instrument_id: None,
         });
 
         let track2 = mgr.tracks.iter_mut().find(|t| t.instrument_id == Some(fm_id2)).unwrap();
@@ -1140,7 +1280,8 @@ mod tests {
             id: Uuid::new_v4(),
             start_tick: 0,
             duration_ticks: 960,
-            notes: vec![Note { tick: 240, pitch: 64, velocity: 100, duration_ticks: 480 }],
+            notes: vec![Note { tick: 240, pitch: 64, velocity: 100, duration_ticks: 480, instrument_id: None, detune: 0, pan_override: None, modulation: None }],
+            instrument_id: None,
         });
 
         let snap = mgr.build_snapshot();
@@ -1173,9 +1314,10 @@ mod tests {
             start_tick: 0,
             duration_ticks: 1920,
             notes: vec![
-                Note { tick: 480, pitch: 60, velocity: 100, duration_ticks: 240 },
-                Note { tick: 0, pitch: 48, velocity: 100, duration_ticks: 480 },
+                Note { tick: 480, pitch: 60, velocity: 100, duration_ticks: 240, instrument_id: None, detune: 0, pan_override: None, modulation: None },
+                Note { tick: 0, pitch: 48, velocity: 100, duration_ticks: 480, instrument_id: None, detune: 0, pan_override: None, modulation: None },
             ],
+            instrument_id: None,
         });
 
         let snap = mgr.build_snapshot();

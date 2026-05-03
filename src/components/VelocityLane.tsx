@@ -6,41 +6,47 @@ interface VelocityLaneProps {
   notes: Note[];
   durationTicks: number;
   ticksPerPixel: number;
+  scrollLeft: number;
   channelColor: string;
   onVelocityChange: (noteIndex: number, velocity: number) => void;
 }
 
 const LANE_HEIGHT = 60;
 
-export function VelocityLane({ notes, durationTicks, ticksPerPixel, channelColor, onVelocityChange }: VelocityLaneProps) {
+export function VelocityLane({ notes, durationTicks, ticksPerPixel, scrollLeft, channelColor, onVelocityChange }: VelocityLaneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const canvasWidth = durationTicks / ticksPerPixel;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasWidth * dpr;
+    const viewW = container.getBoundingClientRect().width;
+    canvas.width = viewW * dpr;
     canvas.height = LANE_HEIGHT * dpr;
-    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.width = `${viewW}px`;
     canvas.style.height = `${LANE_HEIGHT}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.scale(dpr, dpr);
 
+    const startTick = scrollLeft * ticksPerPixel;
+
     ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(0, 0, canvasWidth, LANE_HEIGHT);
+    ctx.fillRect(0, 0, viewW, LANE_HEIGHT);
 
     for (const note of notes) {
-      const x = note.tick / ticksPerPixel;
+      const x = (note.tick - startTick) / ticksPerPixel;
+      const w = Math.max(4, note.durationTicks / ticksPerPixel * 0.8);
+      if (x + w < 0 || x > viewW) continue;
       const barHeight = (note.velocity / 127) * (LANE_HEIGHT - 4);
       const alpha = 0.5 + (note.velocity / 127) * 0.5;
       ctx.fillStyle = channelColor + Math.round(alpha * 255).toString(16).padStart(2, "0");
-      ctx.fillRect(x, LANE_HEIGHT - barHeight - 2, Math.max(4, note.durationTicks / ticksPerPixel * 0.8), barHeight);
+      ctx.fillRect(x, LANE_HEIGHT - barHeight - 2, w, barHeight);
     }
-  }, [notes, durationTicks, ticksPerPixel, channelColor, canvasWidth]);
+  }, [notes, durationTicks, ticksPerPixel, scrollLeft, channelColor]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -50,9 +56,10 @@ export function VelocityLane({ notes, durationTicks, ticksPerPixel, channelColor
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    const startTick = scrollLeft * ticksPerPixel;
 
     for (let i = 0; i < notes.length; i++) {
-      const nx = notes[i].tick / ticksPerPixel;
+      const nx = (notes[i].tick - startTick) / ticksPerPixel;
       const nw = Math.max(4, notes[i].durationTicks / ticksPerPixel * 0.8);
       if (x >= nx && x <= nx + nw) {
         const vel = Math.round((1 - y / LANE_HEIGHT) * 127);
@@ -63,7 +70,7 @@ export function VelocityLane({ notes, durationTicks, ticksPerPixel, channelColor
   }
 
   return (
-    <div className={styles.lane}>
+    <div ref={containerRef} className={styles.lane}>
       <canvas ref={canvasRef} onMouseDown={handleMouseDown} />
     </div>
   );

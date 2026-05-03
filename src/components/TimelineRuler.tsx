@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import styles from "./TimelineRuler.module.css";
 
 interface TimelineRulerProps {
@@ -7,11 +7,15 @@ interface TimelineRulerProps {
   ticksPerBeat: number;
   beatsPerBar: number;
   onSeek: (tick: number) => void;
+  onScrollChange: (scrollLeft: number) => void;
 }
 
-export function TimelineRuler({ ticksPerPixel, scrollLeft, ticksPerBeat, beatsPerBar, onSeek }: TimelineRulerProps) {
+export function TimelineRuler({ ticksPerPixel, scrollLeft, ticksPerBeat, beatsPerBar, onSeek, onScrollChange }: TimelineRulerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startScroll: number } | null>(null);
+  const clickGuardRef = useRef(false);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -75,17 +79,53 @@ export function TimelineRuler({ ticksPerPixel, scrollLeft, ticksPerBeat, beatsPe
     return () => obs.disconnect();
   }, [draw]);
 
-  function handleClick(e: React.MouseEvent) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const tick = (x + scrollLeft) * ticksPerPixel;
-    onSeek(Math.max(0, Math.round(tick)));
+  function handleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    clickGuardRef.current = false;
+    dragRef.current = { startX: e.clientX, startScroll: scrollLeft };
+    setDragging(true);
   }
 
+  useEffect(() => {
+    if (!dragging) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const d = dragRef.current;
+      if (!d) return;
+      const delta = e.clientX - d.startX;
+      if (Math.abs(delta) > 3) clickGuardRef.current = true;
+      onScrollChange(Math.max(0, d.startScroll - delta));
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+      if (!clickGuardRef.current) {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const tick = (x + scrollLeft) * ticksPerPixel;
+          onSeek(Math.max(0, Math.round(tick)));
+        }
+      }
+      dragRef.current = null;
+      setDragging(false);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [dragging, scrollLeft, ticksPerPixel, onScrollChange, onSeek]);
+
   return (
-    <div ref={containerRef} className={styles.rulerContainer} onClick={handleClick}>
+    <div
+      ref={containerRef}
+      className={styles.rulerContainer}
+      onMouseDown={handleMouseDown}
+      style={{ cursor: dragging ? "grabbing" : "grab" }}
+    >
       <canvas ref={canvasRef} className={styles.ruler} />
     </div>
   );

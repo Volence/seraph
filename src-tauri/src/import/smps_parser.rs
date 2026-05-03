@@ -43,6 +43,10 @@ pub enum SmpsEvent {
     SetVoice(u8),
     SetPan(u8),
     Transpose(i8),
+    Detune(i8),
+    VolumeChange(i8),
+    SetModulation { wait: u8, speed: u8, delta: u8, steps: u8 },
+    ModOff,
     Tie,
     Stop,
     Unsupported { name: String },
@@ -269,39 +273,78 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
         return Some(vec![]);
     }
 
-    if trimmed.starts_with("smpsChangeTransposition") || trimmed.starts_with("smpsAlterPitch") {
-        let name = if trimmed.starts_with("smpsChangeTransposition") {
-            "smpsChangeTransposition"
-        } else {
-            "smpsAlterPitch"
-        };
-        let args = extract_macro_args(trimmed, name);
+    if trimmed.starts_with("smpsChangeTransposition") {
+        let args = extract_macro_args(trimmed, "smpsChangeTransposition");
         if let Some(v) = args.first().and_then(|a| parse_hex_i8(a)) {
             return Some(vec![SmpsEvent::Transpose(v)]);
         }
         return Some(vec![]);
     }
 
+    if trimmed.starts_with("smpsAlterNote") {
+        let args = extract_macro_args(trimmed, "smpsAlterNote");
+        if let Some(v) = args.first().and_then(|a| parse_hex_i8(a)) {
+            return Some(vec![SmpsEvent::Detune(v)]);
+        }
+        return Some(vec![]);
+    }
+
+    if trimmed.starts_with("smpsModSet") {
+        let args = extract_macro_args(trimmed, "smpsModSet");
+        if args.len() >= 4 {
+            let wait = args[0].parse::<u8>().or_else(|_| parse_hex(&args[0]).ok_or(())).unwrap_or(0);
+            let speed = args[1].parse::<u8>().or_else(|_| parse_hex(&args[1]).ok_or(())).unwrap_or(1);
+            let delta = args[2].parse::<u8>().or_else(|_| parse_hex(&args[2]).ok_or(())).unwrap_or(0);
+            let steps = args[3].parse::<u8>().or_else(|_| parse_hex(&args[3]).ok_or(())).unwrap_or(0);
+            return Some(vec![SmpsEvent::SetModulation { wait, speed, delta, steps }]);
+        }
+        return Some(vec![]);
+    }
+
+    if trimmed.starts_with("smpsModOff") {
+        return Some(vec![SmpsEvent::ModOff]);
+    }
+
+    if trimmed.starts_with("smpsFMAlterVol")
+        || trimmed.starts_with("smpsAlterVol")
+        || trimmed.starts_with("smpsPSGAlterVol")
+    {
+        let name = if trimmed.starts_with("smpsFMAlterVol") {
+            "smpsFMAlterVol"
+        } else if trimmed.starts_with("smpsPSGAlterVol") {
+            "smpsPSGAlterVol"
+        } else {
+            "smpsAlterVol"
+        };
+        let args = extract_macro_args(trimmed, name);
+        if let Some(v) = args.first().and_then(|a| parse_hex_i8(a)) {
+            return Some(vec![SmpsEvent::VolumeChange(v)]);
+        }
+        return Some(vec![]);
+    }
+
+    if trimmed.starts_with("smpsPSGvoice") {
+        let args = extract_macro_args(trimmed, "smpsPSGvoice");
+        if let Some(v) = args.first().and_then(|a| parse_psg_envelope(a)) {
+            return Some(vec![SmpsEvent::SetVoice(v)]);
+        }
+        return Some(vec![]);
+    }
+
     let known_skips: &[&str] = &[
-        "smpsModSet",
-        "smpsModOff",
         "smpsModChange",
         "smpsModOn",
+        "smpsAlterPitch",
         "smpsDetune",
-        "smpsAlterNote",
-        "smpsAlterVol",
-        "smpsPSGAlterVol",
         "smpsNoteFill",
         "smpsSetTempoMod",
         "smpsSetTempoDiv",
         "smpsSSGEG",
-        "smpsPSGvoice",
         "smpsPlayDACSample",
         "smpsPSGform",
         "smpsSetNote",
         "smpsFMICommand",
         "smpsSetVol",
-        "smpsFMAlterVol",
         "smpsNop",
         "smpsFade",
         "smpsStopFM",
@@ -436,6 +479,29 @@ fn parse_channel_events(
             continue;
         }
 
+        if trimmed.starts_with("if ") || trimmed == "if" {
+            line_idx += 1;
+            continue;
+        }
+        if trimmed == "else" {
+            let mut depth = 1u32;
+            line_idx += 1;
+            while line_idx < lines.len() && depth > 0 {
+                let inner = strip_comment(lines[line_idx]).trim().to_string();
+                if inner.starts_with("if ") || inner == "if" {
+                    depth += 1;
+                } else if inner == "endif" || inner == "endc" {
+                    depth -= 1;
+                }
+                line_idx += 1;
+            }
+            continue;
+        }
+        if trimmed == "endif" || trimmed == "endc" {
+            line_idx += 1;
+            continue;
+        }
+
         if let Some(label) = try_extract_label(trimmed) {
             label_positions.insert(label.to_string(), events.len());
             line_idx += 1;
@@ -504,9 +570,20 @@ fn parse_channel_events(
         }
 
         if trimmed.starts_with("dc.b") {
-            let data = trimmed.strip_prefix("dc.b").unwrap_or("").trim();
-            parse_dcb_tokens(data, &mut events, &mut current_duration, kind, tables);
+            let mut merged = trimmed.strip_prefix("dc.b").unwrap_or("").trim().to_string();
             line_idx += 1;
+            while line_idx < lines.len() {
+                let next_raw = strip_comment(lines[line_idx]);
+                let next_trimmed = next_raw.trim();
+                if next_trimmed.starts_with("dc.b") {
+                    merged.push_str(", ");
+                    merged.push_str(next_trimmed.strip_prefix("dc.b").unwrap_or("").trim());
+                    line_idx += 1;
+                } else {
+                    break;
+                }
+            }
+            parse_dcb_tokens(&merged, &mut events, &mut current_duration, kind, tables);
             continue;
         }
 
@@ -537,7 +614,7 @@ fn build_voice_bytes(
     tl: &[u8; 4],
 ) -> [u8; 25] {
     let mut bytes = [0u8; 25];
-    let op_order = [3usize, 2, 1, 0];
+    let op_order = [0usize, 1, 2, 3];
     for (pos, &idx) in op_order.iter().enumerate() {
         bytes[pos] = (detune[idx] << 4) | (mul[idx] & 0x0F);
         bytes[4 + pos] = (rs[idx] << 6) | (ar[idx] & 0x1F);
@@ -771,6 +848,10 @@ pub fn parse_voice_bank(source: &str) -> Result<Vec<[u8; 25]>, String> {
 pub fn build_note_table() -> HashMap<String, u8> {
     let mut map = HashMap::new();
     map.insert("nRst".into(), 0x80);
+    let nbb6 = 0x81u8 + 6 * 12 + 10; // nBb6 = $D3
+    map.insert("nMaxPSG".into(), nbb6 - 12);
+    map.insert("nMaxPSG1".into(), nbb6);
+    map.insert("nMaxPSG2".into(), nbb6 + 1); // nB6
     let note_names = [
         "C", "Cs", "D", "Eb", "E", "F", "Fs", "G", "Ab", "A", "Bb", "B",
     ];
@@ -990,8 +1071,12 @@ mod tests {
                     | SmpsEvent::SetVoice(_)
                     | SmpsEvent::SetPan(_)
                     | SmpsEvent::Transpose(_)
+                    | SmpsEvent::Detune(_)
                     | SmpsEvent::Tie
                     | SmpsEvent::Stop
+                    | SmpsEvent::SetModulation { .. }
+                    | SmpsEvent::ModOff
+                    | SmpsEvent::VolumeChange(_)
                     | SmpsEvent::Unsupported { .. } => {}
                 }
             }
@@ -1015,10 +1100,10 @@ mod tests {
         let result = parse_smps(source).unwrap();
         let v0 = &result.voices[0];
         assert_eq!(v0[24], (2 << 3) | 0); // fb=2, alg=0
-        assert_eq!(v0[0], (4 << 4) | 5); // op4: dt=4, mul=5
-        assert_eq!(v0[1], (5 << 4) | 0); // op3: dt=5, mul=0
-        assert_eq!(v0[2], (6 << 4) | 4); // op2: dt=6, mul=4
-        assert_eq!(v0[3], (4 << 4) | 1); // op1: dt=4, mul=1
+        assert_eq!(v0[0], (4 << 4) | 1); // op1: dt=4, mul=1
+        assert_eq!(v0[1], (6 << 4) | 4); // op2: dt=6, mul=4
+        assert_eq!(v0[2], (5 << 4) | 0); // op3: dt=5, mul=0
+        assert_eq!(v0[3], (4 << 4) | 5); // op4: dt=4, mul=5
     }
 
     #[test]
@@ -1028,5 +1113,39 @@ mod tests {
         let dac = &result.channels[0];
         assert_eq!(dac.kind, SmpsChannelKind::Dac);
         assert!(dac.events.len() > 10);
+    }
+
+    #[test]
+    fn test_aiz1_alter_note_parsed_as_detune() {
+        let source = include_str!("../../test_data/AIZ1.asm");
+        let result = parse_smps(&source).unwrap();
+        let fm2 = &result.channels[2];
+        assert_eq!(fm2.kind, SmpsChannelKind::Fm);
+        let detune_events: Vec<_> = fm2.events.iter()
+            .filter_map(|e| match e {
+                SmpsEvent::Detune(v) => Some(*v),
+                _ => None,
+            })
+            .collect();
+        assert!(!detune_events.is_empty(),
+            "FM2 should have Detune events from smpsAlterNote");
+        assert!(detune_events.contains(&-5i8),
+            "FM2 should have smpsAlterNote $FB = -5, got {:?}", detune_events);
+    }
+
+    #[test]
+    fn test_aiz1_all_fm_channels_start_at_tick_zero() {
+        let source = include_str!("../../test_data/AIZ1.asm");
+        let result = parse_smps(&source).unwrap();
+        for ch in &result.channels {
+            if ch.kind != SmpsChannelKind::Fm { continue; }
+            let first_note = ch.events.iter().find_map(|e| match e {
+                SmpsEvent::Note { .. } => Some(true),
+                SmpsEvent::Rest { .. } => Some(false),
+                _ => None,
+            });
+            assert_eq!(first_note, Some(true),
+                "{}: first timed event should be a note (not rest)", ch.label);
+        }
     }
 }

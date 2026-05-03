@@ -54,6 +54,8 @@ pub struct PsgInstrument {
     pub volume_sequence: Vec<u8>,
     pub loop_point: Option<usize>,
     pub noise_mode: Option<NoiseMode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smps_envelope_index: Option<u8>,
     pub metadata: InstrumentMetadata,
 }
 
@@ -122,6 +124,7 @@ mod tests {
             volume_sequence: vec![15, 14, 12, 10, 8, 6, 4, 2, 0],
             loop_point: Some(5),
             noise_mode: None,
+            smps_envelope_index: None,
             metadata: InstrumentMetadata::default(),
         };
         let json = serde_json::to_string(&inst).unwrap();

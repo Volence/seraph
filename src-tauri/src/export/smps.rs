@@ -4,7 +4,7 @@ use crate::driver::flamedriver::FlamedriverProfile;
 use crate::export::ExportError;
 use crate::model::driver::DriverProfile;
 use crate::model::instrument::{FmInstrument, InstrumentBank};
-use crate::model::song::{ChannelAssignment, Pan, Track};
+use crate::model::song::{ChannelAssignment, NoteModulation, Pan, Track};
 
 /// SMPS tempo parameters chosen to best represent the song's BPM.
 #[derive(Debug, Clone, Copy)]
@@ -80,15 +80,16 @@ pub fn daw_to_smps_duration(daw_ticks: u64, params: &SmpsTempoParams) -> Option<
 
 const SMPS_MAX_DURATION: u64 = 127;
 
-/// MIDI pitch → SMPS note byte. Valid MIDI range: 12 (C0) through 95 (Bb7).
+/// MIDI pitch → SMPS note byte for FM. Valid MIDI range: 12 (C0) through 106 (Bb7).
+/// Max note byte is $DF (z80_index 94); $E0+ are coordination flags.
 pub fn midi_to_smps_note(midi_pitch: u8) -> Option<u8> {
-    if midi_pitch < 12 || midi_pitch > 95 {
+    if midi_pitch < 12 || midi_pitch > 106 {
         return None;
     }
     Some(0x81 + (midi_pitch - 12))
 }
 
-/// SMPS note name for assembly output.
+/// SMPS note name for FM assembly output.
 pub fn smps_note_name(midi_pitch: u8) -> String {
     let semitone = (midi_pitch - 12) % 12;
     let octave = (midi_pitch - 12) / 12;
@@ -101,6 +102,33 @@ pub fn smps_note_name(midi_pitch: u8) -> String {
     format!("{name}{octave}")
 }
 
+/// SMPS note name for PSG. PSG import uses midi = z80_index + 36, so we
+/// reverse with z80_index = midi - 36, then octave = z80_index / 12.
+pub fn smps_note_name_psg(midi_pitch: u8) -> String {
+    let z80_index = (midi_pitch as i16 - 36).max(0) as u8;
+    let semitone = z80_index % 12;
+    let octave = z80_index / 12;
+    let name = match semitone {
+        0 => "nC", 1 => "nCs", 2 => "nD", 3 => "nEb",
+        4 => "nE", 5 => "nF", 6 => "nFs", 7 => "nG",
+        8 => "nAb", 9 => "nA", 10 => "nBb", 11 => "nB",
+        _ => unreachable!(),
+    };
+    format!("{name}{octave}")
+}
+
+/// DAC sample byte → sample name for assembly output.
+pub fn dac_sample_name(pitch: u8) -> String {
+    use crate::import::smps_parser::build_dac_table;
+    let table = build_dac_table();
+    for (name, byte) in &table {
+        if *byte == pitch {
+            return name.clone();
+        }
+    }
+    format!("${:02X}", pitch)
+}
+
 /// A single event in the SMPS output stream.
 #[derive(Debug, Clone)]
 pub enum SmpsEvent {
@@ -110,6 +138,9 @@ pub enum SmpsEvent {
     SetVoice(u8),
     SetPan(u8),
     SetPsgVoice(u8),
+    VolumeChange(i8),
+    SetModulation { wait: u8, speed: u8, delta: u8, steps: u8 },
+    AlterNote(i8),
     Stop,
 }
 
@@ -119,16 +150,86 @@ pub fn encode_channel_events(
     notes: &[(u64, u8, u64)],
     region_duration: u64,
     params: &SmpsTempoParams,
+    channel: &ChannelAssignment,
+) -> Result<Vec<SmpsEvent>, ExportError> {
+    let notes_with_inst: Vec<(u64, u8, u64, u8, Option<Uuid>, i8, Option<u8>, Option<NoteModulation>)> =
+        notes.iter().map(|&(t, p, d)| (t, p, d, 127, None, 0, None, None)).collect();
+    encode_channel_events_with_voices(&notes_with_inst, region_duration, params, channel, &HashMap::new(), &HashMap::new())
+}
+
+fn encode_channel_events_with_voices(
+    notes: &[(u64, u8, u64, u8, Option<Uuid>, i8, Option<u8>, Option<NoteModulation>)],
+    region_duration: u64,
+    params: &SmpsTempoParams,
+    channel: &ChannelAssignment,
+    voice_map: &HashMap<Uuid, u8>,
+    psg_env_map: &HashMap<Uuid, u8>,
 ) -> Result<Vec<SmpsEvent>, ExportError> {
     let mut out = Vec::new();
     let mut cursor: u64 = 0;
+    let mut current_voice: Option<u8> = None;
+    let mut current_psg_env: Option<u8> = None;
+    let mut current_vol_delta: i16 = 0;
+    let mut current_detune: i8 = 0;
+    let mut current_pan: Option<u8> = None;
+    let mut current_mod: Option<(u8, u8, u8, u8)> = None;
 
-    for &(tick, pitch, dur_ticks) in notes {
+    for (tick, pitch, dur_ticks, velocity, inst_id, detune, pan_override, note_mod) in notes {
+        let (tick, pitch, dur_ticks, velocity, detune) = (*tick, *pitch, *dur_ticks, *velocity, *detune);
         if tick > cursor {
             let gap = tick - cursor;
             if let Some(smps_gap) = daw_to_smps_duration(gap, params) {
                 emit_duration_events(&mut out, None, smps_gap);
             }
+        }
+
+        if matches!(channel, ChannelAssignment::Fm(_)) {
+            if let Some(id) = inst_id {
+                if let Some(&voice_idx) = voice_map.get(id) {
+                    if current_voice != Some(voice_idx) {
+                        out.push(SmpsEvent::SetVoice(voice_idx));
+                        current_voice = Some(voice_idx);
+                    }
+                }
+            }
+
+            let new_mod = note_mod.as_ref().map(|m| (m.wait, m.speed, m.delta, m.steps));
+            if new_mod != current_mod {
+                if let Some((w, s, d, st)) = new_mod {
+                    out.push(SmpsEvent::SetModulation { wait: w, speed: s, delta: d, steps: st });
+                }
+                current_mod = new_mod;
+            }
+
+            if detune != current_detune {
+                out.push(SmpsEvent::AlterNote(detune));
+                current_detune = detune;
+            }
+        }
+
+        if matches!(channel, ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise) {
+            if let Some(id) = inst_id {
+                if let Some(&env_idx) = psg_env_map.get(id) {
+                    if current_psg_env != Some(env_idx) {
+                        out.push(SmpsEvent::SetPsgVoice(env_idx));
+                        current_psg_env = Some(env_idx);
+                    }
+                }
+            }
+        }
+
+        if let Some(pan_byte) = pan_override {
+            if current_pan != Some(*pan_byte) && matches!(channel, ChannelAssignment::Fm(_) | ChannelAssignment::Dac(_)) {
+                out.push(SmpsEvent::SetPan(*pan_byte));
+                current_pan = Some(*pan_byte);
+            }
+        }
+
+        let note_vol_delta = (127i16 - velocity as i16).clamp(0, 127);
+        if note_vol_delta != current_vol_delta && matches!(channel, ChannelAssignment::Fm(_)) {
+            let change = (note_vol_delta - current_vol_delta) as i8;
+            out.push(SmpsEvent::VolumeChange(change));
+            current_vol_delta = note_vol_delta;
         }
 
         let smps_dur = daw_to_smps_duration(dur_ticks, params)
@@ -139,7 +240,11 @@ pub fn encode_channel_events(
                 message: format!("Note duration {dur_ticks} DAW ticks rounds to 0 SMPS ticks"),
             })?;
 
-        let pitch_name = smps_note_name(pitch);
+        let pitch_name = match channel {
+            ChannelAssignment::Dac(_) => dac_sample_name(pitch),
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => smps_note_name_psg(pitch),
+            _ => smps_note_name(pitch),
+        };
         emit_duration_events(&mut out, Some(pitch_name), smps_dur);
 
         cursor = tick + dur_ticks;
@@ -181,20 +286,31 @@ fn emit_duration_events(out: &mut Vec<SmpsEvent>, pitch_name: Option<String>, to
 
 // --- Voice Bank ---
 
-/// Build a deduplicated voice index from active FM tracks.
+/// Build a deduplicated voice index from active FM tracks, including per-note voices.
 pub fn build_voice_index<'a>(tracks: &[Track], instruments: &'a InstrumentBank) -> (HashMap<Uuid, u8>, Vec<&'a FmInstrument>) {
     let mut map = HashMap::new();
     let mut voices: Vec<&FmInstrument> = Vec::new();
+
+    let mut add_voice = |id: &Uuid, map: &mut HashMap<Uuid, u8>, voices: &mut Vec<&'a FmInstrument>| {
+        if map.contains_key(id) { return; }
+        if let Some(inst) = instruments.fm.iter().find(|i| &i.id == id) {
+            let idx = voices.len() as u8;
+            map.insert(*id, idx);
+            voices.push(inst);
+        }
+    };
 
     for track in tracks {
         if track.muted { continue; }
         if !matches!(track.channel, ChannelAssignment::Fm(_)) { continue; }
         if let Some(inst_id) = &track.instrument_id {
-            if map.contains_key(inst_id) { continue; }
-            if let Some(inst) = instruments.fm.iter().find(|i| &i.id == inst_id) {
-                let idx = voices.len() as u8;
-                map.insert(*inst_id, idx);
-                voices.push(inst);
+            add_voice(inst_id, &mut map, &mut voices);
+        }
+        for region in &track.regions {
+            for note in &region.notes {
+                if let Some(inst_id) = &note.instrument_id {
+                    add_voice(inst_id, &mut map, &mut voices);
+                }
             }
         }
     }
@@ -256,8 +372,9 @@ pub fn generate_voice_bank_asm(song_label: &str, voices: &[&FmInstrument], drive
 
 use crate::model::song::Song;
 
-fn sanitize_label(name: &str) -> String {
-    name.chars()
+pub fn sanitize_label(name: &str) -> String {
+    let stripped = name.strip_prefix("Snd_").or_else(|| name.strip_prefix("Snd ")).unwrap_or(name);
+    stripped.chars()
         .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
         .collect()
 }
@@ -309,7 +426,22 @@ fn format_channel_data(events: &[SmpsEvent]) -> String {
             }
             SmpsEvent::SetPsgVoice(idx) => {
                 flush_line(&mut asm, &mut line_items);
-                asm.push_str(&format!("\tsmpsSetPSGVoice\t${idx:02X}\n"));
+                asm.push_str(&format!("\tsmpsPSGvoice\t\tsTone_{idx:02X}\n"));
+            }
+            SmpsEvent::VolumeChange(delta) => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str(&format!("\tsmpsFMAlterVol\t${:02X}\n", *delta as u8));
+                last_duration = None;
+            }
+            SmpsEvent::SetModulation { wait, speed, delta, steps } => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str(&format!("\tsmpsModSet\t\t${wait:02X}, ${speed:02X}, ${delta:02X}, ${steps:02X}\n"));
+                last_duration = None;
+            }
+            SmpsEvent::AlterNote(val) => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str(&format!("\tsmpsAlterNote\t${:02X}\n", *val as u8));
+                last_duration = None;
             }
             SmpsEvent::Tie => {
                 flush_line(&mut asm, &mut line_items);
@@ -387,17 +519,28 @@ pub fn generate_music_asm(
     for track in &active_tracks {
         if !matches!(track.channel, ChannelAssignment::Fm(_)) { continue; }
         let ch_label = format!("Snd_{label}_FM{}", channel_index(&track.channel));
-        let vol = 0xFF - ((track.volume as u16 * 0x7F / 100) as u8);
-        asm.push_str(&format!("\tsmpsHeaderFM\t\t{ch_label}, $00, ${vol:02X}\n"));
+        let vol = (127u8).saturating_sub(track.volume);
+        let pitch = track.pitch_offset as u8;
+        asm.push_str(&format!("\tsmpsHeaderFM\t\t{ch_label}, ${pitch:02X}, ${vol:02X}\n"));
     }
     for track in &active_tracks {
         if !matches!(track.channel, ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise) { continue; }
-        let ch_label = format!("Snd_{label}_PSG{}", channel_index(&track.channel));
-        let vol = 0x0F - ((track.volume as u16 * 0x0F / 100) as u8);
-        asm.push_str(&format!("\tsmpsHeaderPSG\t\t{ch_label}, $00, ${vol:02X}, $00, $00\n"));
+        let ch_label = format!("Snd_{label}_{}{}", channel_type_label(&track.channel), channel_index(&track.channel));
+        let vol = 15u8.saturating_sub(((track.volume as u16 * 15 + 63) / 127) as u8);
+        let pitch = track.pitch_offset as u8;
+        let env_name = track.instrument_id
+            .and_then(|id| instruments.psg.iter().find(|i| i.id == id))
+            .and_then(|i| i.smps_envelope_index)
+            .map(|idx| format!("sTone_{:02X}", idx))
+            .unwrap_or_else(|| "$00".to_string());
+        asm.push_str(&format!("\tsmpsHeaderPSG\t\t{ch_label}, ${pitch:02X}, ${vol:02X}, $00, {env_name}\n"));
     }
 
     asm.push('\n');
+
+    let psg_env_map: HashMap<Uuid, u8> = instruments.psg.iter()
+        .filter_map(|i| i.smps_envelope_index.map(|idx| (i.id, idx)))
+        .collect();
 
     let mut all_errors = Vec::new();
 
@@ -413,44 +556,35 @@ pub fn generate_music_asm(
 
         let mut events: Vec<SmpsEvent> = Vec::new();
 
-        match &track.channel {
-            ChannelAssignment::Fm(_) => {
-                if let Some(inst_id) = &track.instrument_id {
-                    if let Some(&voice_idx) = voice_map.get(inst_id) {
-                        events.push(SmpsEvent::SetVoice(voice_idx));
-                    }
-                }
+        if matches!(track.channel, ChannelAssignment::Fm(_) | ChannelAssignment::Dac(_)) {
+            let has_note_pan = track.regions.iter()
+                .flat_map(|r| &r.notes)
+                .any(|n| n.pan_override.is_some());
+            if !has_note_pan && !matches!(track.pan, Pan::Center) {
+                let pan_byte = match track.pan {
+                    Pan::Left => 0x80u8,
+                    Pan::Right => 0x40,
+                    Pan::Center => 0xC0,
+                };
+                events.push(SmpsEvent::SetPan(pan_byte));
             }
-            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
-                events.push(SmpsEvent::SetPsgVoice(0));
-            }
-            _ => {}
         }
 
-        if matches!(track.channel, ChannelAssignment::Fm(_)) {
-            let pan_byte = match track.pan {
-                Pan::Left => 0x80u8,
-                Pan::Right => 0x40,
-                Pan::Center => 0xC0,
-            };
-            events.push(SmpsEvent::SetPan(pan_byte));
-        }
-
-        let mut all_notes: Vec<(u64, u8, u64)> = Vec::new();
+        let mut all_notes: Vec<(u64, u8, u64, u8, Option<Uuid>, i8, Option<u8>, Option<NoteModulation>)> = Vec::new();
         for region in &track.regions {
             for note in &region.notes {
                 let abs_tick = region.start_tick + note.tick;
-                all_notes.push((abs_tick, note.pitch, note.duration_ticks));
+                all_notes.push((abs_tick, note.pitch, note.duration_ticks, note.velocity, note.instrument_id, note.detune, note.pan_override, note.modulation.clone()));
             }
         }
-        all_notes.sort_by_key(|&(tick, _, _)| tick);
+        all_notes.sort_by_key(|&(tick, _, _, _, _, _, _, _)| tick);
 
         let total_duration = track.regions.iter()
             .map(|r| r.start_tick + r.duration_ticks)
             .max()
             .unwrap_or(0);
 
-        match encode_channel_events(&all_notes, total_duration, params) {
+        match encode_channel_events_with_voices(&all_notes, total_duration, params, &track.channel, voice_map, &psg_env_map) {
             Ok(note_events) => events.extend(note_events),
             Err(e) => {
                 let mut err = e;
@@ -540,17 +674,17 @@ pub fn validate_for_export(
 
         for (ri, region) in track.regions.iter().enumerate() {
             for (ni, note) in region.notes.iter().enumerate() {
-                let is_dac = matches!(track.channel, ChannelAssignment::Dac(_));
-                if !is_dac && midi_to_smps_note(note.pitch).is_none() {
+                let skip_pitch_check = matches!(track.channel, ChannelAssignment::Dac(_) | ChannelAssignment::PsgNoise);
+                if !skip_pitch_check && midi_to_smps_note(note.pitch).is_none() {
                     errors.push(ExportError {
                         track_name: track.name.clone(),
                         region_index: Some(ri),
                         note_index: Some(ni),
-                        message: format!("Pitch {} is outside SMPS range (C0-Bb7, MIDI 12-95)", note.pitch),
+                        message: format!("Pitch {} is outside SMPS range (C0-Bb7, MIDI 12-106)", note.pitch),
                     });
                 }
 
-                if !is_dac && daw_to_smps_duration(note.duration_ticks, params).is_none() {
+                if !skip_pitch_check && daw_to_smps_duration(note.duration_ticks, params).is_none() {
                     errors.push(ExportError {
                         track_name: track.name.clone(),
                         region_index: Some(ri),
@@ -696,7 +830,8 @@ mod tests {
     #[test]
     fn test_midi_to_smps_note_out_of_range() {
         assert_eq!(midi_to_smps_note(11), None);
-        assert_eq!(midi_to_smps_note(96), None);
+        assert_eq!(midi_to_smps_note(107), None);
+        assert_eq!(midi_to_smps_note(106), Some(0xDF));
     }
 
     #[test]
@@ -710,7 +845,8 @@ mod tests {
     fn test_encode_single_note() {
         let params = compute_tempo_params(120.0, 480);
         let notes = vec![(0u64, 60u8, 480u64)];
-        let events = encode_channel_events(&notes, 480, &params).unwrap();
+        let fm = ChannelAssignment::Fm(0);
+        let events = encode_channel_events(&notes, 480, &params, &fm).unwrap();
         assert!(events.iter().any(|e| matches!(e, SmpsEvent::Note { .. })));
     }
 
@@ -718,7 +854,8 @@ mod tests {
     fn test_encode_gap_produces_rest() {
         let params = compute_tempo_params(120.0, 480);
         let notes = vec![(480u64, 60u8, 480u64)];
-        let events = encode_channel_events(&notes, 960, &params).unwrap();
+        let fm = ChannelAssignment::Fm(0);
+        let events = encode_channel_events(&notes, 960, &params, &fm).unwrap();
         assert!(events.iter().any(|e| matches!(e, SmpsEvent::Rest { .. })));
     }
 
@@ -726,7 +863,8 @@ mod tests {
     fn test_long_note_splits_with_tie() {
         let params = SmpsTempoParams { divider: 1, modifier: 128, daw_ticks_per_smps_tick: 1.0 };
         let notes = vec![(0u64, 60u8, 200u64)];
-        let events = encode_channel_events(&notes, 200, &params).unwrap();
+        let fm = ChannelAssignment::Fm(0);
+        let events = encode_channel_events(&notes, 200, &params, &fm).unwrap();
         assert!(events.iter().any(|e| matches!(e, SmpsEvent::Tie)));
     }
 
@@ -739,12 +877,12 @@ mod tests {
             Track {
                 id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
                 instrument_id: Some(inst_id), regions: vec![], muted: false, solo: false,
-                volume: 100, pan: Pan::Center,
+                volume: 100, pan: Pan::Center, pitch_offset: 0, modulation: None,
             },
             Track {
                 id: Uuid::new_v4(), name: "FM2".into(), channel: ChannelAssignment::Fm(1),
                 instrument_id: Some(inst_id), regions: vec![], muted: false, solo: false,
-                volume: 100, pan: Pan::Center,
+                volume: 100, pan: Pan::Center, pitch_offset: 0, modulation: None,
             },
         ];
         let bank = InstrumentBank {
@@ -768,7 +906,7 @@ mod tests {
         let tracks = vec![Track {
             id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
             instrument_id: Some(inst_id), regions: vec![], muted: true, solo: false,
-            volume: 100, pan: Pan::Center,
+            volume: 100, pan: Pan::Center, pitch_offset: 0, modulation: None,
         }];
         let bank = InstrumentBank {
             fm: vec![FmInstrument {
@@ -796,7 +934,7 @@ mod tests {
             tracks: vec![Track {
                 id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
                 instrument_id: None, regions: vec![], muted: false, solo: false,
-                volume: 100, pan: Pan::Center,
+                volume: 100, pan: Pan::Center, pitch_offset: 0, modulation: None,
             }],
             instruments: InstrumentBank { fm: vec![], psg: vec![], dac: vec![] },
         };
@@ -821,9 +959,10 @@ mod tests {
                 id: Uuid::new_v4(), name: "FM1".into(), channel: ChannelAssignment::Fm(0),
                 instrument_id: Some(inst_id), regions: vec![Region {
                     id: Uuid::new_v4(), start_tick: 0, duration_ticks: 480,
-                    notes: vec![Note { tick: 0, pitch: 5, velocity: 100, duration_ticks: 480 }],
+                    notes: vec![Note { tick: 0, pitch: 5, velocity: 100, duration_ticks: 480, instrument_id: None, detune: 0, pan_override: None, modulation: None }],
+                    instrument_id: None,
                 }],
-                muted: false, solo: false, volume: 100, pan: Pan::Center,
+                muted: false, solo: false, volume: 100, pan: Pan::Center, pitch_offset: 0, modulation: None,
             }],
             instruments: InstrumentBank {
                 fm: vec![FmInstrument {
@@ -855,11 +994,12 @@ mod tests {
                 instrument_id: Some(inst_id), regions: vec![Region {
                     id: Uuid::new_v4(), start_tick: 0, duration_ticks: 960,
                     notes: vec![
-                        Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480 },
-                        Note { tick: 480, pitch: 64, velocity: 100, duration_ticks: 480 },
+                        Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480, instrument_id: Some(inst_id), detune: 0, pan_override: None, modulation: None },
+                        Note { tick: 480, pitch: 64, velocity: 100, duration_ticks: 480, instrument_id: Some(inst_id), detune: 0, pan_override: None, modulation: None },
                     ],
+                    instrument_id: None,
                 }],
-                muted: false, solo: false, volume: 100, pan: Pan::Center,
+                muted: false, solo: false, volume: 100, pan: Pan::Center, pitch_offset: 0, modulation: None,
             }],
             instruments: InstrumentBank {
                 fm: vec![FmInstrument {
@@ -878,7 +1018,6 @@ mod tests {
         assert!(asm.contains("Snd_TestSong_Header:"));
         assert!(asm.contains("smpsHeaderStartSong 3"));
         assert!(asm.contains("smpsSetvoice"));
-        assert!(asm.contains("smpsPan"));
         assert!(asm.contains("nC4"));
         assert!(asm.contains("nE4"));
         assert!(asm.contains("smpsStop"));

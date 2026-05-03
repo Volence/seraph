@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Track, SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
 import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
-import { TrackHeader } from "./TrackHeader";
+import { TrackHeader, channelLevelIndex } from "./TrackHeader";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineCanvas } from "./TimelineCanvas";
 import * as ipc from "../api/ipc";
@@ -29,6 +29,15 @@ function channelType(track: Track): "fm" | "psg" | "dac" {
   return "dac";
 }
 
+function channelLabel(track: Track): string {
+  const ch = track.channel;
+  if (ch === "PsgNoise") return "Noise";
+  if (typeof ch === "object" && "Fm" in ch) return `FM${ch.Fm + 1}`;
+  if (typeof ch === "object" && "Psg" in ch) return `PSG${ch.Psg + 1}`;
+  if (typeof ch === "object" && "Dac" in ch) return "DAC";
+  return "?";
+}
+
 export function ArrangementView({
   projectMeta,
   playing,
@@ -38,9 +47,40 @@ export function ArrangementView({
   selectedInstrument,
 }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [channelLevels, setChannelLevels] = useState<number[]>([]);
+  const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta.ticksPerBeat);
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
+  const [seekTick, setSeekTick] = useState(0);
   const trackHeight = 60;
+
+  const { visibleTracks, groupHeads } = useMemo(() => {
+    const groups = new Map<string, Track[]>();
+    for (const track of tracks) {
+      const label = channelLabel(track);
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label)!.push(track);
+    }
+
+    const visible: Track[] = [];
+    const heads = new Map<string, { size: number; collapsed: boolean; label: string }>();
+
+    for (const [label, groupTracks] of groups) {
+      if (groupTracks.length > 1) {
+        const collapsed = collapsedChannels.has(label);
+        heads.set(groupTracks[0].id, { size: groupTracks.length, collapsed, label });
+        if (collapsed) {
+          visible.push(groupTracks[0]);
+        } else {
+          visible.push(...groupTracks);
+        }
+      } else {
+        visible.push(groupTracks[0]);
+      }
+    }
+
+    return { visibleTracks: visible, groupHeads: heads };
+  }, [tracks, collapsedChannels]);
 
   const refresh = useCallback(async () => {
     const t = await ipc.listTracks();
@@ -53,6 +93,18 @@ export function ArrangementView({
     const interval = setInterval(refresh, 1000);
     return () => clearInterval(interval);
   }, [refresh]);
+
+  useEffect(() => {
+    if (!playing) {
+      setChannelLevels([]);
+      return;
+    }
+    const interval = setInterval(async () => {
+      const state = await ipc.getPlaybackState();
+      setChannelLevels(state.channelLevels);
+    }, 60);
+    return () => clearInterval(interval);
+  }, [playing]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -83,17 +135,12 @@ export function ArrangementView({
     }]);
   }
 
-  async function handleEmptyDoubleClick(trackId: string, tick: number, duration: number) {
-    await ipc.addRegion(trackId, tick, duration);
-    refresh();
-  }
-
   async function handleRegionMove(srcTrackId: string, regionId: string, dstTrackId: string, startTick: number, tickDelta: number, trackDelta: number) {
     if (selectedRegions.length > 1 && selectedRegions.some((r) => r.regionId === regionId)) {
       await Promise.all(selectedRegions.map((r) => {
-        const srcIdx = tracks.findIndex((t) => t.id === r.trackId);
-        const dstIdx = Math.max(0, Math.min(tracks.length - 1, srcIdx + trackDelta));
-        const dst = tracks[dstIdx].id;
+        const srcIdx = visibleTracks.findIndex((t) => t.id === r.trackId);
+        const dstIdx = Math.max(0, Math.min(visibleTracks.length - 1, srcIdx + trackDelta));
+        const dst = visibleTracks[dstIdx].id;
         const newStart = Math.max(0, r.startTick + tickDelta);
         return ipc.moveRegion(r.trackId, r.regionId, dst, newStart);
       }));
@@ -109,6 +156,7 @@ export function ArrangementView({
   }
 
   async function handleSeek(tick: number) {
+    setSeekTick(tick);
     await ipc.transportSeek(tick);
   }
 
@@ -172,19 +220,35 @@ export function ArrangementView({
           ticksPerBeat={projectMeta.ticksPerBeat}
           beatsPerBar={projectMeta.timeSignature[0]}
           onSeek={handleSeek}
+          onScrollChange={zoom.setScrollLeft}
         />
       </div>
       <div className={styles.body}>
         <div className={styles.headers}>
-          {tracks.map((track) => (
-            <TrackHeader
-              key={track.id}
-              track={track}
-              selected={selectedInstrument?.id === track.instrumentId}
-              onUpdate={refresh}
-              onClick={() => handleTrackClick(track)}
-            />
-          ))}
+          {visibleTracks.map((track) => {
+            const gh = groupHeads.get(track.id);
+            return (
+              <TrackHeader
+                key={track.id}
+                track={track}
+                selected={selectedInstrument?.id === track.instrumentId}
+                level={channelLevels[channelLevelIndex(track)] ?? 0}
+                onUpdate={refresh}
+                onClick={() => handleTrackClick(track)}
+                isGroupHead={!!gh}
+                groupCollapsed={gh?.collapsed}
+                groupSize={gh?.size}
+                onToggleCollapse={gh ? () => {
+                  setCollapsedChannels(prev => {
+                    const next = new Set(prev);
+                    if (next.has(gh.label)) next.delete(gh.label);
+                    else next.add(gh.label);
+                    return next;
+                  });
+                } : undefined}
+              />
+            );
+          })}
           <div className={styles.addButtons}>
             <button className={styles.addBtn} onClick={addFm}>+ FM</button>
             <button className={styles.addBtn} onClick={addPsg}>+ PSG</button>
@@ -192,7 +256,7 @@ export function ArrangementView({
           </div>
         </div>
         <TimelineCanvas
-          tracks={tracks}
+          tracks={visibleTracks}
           ticksPerPixel={zoom.ticksPerPixel}
           scrollLeft={zoom.scrollLeft}
           trackHeight={trackHeight}
@@ -202,7 +266,7 @@ export function ArrangementView({
           playing={playing}
           selectedRegions={selectedRegions}
           onRegionClick={(trackId, regionId, ctrlKey) => {
-            const track = tracks.find((t) => t.id === trackId);
+            const track = visibleTracks.find((t) => t.id === trackId);
             if (!track) return;
             const region = track.regions.find((r) => r.id === regionId);
             if (!region) return;
@@ -222,10 +286,11 @@ export function ArrangementView({
             }
           }}
           onRegionDoubleClick={handleRegionDoubleClick}
-          onEmptyDoubleClick={handleEmptyDoubleClick}
           onSelectRegions={onSelectRegions}
           onRegionMove={handleRegionMove}
           onRegionResize={handleRegionResize}
+          onSeek={handleSeek}
+          seekTick={seekTick}
         />
       </div>
     </div>

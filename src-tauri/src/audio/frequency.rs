@@ -1,16 +1,16 @@
 const FM_FNUM_TABLE: [u16; 12] = [
     644,  // C
-    682,  // C#
+    683,  // C#
     723,  // D
     766,  // D#
-    811,  // E
-    859,  // F
-    910,  // F#
+    813,  // E
+    860,  // F
+    911,  // F#
     965,  // G
-    1022, // G#
-    1083, // A
-    1147, // A#
-    1215, // B
+    1023, // G#
+    1084, // A
+    1148, // A#
+    1216, // B
 ];
 
 pub fn midi_to_fm_freq(midi_note: u8) -> (u8, u16) {
@@ -49,9 +49,9 @@ mod tests {
     }
 
     #[test]
-    fn test_fm_a4_fnum_is_1083() {
+    fn test_fm_a4_fnum_is_1084() {
         let (_, fnum) = midi_to_fm_freq(69);
-        assert_eq!(fnum, 1083);
+        assert_eq!(fnum, 1084);
     }
 
     #[test]

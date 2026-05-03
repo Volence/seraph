@@ -18,7 +18,7 @@ pub enum InstrumentData {
 
 #[derive(Debug, Clone)]
 pub enum SequencerEvent {
-    NoteOn { tick: u64, pitch: u8, velocity: u8, duration_ticks: u64, instrument: InstrumentData },
+    NoteOn { tick: u64, pitch: u8, velocity: u8, duration_ticks: u64, instrument: InstrumentData, modulation: Option<ModulationParams> },
     NoteOff { tick: u64, pitch: u8 },
 }
 
@@ -41,9 +41,19 @@ pub struct OverlapWarning {
 }
 
 #[derive(Debug, Clone)]
+pub struct ModulationParams {
+    pub wait: u8,
+    pub speed: u8,
+    pub delta: u8,
+    pub steps: u8,
+}
+
+#[derive(Debug, Clone)]
 pub struct ChannelSequence {
     pub channel_type: ChannelType,
     pub volume: u8,
+    pub pan: u8,
+    pub modulation: Option<ModulationParams>,
     pub events: Vec<SequencerEvent>,
     pub overlaps: Vec<OverlapWarning>,
 }
@@ -88,6 +98,7 @@ mod tests {
             velocity: 100,
             duration_ticks: 240,
             instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
+            modulation: None,
         };
         assert_eq!(on.tick(), 480);
         let off = SequencerEvent::NoteOff { tick: 720, pitch: 60 };

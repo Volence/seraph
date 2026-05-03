@@ -25,6 +25,19 @@ pub struct Track {
     pub solo: bool,
     pub volume: u8,
     pub pan: Pan,
+    #[serde(default)]
+    pub pitch_offset: i8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modulation: Option<TrackModulation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackModulation {
+    pub wait: u8,
+    pub speed: u8,
+    pub delta: u8,
+    pub steps: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +62,8 @@ pub struct Region {
     pub start_tick: u64,
     pub duration_ticks: u64,
     pub notes: Vec<Note>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instrument_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +73,23 @@ pub struct Note {
     pub pitch: u8,
     pub velocity: u8,
     pub duration_ticks: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instrument_id: Option<Uuid>,
+    #[serde(default)]
+    pub detune: i8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pan_override: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modulation: Option<NoteModulation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteModulation {
+    pub wait: u8,
+    pub speed: u8,
+    pub delta: u8,
+    pub steps: u8,
 }
 
 /// On-disk format for project.json (no instruments — they're separate files).
@@ -116,6 +148,8 @@ mod tests {
                 solo: false,
                 volume: 100,
                 pan: Pan::Center,
+                pitch_offset: 0,
+                modulation: None,
             }],
         };
         let json = serde_json::to_string_pretty(&pf).unwrap();

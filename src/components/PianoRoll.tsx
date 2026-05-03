@@ -32,8 +32,8 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 const PITCH_RANGES: Record<string, [number, number]> = {
-  fm: [24, 95],
-  psg: [33, 95],
+  fm: [24, 106],
+  psg: [33, 106],
   dac: [0, 0],
 };
 
@@ -46,8 +46,24 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const gridSnapTicks = Math.round(ticksPerBeat * 4 / GRID_OPTIONS[gridIdx].divisor);
   const [minPitch, maxPitch] = PITCH_RANGES[region.channelType] || [24, 95];
   const rowHeight = 14;
-  const ticksPerPixel = region.durationTicks / 800;
+  const ticksPerBar = ticksPerBeat * 4;
+  const defaultTpp = region.durationTicks / 800;
+  const [ticksPerPixel, setTicksPerPixel] = useState(defaultTpp);
+  const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
+
+  function handleZoom(deltaY: number, centerX: number) {
+    const zoomFactor = deltaY > 0 ? 1.15 : 0.87;
+    setTicksPerPixel((prev) => {
+      const next = prev * zoomFactor;
+      const minTpp = ticksPerBeat / 480;
+      const clamped = Math.max(minTpp, Math.min(next, ticksPerBar * 2));
+      const tickAtCenter = (centerX + pianoScrollLeft) * prev;
+      const newScrollLeft = tickAtCenter / clamped - centerX;
+      setPianoScrollLeft(Math.max(0, newScrollLeft));
+      return clamped;
+    });
+  }
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const playheadTick = playing ? interpolatedTick - region.startTick : -1;
 
@@ -153,6 +169,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           maxPitch={maxPitch}
           durationTicks={region.durationTicks}
           ticksPerPixel={ticksPerPixel}
+          scrollLeft={pianoScrollLeft}
           rowHeight={rowHeight}
           gridSnapTicks={gridSnapTicks}
           channelColor={channelColor}
@@ -162,6 +179,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           onAudition={handleAudition}
           onNoteResize={handleNoteResize}
           onScrollTopChange={setScrollTop}
+          onScrollLeftChange={setPianoScrollLeft}
+          onZoom={handleZoom}
           playheadTick={playheadTick}
           playing={playing}
         />
@@ -170,6 +189,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
         notes={notes}
         durationTicks={region.durationTicks}
         ticksPerPixel={ticksPerPixel}
+        scrollLeft={pianoScrollLeft}
         channelColor={channelColor}
         onVelocityChange={handleVelocityChange}
       />

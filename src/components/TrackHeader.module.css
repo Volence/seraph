@@ -19,6 +19,34 @@
   padding-left: 5px;
 }
 
+.collapseBtn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.collapseBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.hiddenCount {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .top {
   display: flex;
   align-items: center;
@@ -81,5 +109,57 @@
   cursor: pointer;
   accent-color: var(--accent-fm);
   margin-left: 2px;
+}
+
+.pitchGroup {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.pitchBtn {
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.pitchBtn:hover {
+  color: var(--text-primary);
+  background: var(--border);
+}
+
+.pitchLabel {
+  font-size: 9px;
+  color: var(--text-secondary);
+  min-width: 22px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  width: 30px;
+  height: 10px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 60ms linear;
 }
 

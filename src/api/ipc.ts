@@ -156,8 +156,9 @@ export async function updateTrack(
   solo: boolean,
   volume: number,
   pan: Pan,
+  pitchOffset?: number,
 ): Promise<void> {
-  return invoke("update_track", { id, name, channel, instrumentId, muted, solo, volume, pan });
+  return invoke("update_track", { id, name, channel, instrumentId, muted, solo, volume, pan, pitchOffset: pitchOffset ?? 0 });
 }
 
 export async function deleteTrack(id: string): Promise<void> {
@@ -301,6 +302,6 @@ export interface ImportResult {
   warnings: ImportWarning[];
 }
 
-export async function importSong(sourcePath: string, parentDir: string): Promise<ImportResult> {
-  return invoke<ImportResult>("import_song", { sourcePath, parentDir });
+export async function importSong(sourcePath: string, parentDir: string, dacDir?: string): Promise<ImportResult> {
+  return invoke<ImportResult>("import_song", { sourcePath, parentDir, dacDir: dacDir ?? null });
 }

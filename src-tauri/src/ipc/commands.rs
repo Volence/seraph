@@ -639,6 +639,7 @@ pub fn update_track(
     solo: bool,
     volume: u8,
     pan: crate::model::song::Pan,
+    pitch_offset: Option<i8>,
 ) -> Result<(), String> {
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let inst_uuid = instrument_id
@@ -646,7 +647,7 @@ pub fn update_track(
         .transpose()
         .map_err(|e| format!("invalid UUID: {e}"))?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-    mgr.update_track(uuid, name, channel, inst_uuid, muted, solo, volume, pan)
+    mgr.update_track(uuid, name, channel, inst_uuid, muted, solo, volume, pan, pitch_offset.unwrap_or(0))
 }
 
 #[tauri::command]
@@ -831,17 +832,22 @@ pub struct PlaybackState {
     pub tick: u64,
     pub loop_start: Option<u64>,
     pub loop_end: Option<u64>,
+    pub channel_levels: Vec<u8>,
 }
 
 #[tauri::command]
 pub fn get_playback_state(audio_state: State<'_, AudioState>) -> Result<PlaybackState, String> {
     let thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let tick = thread.position_tick().load(std::sync::atomic::Ordering::Relaxed);
+    let levels: Vec<u8> = thread.channel_levels().iter()
+        .map(|a| a.load(std::sync::atomic::Ordering::Relaxed))
+        .collect();
     Ok(PlaybackState {
         playing: false,
         tick,
         loop_start: None,
         loop_end: None,
+        channel_levels: levels,
     })
 }
 
@@ -898,6 +904,7 @@ pub fn import_song(
     state: State<'_, ProjectState>,
     source_path: String,
     parent_dir: String,
+    dac_dir: Option<String>,
 ) -> Result<crate::import::ImportResult, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let registry = mgr.driver_registry();
@@ -906,6 +913,7 @@ pub fn import_song(
 
     let source = std::path::PathBuf::from(&source_path);
     let parent = std::path::PathBuf::from(&parent_dir);
+    let dac_path = dac_dir.as_ref().map(std::path::PathBuf::from);
 
-    crate::import::import_smps_file(&source, &parent, driver)
+    crate::import::import_smps_file_with_dac(&source, &parent, driver, dac_path.as_deref())
 }

@@ -20,15 +20,14 @@
 }
 
 .body {
-  display: flex;
+  display: grid;
+  grid-template-columns: 180px 1fr;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .headers {
-  width: 180px;
-  flex-shrink: 0;
-  overflow-y: auto;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
 }

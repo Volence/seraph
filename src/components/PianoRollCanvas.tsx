@@ -8,6 +8,7 @@ interface PianoRollCanvasProps {
   maxPitch: number;
   durationTicks: number;
   ticksPerPixel: number;
+  scrollLeft: number;
   rowHeight: number;
   gridSnapTicks: number;
   channelColor: string;
@@ -17,6 +18,8 @@ interface PianoRollCanvasProps {
   onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
   onScrollTopChange: (scrollTop: number) => void;
+  onScrollLeftChange: (scrollLeft: number) => void;
+  onZoom: (delta: number, centerX: number) => void;
   playheadTick: number;
   playing: boolean;
 }
@@ -33,6 +36,7 @@ export function PianoRollCanvas({
   maxPitch,
   durationTicks,
   ticksPerPixel,
+  scrollLeft,
   rowHeight,
   gridSnapTicks,
   channelColor,
@@ -42,6 +46,8 @@ export function PianoRollCanvas({
   onAudition,
   onNoteResize,
   onScrollTopChange,
+  onScrollLeftChange,
+  onZoom,
   playheadTick,
   playing,
 }: PianoRollCanvasProps) {
@@ -50,43 +56,58 @@ export function PianoRollCanvas({
   const [drag, setDrag] = useState<{ noteIndex: number; startX: number; origDuration: number } | null>(null);
   const drawingRef = useRef<{ startTick: number; pitch: number; endTick: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const panRef = useRef<{ startX: number; startY: number; startScrollLeft: number; startScrollTop: number } | null>(null);
 
   const totalNotes = maxPitch - minPitch + 1;
-  const canvasWidth = durationTicks / ticksPerPixel;
   const canvasHeight = totalNotes * rowHeight;
+
+  function pixelToTick(px: number): number {
+    return (px + scrollLeft) * ticksPerPixel;
+  }
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
-    canvas.style.width = `${canvasWidth}px`;
-    canvas.style.height = `${canvasHeight}px`;
+    const viewW = rect.width;
+    const viewH = Math.max(rect.height, canvasHeight);
+
+    canvas.width = viewW * dpr;
+    canvas.height = viewH * dpr;
+    canvas.style.width = `${viewW}px`;
+    canvas.style.height = `${viewH}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.scale(dpr, dpr);
 
+    const startTick = scrollLeft * ticksPerPixel;
+
     for (let i = 0; i < totalNotes; i++) {
       const pitch = maxPitch - i;
       const y = i * rowHeight;
       ctx.fillStyle = isBlackKey(pitch) ? "#1a1a1a" : "#1e1e1e";
-      ctx.fillRect(0, y, canvasWidth, rowHeight);
+      ctx.fillRect(0, y, viewW, rowHeight);
       ctx.strokeStyle = "#2a2a2a";
       ctx.beginPath();
       ctx.moveTo(0, y + rowHeight);
-      ctx.lineTo(canvasWidth, y + rowHeight);
+      ctx.lineTo(viewW, y + rowHeight);
       ctx.stroke();
     }
 
     const gridPx = gridSnapTicks / ticksPerPixel;
     if (gridPx > 4) {
       ctx.strokeStyle = "#2a2a2a";
-      for (let x = 0; x < canvasWidth; x += gridPx) {
+      const firstGrid = Math.floor(startTick / gridSnapTicks) * gridSnapTicks;
+      for (let tick = firstGrid; tick < startTick + viewW * ticksPerPixel; tick += gridSnapTicks) {
+        const x = (tick - startTick) / ticksPerPixel;
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvasHeight);
+        ctx.lineTo(x, viewH);
         ctx.stroke();
       }
     }
@@ -94,23 +115,26 @@ export function PianoRollCanvas({
     for (let i = 0; i < notes.length; i++) {
       const note = notes[i];
       if (note.pitch < minPitch || note.pitch > maxPitch) continue;
-      const x = note.tick / ticksPerPixel;
+      const x = (note.tick - startTick / 1) / ticksPerPixel;
+      const noteEndPx = (note.tick + note.durationTicks - startTick) / ticksPerPixel;
+      if (noteEndPx < 0 || x > viewW) continue;
       const w = Math.max(2, note.durationTicks / ticksPerPixel);
+      const drawX = (note.tick - startTick) / ticksPerPixel;
       const row = maxPitch - note.pitch;
       const y = row * rowHeight + 1;
       const h = rowHeight - 2;
 
       const selected = selectedNotes.has(i);
       ctx.fillStyle = selected ? channelColor : channelColor + "cc";
-      ctx.fillRect(x, y, w, h);
+      ctx.fillRect(drawX, y, w, h);
       ctx.strokeStyle = selected ? "#ffffff" : channelColor;
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      ctx.strokeRect(drawX + 0.5, y + 0.5, w - 1, h - 1);
     }
 
     const dr = drawingRef.current;
     if (dr) {
-      const x = dr.startTick / ticksPerPixel;
+      const x = (dr.startTick - startTick) / ticksPerPixel;
       const dur = Math.max(gridSnapTicks, dr.endTick - dr.startTick);
       const w = Math.max(2, dur / ticksPerPixel);
       const row = maxPitch - dr.pitch;
@@ -126,15 +150,17 @@ export function PianoRollCanvas({
     }
 
     if (playheadTick >= 0 && playheadTick <= durationTicks) {
-      const px = playheadTick / ticksPerPixel;
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, canvasHeight);
-      ctx.stroke();
+      const px = (playheadTick - startTick) / ticksPerPixel;
+      if (px >= 0 && px <= viewW) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, viewH);
+        ctx.stroke();
+      }
     }
-  }, [notes, minPitch, maxPitch, durationTicks, ticksPerPixel, rowHeight, gridSnapTicks, channelColor, selectedNotes, canvasWidth, canvasHeight, totalNotes, playheadTick]);
+  }, [notes, minPitch, maxPitch, durationTicks, ticksPerPixel, scrollLeft, rowHeight, gridSnapTicks, channelColor, selectedNotes, canvasHeight, totalNotes, playheadTick]);
 
   const animRef = useRef(0);
   useEffect(() => {
@@ -151,17 +177,18 @@ export function PianoRollCanvas({
     return () => cancelAnimationFrame(animRef.current);
   }, [draw, playing]);
 
-  function findNoteAtPos(x: number, y: number): { index: number; nearEdge: boolean } | null {
+  function findNoteAtPos(viewX: number, y: number): { index: number; nearEdge: boolean } | null {
     const clickRow = Math.floor(y / rowHeight);
     const clickPitch = maxPitch - clickRow;
+    const startTick = scrollLeft * ticksPerPixel;
 
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i];
       if (n.pitch !== clickPitch) continue;
-      const nx = n.tick / ticksPerPixel;
+      const nx = (n.tick - startTick) / ticksPerPixel;
       const nw = Math.max(2, n.durationTicks / ticksPerPixel);
-      if (x >= nx && x <= nx + nw) {
-        const nearEdge = x >= nx + nw - EDGE_THRESHOLD;
+      if (viewX >= nx && viewX <= nx + nw) {
+        const nearEdge = viewX >= nx + nw - EDGE_THRESHOLD;
         return { index: i, nearEdge };
       }
     }
@@ -188,7 +215,29 @@ export function PianoRollCanvas({
       return;
     }
 
-    const clickTick = x * ticksPerPixel;
+    // Any click on empty space: pan
+    e.preventDefault();
+    const container = containerRef.current;
+    panRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startScrollLeft: scrollLeft,
+      startScrollTop: container?.scrollTop ?? 0,
+    };
+    setIsPanning(true);
+  }
+
+  function handleDoubleClick(e: React.MouseEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hit = findNoteAtPos(x, y);
+    if (hit) return;
+
+    const clickTick = pixelToTick(x);
     const clickRow = Math.floor(y / rowHeight);
     const clickPitch = maxPitch - clickRow;
     const snapped = Math.floor(clickTick / gridSnapTicks) * gridSnapTicks;
@@ -200,6 +249,33 @@ export function PianoRollCanvas({
     }
   }
 
+  // Panning effect
+  useEffect(() => {
+    if (!isPanning) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const p = panRef.current;
+      if (!p) return;
+      const dx = e.clientX - p.startX;
+      const dy = e.clientY - p.startY;
+      onScrollLeftChange(Math.max(0, p.startScrollLeft - dx));
+      const container = containerRef.current;
+      if (container) container.scrollTop = Math.max(0, p.startScrollTop - dy);
+    }
+
+    function handleMouseUp() {
+      panRef.current = null;
+      setIsPanning(false);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isPanning, onScrollLeftChange]);
+
   useEffect(() => {
     if (!isDrawing) return;
 
@@ -209,7 +285,7 @@ export function PianoRollCanvas({
       canvas.style.cursor = "crosshair";
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const rawEndTick = x * ticksPerPixel;
+      const rawEndTick = pixelToTick(x);
       const snappedEnd = Math.ceil(rawEndTick / gridSnapTicks) * gridSnapTicks;
       drawingRef.current.endTick = Math.max(
         drawingRef.current.startTick + gridSnapTicks,
@@ -237,7 +313,7 @@ export function PianoRollCanvas({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDrawing, ticksPerPixel, gridSnapTicks, onNoteAdd, draw]);
+  }, [isDrawing, ticksPerPixel, scrollLeft, gridSnapTicks, onNoteAdd, draw]);
 
   useEffect(() => {
     if (!drag) return;
@@ -271,7 +347,7 @@ export function PianoRollCanvas({
   }, [drag, ticksPerPixel, gridSnapTicks, onNoteResize]);
 
   function handleMouseMove(e: React.MouseEvent) {
-    if (drag || isDrawing) return;
+    if (drag || isDrawing || isPanning) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -282,19 +358,52 @@ export function PianoRollCanvas({
     canvas.style.cursor = hit?.nearEdge ? "ew-resize" : "";
   }
 
-  function handleScroll() {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    function handleWheel(e: WheelEvent) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const rect = canvasRef.current?.getBoundingClientRect();
+        const centerX = rect ? e.clientX - rect.left : 0;
+        onZoom(e.deltaY, centerX);
+      } else if (e.shiftKey) {
+        e.preventDefault();
+        onScrollLeftChange(Math.max(0, scrollLeft + e.deltaY));
+      } else if (e.deltaX !== 0) {
+        e.preventDefault();
+        onScrollLeftChange(Math.max(0, scrollLeft + e.deltaX));
+      }
+    }
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [scrollLeft, onScrollLeftChange, onZoom]);
+
+  function handleVerticalScroll() {
     if (containerRef.current) {
       onScrollTopChange(containerRef.current.scrollTop);
     }
   }
 
+  function handleContextMenu(e: React.MouseEvent) {
+    e.preventDefault();
+  }
+
   return (
-    <div ref={containerRef} className={styles.container} onScroll={handleScroll}>
+    <div
+      ref={containerRef}
+      className={styles.container}
+      onScroll={handleVerticalScroll}
+      onContextMenu={handleContextMenu}
+    >
       <canvas
         ref={canvasRef}
         className={styles.canvas}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onDoubleClick={handleDoubleClick}
       />
     </div>
   );

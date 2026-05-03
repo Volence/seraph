@@ -128,11 +128,16 @@ export default function App() {
     });
     if (!parentDir) return;
 
+    const dacDir = await open({
+      directory: true,
+      title: "Select DAC Samples Directory (optional — e.g. skdisasm/Sound/DAC/)",
+    });
+
     try {
       if (projectOpen) await ipc.closeProject();
       setPlaying(false);
 
-      const result = await ipc.importSong(sourcePath as string, parentDir as string);
+      const result = await ipc.importSong(sourcePath as string, parentDir as string, dacDir as string | undefined);
       const song = await ipc.openProject(result.projectDir);
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);

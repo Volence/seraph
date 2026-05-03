@@ -81,6 +81,7 @@ export interface Track {
   solo: boolean;
   volume: number;
   pan: Pan;
+  pitchOffset: number;
 }
 
 export interface Region {
@@ -88,6 +89,14 @@ export interface Region {
   startTick: number;
   durationTicks: number;
   notes: Note[];
+  instrumentId?: string | null;
+}
+
+export interface NoteModulation {
+  wait: number;
+  speed: number;
+  delta: number;
+  steps: number;
 }
 
 export interface Note {
@@ -95,6 +104,10 @@ export interface Note {
   pitch: number;
   velocity: number;
   durationTicks: number;
+  instrumentId?: string | null;
+  detune?: number;
+  panOverride?: number | null;
+  modulation?: NoteModulation | null;
 }
 
 export interface Song {
@@ -189,6 +202,7 @@ export interface PlaybackState {
   tick: number;
   loopStart: number | null;
   loopEnd: number | null;
+  channelLevels: number[];
 }
 
 export interface OverlapWarning {

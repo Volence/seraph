@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rtrb::RingBuffer;
@@ -23,6 +23,7 @@ pub struct AudioThread {
     _stream: cpal::Stream,
     running: Arc<AtomicBool>,
     position_tick: Arc<AtomicU64>,
+    channel_levels: Arc<Vec<AtomicU8>>,
 }
 
 impl AudioThread {
@@ -53,6 +54,7 @@ impl AudioThread {
         // AudioEngine is created here; capture the position atomic before moving into the closure.
         let mut engine = AudioEngine::new(sample_rate);
         let position_tick = engine.position_tick();
+        let channel_levels = engine.channel_levels();
 
         let err_fn = |err| eprintln!("[AudioThread] stream error: {err}");
 
@@ -89,6 +91,7 @@ impl AudioThread {
             _stream: stream,
             running,
             position_tick,
+            channel_levels,
         })
     }
 
@@ -102,6 +105,10 @@ impl AudioThread {
 
     pub fn position_tick(&self) -> &Arc<AtomicU64> {
         &self.position_tick
+    }
+
+    pub fn channel_levels(&self) -> &Arc<Vec<AtomicU8>> {
+        &self.channel_levels
     }
 
     /// Signal the audio callback to stop rendering (output silence instead).

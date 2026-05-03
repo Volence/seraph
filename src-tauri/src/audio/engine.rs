@@ -29,6 +29,18 @@ struct FmModulationPlayer {
     steps_reset: u8,
 }
 
+struct PsgModulationPlayer {
+    hw_ch: u8,
+    base_period: u16,
+    accumulated: i16,
+    wait_counter: u8,
+    speed_counter: u8,
+    speed_reset: u8,
+    delta: i16,
+    steps_counter: u8,
+    steps_reset: u8,
+}
+
 pub struct AudioEngine {
     ym2612: Ym2612,
     sn76489: Sn76489,
@@ -48,6 +60,7 @@ pub struct AudioEngine {
     psg_preview_samples_per_tick: f64,
     psg_envelopes: [Option<PsgEnvelopePlayer>; 4],
     fm_modulations: [Option<FmModulationPlayer>; 6],
+    psg_modulations: [Option<PsgModulationPlayer>; 4],
     psg_env_tick_acc: f64,
     sequencer: Sequencer,
     position_tick: Arc<AtomicU64>,
@@ -82,6 +95,7 @@ impl AudioEngine {
             psg_preview_samples_per_tick: sample_rate_f / 60.0,
             psg_envelopes: [None, None, None, None],
             fm_modulations: [None, None, None, None, None, None],
+            psg_modulations: [None, None, None, None],
             psg_env_tick_acc: 0.0,
             sequencer: Sequencer::new(sample_rate),
             position_tick: Arc::new(AtomicU64::new(0)),
@@ -174,6 +188,7 @@ impl AudioEngine {
                 self.psg_preview_envelope = None;
                 self.psg_envelopes = [None, None, None, None];
                 self.fm_modulations = [None, None, None, None, None, None];
+                self.psg_modulations = [None, None, None, None];
                 self.psg_env_tick_acc = 0.0;
             }
             AudioCommand::TransportPlay => {
@@ -263,6 +278,26 @@ impl AudioEngine {
                 SequencerOutput::FmModulationStop { hw_ch } => {
                     if (hw_ch as usize) < 6 {
                         self.fm_modulations[hw_ch as usize] = None;
+                    }
+                }
+                SequencerOutput::PsgModulationStart { hw_ch, wait, speed, delta, steps, base_period } => {
+                    if (hw_ch as usize) < 4 {
+                        self.psg_modulations[hw_ch as usize] = Some(PsgModulationPlayer {
+                            hw_ch,
+                            base_period,
+                            accumulated: 0,
+                            wait_counter: wait,
+                            speed_counter: speed,
+                            speed_reset: speed,
+                            delta: delta as i16,
+                            steps_counter: steps / 2,
+                            steps_reset: steps,
+                        });
+                    }
+                }
+                SequencerOutput::PsgModulationStop { hw_ch } => {
+                    if (hw_ch as usize) < 4 {
+                        self.psg_modulations[hw_ch as usize] = None;
                     }
                 }
             }
@@ -473,6 +508,39 @@ impl AudioEngine {
                             for _ in 0..24 { self.ym2612.clock(); }
                             self.ym2612.write(port + 1, freq_lsb);
                             for _ in 0..24 { self.ym2612.clock(); }
+                        }
+                    }
+                }
+
+                // --- PSG modulation stepping (same 60 Hz tick) ---
+                for slot in 0..4 {
+                    let needs_write = if let Some(ref mut player) = self.psg_modulations[slot] {
+                        if player.wait_counter > 0 {
+                            player.wait_counter -= 1;
+                            false
+                        } else {
+                            player.speed_counter = player.speed_counter.saturating_sub(1);
+                            if player.speed_counter == 0 {
+                                player.speed_counter = player.speed_reset;
+                                player.accumulated = player.accumulated.wrapping_add(player.delta);
+                                player.steps_counter = player.steps_counter.saturating_sub(1);
+                                if player.steps_counter == 0 {
+                                    player.steps_counter = player.steps_reset;
+                                    player.delta = -player.delta;
+                                }
+                            }
+                            true
+                        }
+                    } else {
+                        false
+                    };
+                    if needs_write {
+                        if let Some(ref player) = self.psg_modulations[slot] {
+                            let period = (player.base_period as i32 + player.accumulated as i32).clamp(0, 1023) as u16;
+                            let low_nibble = (period & 0x0F) as u8;
+                            let high_bits = ((period >> 4) & 0x3F) as u8;
+                            self.sn76489.write(0x80 | (player.hw_ch << 5) | low_nibble);
+                            self.sn76489.write(high_bits);
                         }
                     }
                 }

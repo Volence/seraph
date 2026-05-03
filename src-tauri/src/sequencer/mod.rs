@@ -36,6 +36,8 @@ pub enum SequencerOutput {
     PsgEnvelopeStop { hw_ch: u8 },
     FmModulationStart { hw_ch: u8, wait: u8, speed: u8, delta: i8, steps: u8, base_freq: u16 },
     FmModulationStop { hw_ch: u8 },
+    PsgModulationStart { hw_ch: u8, wait: u8, speed: u8, delta: i8, steps: u8, base_period: u16 },
+    PsgModulationStop { hw_ch: u8 },
 }
 
 impl Sequencer {
@@ -212,9 +214,23 @@ impl Sequencer {
                     }
                     ChannelType::Psg(hw_ch) => {
                         self.program_psg(*hw_ch, *pitch, volume, instrument, output);
+                        if let Some(ref mod_params) = modulation {
+                            let base_period = midi_to_psg_period(*pitch);
+                            output.push(SequencerOutput::PsgModulationStart {
+                                hw_ch: *hw_ch,
+                                wait: mod_params.wait,
+                                speed: mod_params.speed,
+                                delta: mod_params.delta as i8,
+                                steps: mod_params.steps,
+                                base_period,
+                            });
+                        } else {
+                            output.push(SequencerOutput::PsgModulationStop { hw_ch: *hw_ch });
+                        }
                     }
                     ChannelType::PsgNoise => {
-                        self.program_psg_noise(volume, instrument, output);
+                        let noise_reg = self.snapshot.channels[ch_idx].noise_reg;
+                        self.program_psg_noise(noise_reg, volume, instrument, output);
                     }
                     ChannelType::Dac(_) => {
                         if let InstrumentData::DacSample { samples, sample_rate } = instrument {
@@ -319,8 +335,8 @@ impl Sequencer {
         output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | (atten & 0x0F)));
     }
 
-    fn program_psg_noise(&self, volume: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
-        output.push(SequencerOutput::PsgWrite(0xE0 | 0x04));
+    fn program_psg_noise(&self, noise_reg: u8, volume: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+        output.push(SequencerOutput::PsgWrite(noise_reg));
 
         if let InstrumentData::PsgEnvelope { envelope, loop_point, .. } = instrument {
             if !envelope.is_empty() {
@@ -348,10 +364,12 @@ impl Sequencer {
             }
             ChannelType::Psg(hw_ch) => {
                 output.push(SequencerOutput::PsgEnvelopeStop { hw_ch: *hw_ch });
+                output.push(SequencerOutput::PsgModulationStop { hw_ch: *hw_ch });
                 output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | 0x0F));
             }
             ChannelType::PsgNoise => {
                 output.push(SequencerOutput::PsgEnvelopeStop { hw_ch: 3 });
+                output.push(SequencerOutput::PsgModulationStop { hw_ch: 3 });
                 output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | 0x0F));
             }
             ChannelType::Dac(_) => {}
@@ -398,6 +416,7 @@ mod tests {
                 volume: 127,
                 pan: 0xC0,
                 modulation: None,
+                noise_reg: 0xE4,
                 events: vec![
                     SequencerEvent::NoteOn {
                         tick: 0,
@@ -508,6 +527,7 @@ mod tests {
                 volume: 127,
                 pan: 0xC0,
                 modulation: None,
+                noise_reg: 0xE4,
                 events: vec![
                     SequencerEvent::NoteOn {
                         tick: 0, pitch: 60, velocity: 127, duration_ticks: 480,
@@ -622,6 +642,7 @@ mod tests {
                 volume: 112,
                 pan: 0xC0,
                 modulation: None,
+                noise_reg: 0xE4,
                 events: vec![
                     SequencerEvent::NoteOn {
                         tick: 0, pitch: 60, velocity: 100, duration_ticks: 480,

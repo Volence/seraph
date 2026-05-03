@@ -48,6 +48,7 @@ pub enum SmpsEvent {
     SetModulation { wait: u8, speed: u8, delta: u8, steps: u8 },
     ModOff,
     Tie,
+    PsgForm(u8),
     Stop,
     Unsupported { name: String },
 }
@@ -331,6 +332,14 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
         return Some(vec![]);
     }
 
+    if trimmed.starts_with("smpsPSGform") {
+        let args = extract_macro_args(trimmed, "smpsPSGform");
+        if let Some(byte) = args.first().and_then(|a| parse_hex(a)) {
+            return Some(vec![SmpsEvent::PsgForm(byte)]);
+        }
+        return Some(vec![]);
+    }
+
     let known_skips: &[&str] = &[
         "smpsModChange",
         "smpsModOn",
@@ -341,7 +350,6 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
         "smpsSetTempoDiv",
         "smpsSSGEG",
         "smpsPlayDACSample",
-        "smpsPSGform",
         "smpsSetNote",
         "smpsFMICommand",
         "smpsSetVol",
@@ -1073,6 +1081,7 @@ mod tests {
                     | SmpsEvent::Transpose(_)
                     | SmpsEvent::Detune(_)
                     | SmpsEvent::Tie
+                    | SmpsEvent::PsgForm(_)
                     | SmpsEvent::Stop
                     | SmpsEvent::SetModulation { .. }
                     | SmpsEvent::ModOff

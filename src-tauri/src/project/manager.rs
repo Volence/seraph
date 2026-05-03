@@ -551,11 +551,24 @@ impl ProjectManager {
                     wait: m.wait, speed: m.speed, delta: m.delta, steps: m.steps,
                 }
             });
+            let noise_reg = if matches!(channel_type, ChannelType::PsgNoise) {
+                if let Some(ref inst_id) = tracks[0].instrument_id {
+                    self.instruments.psg.iter()
+                        .find(|p| &p.id == inst_id)
+                        .and_then(|p| p.noise_mode.as_ref())
+                        .map(|nm| match nm {
+                            crate::model::instrument::NoiseMode::Periodic(f) => 0xE0 | ((*f as u8) & 0x03),
+                            crate::model::instrument::NoiseMode::White(f) => 0xE0 | 0x04 | ((*f as u8) & 0x03),
+                        })
+                        .unwrap_or(0xE4)
+                } else { 0xE4 }
+            } else { 0xE4 };
             channels.push(ChannelSequence {
                 channel_type,
                 volume,
                 pan: pan_byte,
                 modulation,
+                noise_reg,
                 events,
                 overlaps,
             });

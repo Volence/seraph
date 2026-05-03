@@ -141,6 +141,7 @@ pub enum SmpsEvent {
     VolumeChange(i8),
     SetModulation { wait: u8, speed: u8, delta: u8, steps: u8 },
     AlterNote(i8),
+    PsgForm(u8),
     Stop,
 }
 
@@ -215,6 +216,19 @@ fn encode_channel_events_with_voices(
                         current_psg_env = Some(env_idx);
                     }
                 }
+            }
+
+            let new_mod = note_mod.as_ref().map(|m| (m.wait, m.speed, m.delta, m.steps));
+            if new_mod != current_mod {
+                if let Some((w, s, d, st)) = new_mod {
+                    out.push(SmpsEvent::SetModulation { wait: w, speed: s, delta: d, steps: st });
+                }
+                current_mod = new_mod;
+            }
+
+            if detune != current_detune {
+                out.push(SmpsEvent::AlterNote(detune));
+                current_detune = detune;
             }
         }
 
@@ -438,6 +452,11 @@ fn format_channel_data(events: &[SmpsEvent]) -> String {
                 asm.push_str(&format!("\tsmpsModSet\t\t${wait:02X}, ${speed:02X}, ${delta:02X}, ${steps:02X}\n"));
                 last_duration = None;
             }
+            SmpsEvent::PsgForm(byte) => {
+                flush_line(&mut asm, &mut line_items);
+                asm.push_str(&format!("\tsmpsPSGform\t\t${byte:02X}\n"));
+                last_duration = None;
+            }
             SmpsEvent::AlterNote(val) => {
                 flush_line(&mut asm, &mut line_items);
                 asm.push_str(&format!("\tsmpsAlterNote\t${:02X}\n", *val as u8));
@@ -567,6 +586,20 @@ pub fn generate_music_asm(
                     Pan::Center => 0xC0,
                 };
                 events.push(SmpsEvent::SetPan(pan_byte));
+            }
+        }
+
+        if matches!(track.channel, ChannelAssignment::PsgNoise) {
+            if let Some(ref inst_id) = track.instrument_id {
+                if let Some(psg_inst) = instruments.psg.iter().find(|i| &i.id == inst_id) {
+                    if let Some(ref nm) = psg_inst.noise_mode {
+                        let byte = match nm {
+                            crate::model::instrument::NoiseMode::Periodic(f) => 0xE0 | ((*f as u8) & 0x03),
+                            crate::model::instrument::NoiseMode::White(f) => 0xE0 | 0x04 | ((*f as u8) & 0x03),
+                        };
+                        events.push(SmpsEvent::PsgForm(byte));
+                    }
+                }
             }
         }
 

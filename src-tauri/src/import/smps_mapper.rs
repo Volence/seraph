@@ -177,7 +177,24 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
         } else {
             let instrument_id = match ch.kind {
                 SmpsChannelKind::Psg => {
-                    resolve_psg_instrument(ch, &mut psg_env_to_id, &mut instruments)
+                    let id = resolve_psg_instrument(ch, &mut psg_env_to_id, &mut instruments);
+                    if let Some(ref uid) = id {
+                        if let Some(form_byte) = ch.events.iter().find_map(|e| match e {
+                            SmpsEvent::PsgForm(b) => Some(*b),
+                            _ => None,
+                        }) {
+                            if let Some(inst) = instruments.psg.iter_mut().find(|p| p.id == *uid) {
+                                let noise_type = form_byte & 0x04;
+                                let freq_sel = form_byte & 0x03;
+                                inst.noise_mode = if noise_type != 0 {
+                                    Some(crate::model::instrument::NoiseMode::White(freq_sel as u16))
+                                } else {
+                                    Some(crate::model::instrument::NoiseMode::Periodic(freq_sel as u16))
+                                };
+                            }
+                        }
+                    }
+                    id
                 }
                 _ => None,
             };
@@ -403,6 +420,7 @@ fn map_fm_channel_flat(
             SmpsEvent::SetPan(p) => {
                 current_pan = Some(*p);
             }
+            SmpsEvent::PsgForm(_) => {}
             SmpsEvent::Stop => break,
             SmpsEvent::Unsupported { name } => {
                 *unsupported_counts.entry(name.clone()).or_insert(0u32) += 1;
@@ -441,6 +459,8 @@ fn map_channel_events(
     let mut tying = false;
     let mut current_psg_inst: Option<Uuid> = None;
     let mut current_pan: Option<u8> = None;
+    let mut current_mod: Option<NoteModulation> = None;
+    let mut current_detune: i8 = 0;
 
     if ch.kind == SmpsChannelKind::Psg {
         if let Some(env_idx) = ch.psg_envelope {
@@ -486,9 +506,9 @@ fn map_channel_events(
                         velocity,
                         duration_ticks: daw_dur.max(1),
                         instrument_id: current_psg_inst,
-                        detune: 0,
-                        pan_override: None,
-                        modulation: None,
+                        detune: current_detune,
+                        pan_override: current_pan,
+                        modulation: current_mod.clone(),
                     });
                 }
                 tying = false;
@@ -512,11 +532,24 @@ fn map_channel_events(
                     current_psg_inst = resolve_psg_env(*v, psg_env_to_id, instruments);
                 }
             }
-            SmpsEvent::Detune(_) => {}
+            SmpsEvent::Detune(d) => {
+                current_detune = *d;
+            }
             SmpsEvent::SetPan(p) => {
                 current_pan = Some(*p);
             }
-            SmpsEvent::SetModulation { .. } | SmpsEvent::ModOff => {}
+            SmpsEvent::SetModulation { wait, speed, delta, steps } => {
+                current_mod = Some(NoteModulation {
+                    wait: *wait,
+                    speed: *speed,
+                    delta: *delta,
+                    steps: *steps,
+                });
+            }
+            SmpsEvent::ModOff => {
+                current_mod = None;
+            }
+            SmpsEvent::PsgForm(_) => {}
             SmpsEvent::Stop => break,
             SmpsEvent::Unsupported { name } => {
                 *unsupported_counts.entry(name.clone()).or_insert(0u32) += 1;

@@ -54,6 +54,7 @@ pub struct ChannelSequence {
     pub volume: u8,
     pub pan: u8,
     pub modulation: Option<ModulationParams>,
+    pub noise_reg: u8,
     pub events: Vec<SequencerEvent>,
     pub overlaps: Vec<OverlapWarning>,
 }

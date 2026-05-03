@@ -17,6 +17,7 @@ pub struct Sequencer {
     sample_rate: f64,
     channel_cursors: Vec<usize>,
     last_fm_patch: [[u8; 25]; 6],
+    last_fm_pan: [u8; 6],
     active_notes: Vec<Option<u8>>,
 }
 
@@ -47,6 +48,7 @@ impl Sequencer {
             sample_rate: sample_rate as f64,
             channel_cursors: Vec::new(),
             last_fm_patch: [[0xFF; 25]; 6],
+            last_fm_pan: [0xFF; 6],
             active_notes: Vec::new(),
         }
     }
@@ -57,6 +59,7 @@ impl Sequencer {
         self.channel_cursors = vec![0; snapshot.channels.len()];
         self.active_notes = vec![None; snapshot.channels.len()];
         self.last_fm_patch = [[0xFF; 25]; 6];
+        self.last_fm_pan = [0xFF; 6];
         self.snapshot = snapshot;
     }
 
@@ -86,12 +89,14 @@ impl Sequencer {
         self.playing = false;
         self.silence_all(output);
         self.last_fm_patch = [[0xFF; 25]; 6];
+        self.last_fm_pan = [0xFF; 6];
     }
 
     pub fn seek(&mut self, tick: u64, output: &mut Vec<SequencerOutput>) {
         self.current_tick = tick as f64;
         self.silence_all(output);
         self.last_fm_patch = [[0xFF; 25]; 6];
+        self.last_fm_pan = [0xFF; 6];
         self.seek_cursors();
     }
 
@@ -179,14 +184,14 @@ impl Sequencer {
         output: &mut Vec<SequencerOutput>,
     ) {
         match event {
-            SequencerEvent::NoteOn { pitch, velocity, instrument, modulation, .. } => {
+            SequencerEvent::NoteOn { pitch, velocity, instrument, modulation, pan_override, .. } => {
                 if self.active_notes[ch_idx].is_some() {
                     self.key_off_channel(ch_idx, channel_type, output);
                 }
 
                 match channel_type {
                     ChannelType::Fm(hw_ch) => {
-                        let pan = self.snapshot.channels[ch_idx].pan;
+                        let pan = pan_override.unwrap_or(self.snapshot.channels[ch_idx].pan);
                         self.program_fm(*hw_ch, *pitch, volume, *velocity, pan, instrument, output);
                         if let Some(ref mod_params) = modulation {
                             let (block, fnum) = midi_to_fm_freq(*pitch);
@@ -257,6 +262,10 @@ impl Sequencer {
                 self.fm_write(port_base, 0xB0 + ch_offset, patch[24], output);
                 self.fm_write(port_base, 0xB4 + ch_offset, pan, output);
                 self.last_fm_patch[hw_ch as usize] = *patch;
+                self.last_fm_pan[hw_ch as usize] = pan;
+            } else if self.last_fm_pan[hw_ch as usize] != pan {
+                self.fm_write(port_base, 0xB4 + ch_offset, pan, output);
+                self.last_fm_pan[hw_ch as usize] = pan;
             }
 
             let vol_offset = 127u16.saturating_sub(volume as u16)
@@ -397,6 +406,7 @@ mod tests {
                         duration_ticks: 480,
                         instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
                         modulation: None,
+                        pan_override: None,
                     },
                     SequencerEvent::NoteOff { tick: 480, pitch: 60 },
                 ],
@@ -503,6 +513,7 @@ mod tests {
                         tick: 0, pitch: 60, velocity: 127, duration_ticks: 480,
                         instrument: inst,
                         modulation: None,
+                        pan_override: None,
                     },
                     SequencerEvent::NoteOff { tick: 480, pitch: 60 },
                 ],
@@ -616,6 +627,7 @@ mod tests {
                         tick: 0, pitch: 60, velocity: 100, duration_ticks: 480,
                         instrument,
                         modulation: None,
+                        pan_override: None,
                     },
                     SequencerEvent::NoteOff { tick: 480, pitch: 60 },
                 ],

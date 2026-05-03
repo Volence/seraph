@@ -169,12 +169,31 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const barStart = Math.floor(region.startTick / (ticksPerBeat * 4)) + 1;
   const barEnd = Math.ceil((region.startTick + region.durationTicks) / (ticksPerBeat * 4));
 
+  const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  function noteName(pitch: number): string {
+    const octave = Math.floor(pitch / 12) - 1;
+    return `${NOTE_NAMES[pitch % 12]}${octave}`;
+  }
+
+  const selInfo = selectedNotes.size === 1
+    ? (() => {
+        const idx = Array.from(selectedNotes)[0];
+        const n = notes[idx];
+        if (!n) return "";
+        const dur = `${(n.durationTicks / ticksPerBeat).toFixed(2)} beats`;
+        return `${noteName(n.pitch)} vel:${n.velocity} ${dur}${n.detune ? ` det:${n.detune > 0 ? "+" : ""}${n.detune}` : ""}${n.modulation ? " mod" : ""}`;
+      })()
+    : selectedNotes.size > 1
+      ? `${selectedNotes.size} notes`
+      : "";
+
   return (
     <div className={styles.pianoRoll}>
       <div className={styles.header}>
         <span className={styles.label}>
           {region.trackName} | Bars {barStart}-{barEnd}
         </span>
+        {selInfo && <span className={styles.noteInfo}>{selInfo}</span>}
         <select
           className={styles.gridSelect}
           value={gridIdx}

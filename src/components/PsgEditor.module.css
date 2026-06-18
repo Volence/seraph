@@ -98,7 +98,7 @@
 
 .noiseBtn.activeNoise {
   background: var(--accent-psg);
-  color: #000;
+  color: var(--surface-void);
   border-color: var(--accent-psg);
 }
 
@@ -125,7 +125,7 @@
 .previewBtn {
   padding: 8px 16px;
   background: var(--accent-psg);
-  color: #000;
+  color: var(--surface-void);
   border: none;
   border-radius: 4px;
   font-weight: 500;

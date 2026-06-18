@@ -47,7 +47,7 @@
   font-size: 9px;
   padding: 1px 4px;
   background: var(--carrier-highlight);
-  color: #000;
+  color: var(--surface-void);
   border-radius: 2px;
   font-weight: 700;
 }

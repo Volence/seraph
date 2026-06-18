@@ -57,7 +57,7 @@
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 3px;
-  color: #fff;
+  color: var(--text-hi);
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -93,13 +93,13 @@
 
 .muteBtn.active {
   background: var(--error);
-  color: #fff;
+  color: var(--text-hi);
   border-color: var(--error);
 }
 
 .soloBtn.active {
   background: var(--carrier-highlight);
-  color: #000;
+  color: var(--surface-void);
   border-color: var(--carrier-highlight);
 }
 
@@ -151,7 +151,7 @@
 .meter {
   width: 30px;
   height: 10px;
-  background: #1a1a1a;
+  background: var(--surface-void);
   border-radius: 2px;
   overflow: hidden;
   flex-shrink: 0;

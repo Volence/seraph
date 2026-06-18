@@ -17,8 +17,8 @@
   top: 48px;
   left: 50%;
   transform: translateX(-50%);
-  background: #2a5a2a;
-  color: #88ff88;
+  background: var(--surface-raised);
+  color: var(--success);
   padding: 8px 20px;
   border-radius: 4px;
   font-size: 13px;
@@ -29,9 +29,9 @@
   position: fixed;
   top: 48px;
   right: 16px;
-  background: #3a1a1a;
-  border: 1px solid #ff4444;
-  color: #ffaaaa;
+  background: var(--surface-raised);
+  border: 1px solid var(--error);
+  color: var(--text-base);
   padding: 12px 16px;
   border-radius: 6px;
   font-size: 13px;
@@ -52,7 +52,7 @@
 .exportErrorHeader button {
   background: none;
   border: none;
-  color: #ffaaaa;
+  color: var(--error);
   cursor: pointer;
   font-size: 14px;
 }
@@ -70,9 +70,9 @@
   position: fixed;
   top: 48px;
   right: 16px;
-  background: #2a2a1a;
-  border: 1px solid #ccaa44;
-  color: #eedd88;
+  background: var(--surface-raised);
+  border: 1px solid var(--warning);
+  color: var(--text-base);
   padding: 12px 16px;
   border-radius: 6px;
   font-size: 13px;
@@ -93,7 +93,7 @@
 .importWarningHeader button {
   background: none;
   border: none;
-  color: #eedd88;
+  color: var(--warning);
   cursor: pointer;
   font-size: 14px;
 }

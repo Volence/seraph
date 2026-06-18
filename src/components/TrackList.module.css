@@ -24,9 +24,9 @@
   text-transform: uppercase;
 }
 
-.fm { background: var(--accent-fm); color: #000; }
-.psg { background: var(--accent-psg); color: #000; }
-.dac { background: var(--accent-dac); color: #000; }
+.fm { background: var(--accent-fm); color: var(--surface-void); }
+.psg { background: var(--accent-psg); color: var(--surface-void); }
+.dac { background: var(--accent-dac); color: var(--surface-void); }
 
 .name {
   font-size: 12px;

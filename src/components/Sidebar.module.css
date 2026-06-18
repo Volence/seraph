@@ -28,7 +28,7 @@
 
 .tab.active {
   color: var(--text-primary);
-  border-bottom-color: var(--accent-fm);
+  border-bottom-color: var(--accent);
 }
 
 .tab:hover {

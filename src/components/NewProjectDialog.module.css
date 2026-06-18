@@ -139,8 +139,8 @@
 
 .createBtn {
   padding: 8px 20px;
-  background: var(--accent-fm);
-  color: #fff;
+  background: var(--accent);
+  color: var(--surface-void);
   border: none;
   border-radius: 3px;
   font-weight: 500;

@@ -115,7 +115,7 @@
 .masterVolSlider {
   width: 80px;
   height: 4px;
-  accent-color: var(--accent, #4a9eff);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 

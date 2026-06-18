@@ -7,7 +7,7 @@ use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
 use crate::audio::{AudioCommand, AudioThread};
 use crate::dac;
 use crate::export::{ExportResult, ExportError};
-use crate::model::driver::{ChannelLayout, DriverFeature, DriverProfile};
+use crate::model::driver::{ChannelLayout, DriverFeature};
 use crate::model::instrument::*;
 use crate::model::song::{Song, SongMetadata};
 use crate::project::ProjectManager;
@@ -825,6 +825,13 @@ pub fn transport_clear_loop(audio_state: State<'_, AudioState>) -> Result<(), St
     Ok(())
 }
 
+#[tauri::command]
+pub fn set_master_volume(audio_state: State<'_, AudioState>, volume: f32) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    thread.send(AudioCommand::SetMasterVolume { volume });
+    Ok(())
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackState {
@@ -897,6 +904,61 @@ pub fn export_song(
     driver.export_song(&song, &song.instruments, &path).map_err(|errors| ExportFailure { errors })
 }
 
+// --- WAV Export ---
+
+#[tauri::command]
+pub fn export_wav(
+    project_state: State<'_, ProjectState>,
+    output_path: String,
+    duration_seconds: f64,
+) -> Result<String, String> {
+    use crate::audio::engine::AudioEngine;
+
+    let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let snapshot = mgr.build_snapshot();
+    drop(mgr);
+
+    let sample_rate: u32 = 44100;
+    let mut engine = AudioEngine::new(sample_rate);
+
+    engine.process_command(AudioCommand::LoadSequence { snapshot });
+    engine.process_command(AudioCommand::TransportPlay);
+
+    let total_samples = (sample_rate as f64 * duration_seconds) as usize;
+    let mut all_samples = Vec::with_capacity(total_samples * 2);
+    let chunk_size = 1024;
+    let mut buf = vec![0.0f32; chunk_size * 2];
+    let mut rendered = 0;
+
+    while rendered < total_samples {
+        let frames_this_chunk = (total_samples - rendered).min(chunk_size);
+        let slice = &mut buf[..frames_this_chunk * 2];
+        for s in slice.iter_mut() { *s = 0.0; }
+        engine.render(slice);
+        all_samples.extend_from_slice(slice);
+        rendered += frames_this_chunk;
+    }
+
+    let path = std::path::Path::new(&output_path);
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create(path, spec)
+        .map_err(|e| format!("failed to create WAV: {e}"))?;
+
+    for &sample in &all_samples {
+        let clamped = sample.clamp(-1.0, 1.0);
+        let int_sample = (clamped * 32767.0) as i16;
+        writer.write_sample(int_sample).map_err(|e| format!("WAV write error: {e}"))?;
+    }
+    writer.finalize().map_err(|e| format!("WAV finalize error: {e}"))?;
+
+    Ok(format!("Exported {} seconds to {}", duration_seconds, output_path))
+}
+
 // --- Import ---
 
 #[tauri::command]
@@ -916,4 +978,83 @@ pub fn import_song(
     let dac_path = dac_dir.as_ref().map(std::path::PathBuf::from);
 
     crate::import::import_smps_file_with_dac(&source, &parent, driver, dac_path.as_deref())
+}
+
+// --- FM File Import ---
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FmFileImportResponse {
+    pub format: String,
+    pub count: usize,
+    pub ids: Vec<String>,
+}
+
+#[tauri::command]
+pub fn import_fm_file(
+    state: State<'_, ProjectState>,
+    file_path: String,
+) -> Result<FmFileImportResponse, String> {
+    let path = std::path::Path::new(&file_path);
+    let data = std::fs::read(path)
+        .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    let filename = path.file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or("unknown");
+
+    let result = crate::import::fm_formats::import_fm_file(&data, filename)?;
+
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let mut ids = Vec::new();
+    for inst in result.instruments {
+        let id = mgr.add_fm_instrument(inst);
+        ids.push(id.to_string());
+    }
+
+    Ok(FmFileImportResponse {
+        format: result.format,
+        count: ids.len(),
+        ids,
+    })
+}
+
+// --- VGM Export ---
+
+#[tauri::command]
+pub fn export_vgm(
+    project_state: State<'_, ProjectState>,
+    output_path: String,
+    duration_seconds: f64,
+) -> Result<String, String> {
+    let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let song = mgr.song().ok_or("No project open")?;
+    let instruments = song.instruments.clone();
+    let data = crate::export::vgm::export_vgm_data(&song, &instruments, Some(duration_seconds))?;
+    drop(mgr);
+
+    std::fs::write(&output_path, &data)
+        .map_err(|e| format!("failed to write VGM: {e}"))?;
+
+    Ok(format!("Exported VGM ({} bytes) to {}", data.len(), output_path))
+}
+
+#[tauri::command]
+pub fn import_zyrinx_song(
+    rom_path: String,
+    parent_dir: String,
+    game_id: u8,
+) -> Result<crate::import::ImportResult, String> {
+    let rom = std::path::PathBuf::from(&rom_path);
+    let parent = std::path::PathBuf::from(&parent_dir);
+    crate::import::import_zyrinx_rom(&rom, &parent, game_id)
+}
+
+#[tauri::command]
+pub fn import_vgm(
+    vgm_path: String,
+    parent_dir: String,
+) -> Result<crate::import::ImportResult, String> {
+    let path = std::path::PathBuf::from(&vgm_path);
+    let parent = std::path::PathBuf::from(&parent_dir);
+    crate::import::vgm_import::import_vgm_file(&path, &parent)
 }

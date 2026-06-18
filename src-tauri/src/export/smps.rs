@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use uuid::Uuid;
-use crate::driver::flamedriver::FlamedriverProfile;
 use crate::export::ExportError;
 use crate::model::driver::DriverProfile;
 use crate::model::instrument::{FmInstrument, InstrumentBank};
@@ -117,16 +116,18 @@ pub fn smps_note_name_psg(midi_pitch: u8) -> String {
     format!("{name}{octave}")
 }
 
-/// DAC sample byte → sample name for assembly output.
-pub fn dac_sample_name(pitch: u8) -> String {
+/// DAW pitch → SMPS DAC sample name for assembly output.
+/// DAW pitch 36 maps to SMPS byte 0x81, pitch 37→0x82, etc.
+pub fn dac_sample_name(daw_pitch: u8) -> String {
+    let smps_byte = 0x81u8.wrapping_add(daw_pitch.saturating_sub(36));
     use crate::import::smps_parser::build_dac_table;
     let table = build_dac_table();
     for (name, byte) in &table {
-        if *byte == pitch {
+        if *byte == smps_byte {
             return name.clone();
         }
     }
-    format!("${:02X}", pitch)
+    format!("${:02X}", smps_byte)
 }
 
 /// A single event in the SMPS output stream.
@@ -305,7 +306,7 @@ pub fn build_voice_index<'a>(tracks: &[Track], instruments: &'a InstrumentBank) 
     let mut map = HashMap::new();
     let mut voices: Vec<&FmInstrument> = Vec::new();
 
-    let mut add_voice = |id: &Uuid, map: &mut HashMap<Uuid, u8>, voices: &mut Vec<&'a FmInstrument>| {
+    let add_voice = |id: &Uuid, map: &mut HashMap<Uuid, u8>, voices: &mut Vec<&'a FmInstrument>| {
         if map.contains_key(id) { return; }
         if let Some(inst) = instruments.fm.iter().find(|i| &i.id == id) {
             let idx = voices.len() as u8;
@@ -333,11 +334,11 @@ pub fn build_voice_index<'a>(tracks: &[Track], instruments: &'a InstrumentBank) 
 }
 
 /// Generate the voice bank assembly text.
-pub fn generate_voice_bank_asm(song_label: &str, voices: &[&FmInstrument], driver: &FlamedriverProfile) -> String {
+pub fn generate_voice_bank_asm(song_label: &str, voices: &[&FmInstrument], driver: &dyn DriverProfile) -> String {
     let mut asm = String::new();
     asm.push_str("; ============================================================\n");
     asm.push_str(&format!("; Voice Bank: {song_label}\n"));
-    asm.push_str("; Exported from MegaDAW\n");
+    asm.push_str("; Exported from Seraph\n");
     asm.push_str("; ============================================================\n\n");
     asm.push_str(&format!("Snd_{song_label}_Voices:\n"));
 
@@ -513,7 +514,7 @@ pub fn generate_music_asm(
 
     asm.push_str("; ============================================================\n");
     asm.push_str(&format!("; Song: {}\n", song.metadata.name));
-    asm.push_str("; Exported from MegaDAW\n");
+    asm.push_str("; Exported from Seraph\n");
     asm.push_str("; ============================================================\n\n");
 
     let active_tracks: Vec<&Track> = song.tracks.iter()
@@ -682,12 +683,6 @@ pub fn validate_for_export(
 
         let has_notes = track.regions.iter().any(|r| !r.notes.is_empty());
         if !has_notes {
-            errors.push(ExportError {
-                track_name: track.name.clone(),
-                region_index: None,
-                note_index: None,
-                message: "Track has no notes".into(),
-            });
             continue;
         }
 
@@ -742,7 +737,7 @@ use std::path::Path;
 pub fn write_export(
     song: &Song,
     instruments: &InstrumentBank,
-    driver: &FlamedriverProfile,
+    driver: &dyn DriverProfile,
     output_dir: &Path,
 ) -> Result<ExportResult, Vec<ExportError>> {
     let params = compute_tempo_params(song.metadata.tempo, song.metadata.ticks_per_beat);

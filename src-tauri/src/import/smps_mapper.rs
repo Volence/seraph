@@ -70,6 +70,7 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
     let mut dac_sample_to_id: HashMap<u8, Uuid> = HashMap::new();
 
     let mut tracks = Vec::new();
+    let mut track_loop_ticks: Vec<Option<u64>> = Vec::new();
 
     let mut fm_idx = 0u8;
     let mut psg_idx = 0u8;
@@ -111,7 +112,7 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
         });
 
         if ch.kind == SmpsChannelKind::Fm {
-            let (notes, first_inst, track_warnings, total_daw_ticks) = map_fm_channel_flat(
+            let (notes, first_inst, track_warnings, total_daw_ticks, ch_loop_tick) = map_fm_channel_flat(
                 ch, daw_per_smps, &voice_to_fm_id, &mut instruments, &mut warnings,
             );
             warnings.extend(track_warnings);
@@ -129,7 +130,6 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 }]
             };
 
-            let track_vol = (127i16 - ch.initial_volume as i16).clamp(0, 127) as u8;
             tracks.push(Track {
                 id: Uuid::new_v4(),
                 name: track_name,
@@ -138,13 +138,14 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 regions,
                 muted: false,
                 solo: false,
-                volume: track_vol,
+                volume: 127,
                 pan: pan.clone(),
                 pitch_offset: 0,
                 modulation: modulation.clone(),
             });
+            track_loop_ticks.push(ch_loop_tick);
         } else if ch.kind == SmpsChannelKind::Dac {
-            let (notes, track_warnings, total_daw_ticks) = map_channel_events(ch, daw_per_smps, &mut dac_sample_to_id, &mut psg_env_to_id, &mut instruments);
+            let (notes, track_warnings, total_daw_ticks, ch_loop_tick) = map_channel_events(ch, daw_per_smps, &mut dac_sample_to_id, &mut psg_env_to_id, &mut instruments, smps.driver_version);
             warnings.extend(track_warnings);
 
             let first_inst = dac_sample_to_id.values().next().copied();
@@ -174,10 +175,11 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 pitch_offset: 0,
                 modulation: modulation.clone(),
             });
+            track_loop_ticks.push(ch_loop_tick);
         } else {
             let instrument_id = match ch.kind {
                 SmpsChannelKind::Psg => {
-                    let id = resolve_psg_instrument(ch, &mut psg_env_to_id, &mut instruments);
+                    let id = resolve_psg_instrument(ch, &mut psg_env_to_id, &mut instruments, smps.driver_version);
                     if let Some(ref uid) = id {
                         if let Some(form_byte) = ch.events.iter().find_map(|e| match e {
                             SmpsEvent::PsgForm(b) => Some(*b),
@@ -199,7 +201,7 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 _ => None,
             };
 
-            let (notes, track_warnings, total_daw_ticks) = map_channel_events(ch, daw_per_smps, &mut dac_sample_to_id, &mut psg_env_to_id, &mut instruments);
+            let (notes, track_warnings, total_daw_ticks, ch_loop_tick) = map_channel_events(ch, daw_per_smps, &mut dac_sample_to_id, &mut psg_env_to_id, &mut instruments, smps.driver_version);
             warnings.extend(track_warnings);
 
             let duration = total_daw_ticks.max(notes.last().map(|n| n.tick + n.duration_ticks).unwrap_or(0));
@@ -215,11 +217,6 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 }]
             };
 
-            let track_vol = if matches!(ch.kind, SmpsChannelKind::Psg) {
-                ((15i16 - ch.initial_volume as i16).clamp(0, 15) * 127 / 15) as u8
-            } else {
-                (127i16 - ch.initial_volume as i16).clamp(0, 127) as u8
-            };
             tracks.push(Track {
                 id: Uuid::new_v4(),
                 name: track_name,
@@ -228,11 +225,50 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 regions: region,
                 muted: false,
                 solo: false,
-                volume: track_vol,
+                volume: 127,
                 pan,
                 pitch_offset: 0,
                 modulation,
             });
+            track_loop_ticks.push(ch_loop_tick);
+        }
+    }
+
+    // Normalize channel lengths: SMPS channels loop independently, so shorter
+    // channels need their data repeated to match the longest channel.
+    // When a channel has a loop point (from smpsJump backward), only the loop
+    // body (from loop_tick to end) is repeated, not the intro.
+    let max_duration = tracks.iter()
+        .flat_map(|t| t.regions.iter())
+        .map(|r| r.start_tick + r.duration_ticks)
+        .max()
+        .unwrap_or(0);
+    for (track_idx, track) in tracks.iter_mut().enumerate() {
+        if let Some(region) = track.regions.first_mut() {
+            let orig_len = region.duration_ticks;
+            if orig_len > 0 && orig_len < max_duration && !region.notes.is_empty() {
+                let loop_tick = track_loop_ticks.get(track_idx).copied().flatten().unwrap_or(0);
+                let loop_body_len = orig_len - loop_tick;
+                if loop_body_len == 0 { continue; }
+                let loop_notes: Vec<_> = region.notes.iter()
+                    .filter(|n| n.tick >= loop_tick)
+                    .cloned()
+                    .collect();
+                let mut offset = orig_len;
+                while offset < max_duration {
+                    for note in &loop_notes {
+                        let new_tick = (note.tick - loop_tick) + offset;
+                        if new_tick < max_duration {
+                            let mut n = note.clone();
+                            n.tick = new_tick;
+                            n.duration_ticks = n.duration_ticks.min(max_duration - new_tick);
+                            region.notes.push(n);
+                        }
+                    }
+                    offset += loop_body_len;
+                }
+                region.duration_ticks = max_duration;
+            }
         }
     }
 
@@ -243,11 +279,12 @@ pub fn map_smps_to_song_with_dac(smps: &SmpsFile, driver: &dyn DriverProfile, da
                 .find(|(_, &id)| id == inst.id)
                 .map(|(&byte, _)| byte);
             if let Some(byte) = sample_byte {
-                if let Some(pcm) = load_dac_wav(dir, byte) {
+                if let Some((pcm, wav_rate)) = load_dac_wav(dir, byte) {
                     let filename = format!("{}.pcm", inst.id);
                     inst.pcm_file = filename;
                     inst.original_file = format!("{:02X}.wav", byte);
-                    inst.target_sample_rate = 18790;
+                    let scale = dac_rate_scale(byte);
+                    inst.target_sample_rate = (wav_rate as f64 * scale).round() as u32;
                     dac_pcm.insert(inst.id, pcm);
                 }
             }
@@ -273,29 +310,56 @@ fn resolve_psg_instrument(
     ch: &SmpsChannel,
     psg_env_to_id: &mut HashMap<u8, Uuid>,
     instruments: &mut InstrumentBank,
+    driver_version: u8,
 ) -> Option<Uuid> {
     let env_idx = ch.psg_envelope?;
-    resolve_psg_env(env_idx, psg_env_to_id, instruments)
+    resolve_psg_env(env_idx, psg_env_to_id, instruments, driver_version)
 }
 
 fn resolve_psg_env(
     env_idx: u8,
     psg_env_to_id: &mut HashMap<u8, Uuid>,
     instruments: &mut InstrumentBank,
+    _driver_version: u8,
 ) -> Option<Uuid> {
     if let Some(&id) = psg_env_to_id.get(&env_idx) {
         return Some(id);
     }
 
-    let (volumes, loop_point) = match psg_envelopes::get_envelope(env_idx) {
+    // Voice 0 = no envelope (constant volume). The Z80 driver skips
+    // envelope processing entirely when VoiceIndex == 0.
+    if env_idx == 0 {
+        let inst = PsgInstrument {
+            id: Uuid::new_v4(),
+            name: "PSG No Envelope".into(),
+            volume_sequence: vec![15],
+            loop_point: Some(0),
+            silence_on_end: false,
+            noise_mode: None,
+            smps_envelope_index: Some(0),
+            metadata: InstrumentMetadata {
+                category: "Imported".into(),
+                author: String::new(),
+                tags: vec![],
+            },
+        };
+        let id = inst.id;
+        instruments.psg.push(inst);
+        psg_env_to_id.insert(0, id);
+        return Some(id);
+    }
+
+    // Both S3K and Flamedriver use 1-based indexing (Z80 does `dec a`).
+    let table_idx = env_idx.saturating_sub(1);
+    let (volumes, loop_point, silence_on_end) = match psg_envelopes::get_envelope(table_idx) {
         Some(entry) => {
             let vols: Vec<u8> = entry.volumes.iter().map(|&v| {
                 let atten = (v as u8).min(15);
                 15 - atten
             }).collect();
-            (vols, entry.loop_point)
+            (vols, entry.loop_point, entry.silence_on_end)
         }
-        None => (vec![0], None),
+        None => (vec![0], None, true),
     };
 
     let inst = PsgInstrument {
@@ -303,6 +367,7 @@ fn resolve_psg_env(
         name: format!("PSG Env ${:02X}", env_idx),
         volume_sequence: volumes,
         loop_point,
+        silence_on_end,
         noise_mode: None,
         smps_envelope_index: Some(env_idx),
         metadata: InstrumentMetadata {
@@ -322,7 +387,7 @@ fn map_fm_channel_flat(
     voice_to_fm_id: &HashMap<u8, Uuid>,
     instruments: &mut InstrumentBank,
     warnings: &mut Vec<ImportWarning>,
-) -> (Vec<Note>, Option<Uuid>, Vec<ImportWarning>, u64) {
+) -> (Vec<Note>, Option<Uuid>, Vec<ImportWarning>, u64, Option<u64>) {
     let mut notes: Vec<Note> = Vec::new();
     let mut track_warnings = Vec::new();
     let mut unsupported_counts: HashMap<String, u32> = HashMap::new();
@@ -336,8 +401,13 @@ fn map_fm_channel_flat(
     let mut current_detune: i8 = 0;
     let mut current_pan: Option<u8> = None;
     let mut current_mod: Option<NoteModulation> = None;
+    let mut note_fill: u8 = 0;
+    let mut loop_tick: Option<u64> = None;
 
-    for event in &ch.events {
+    for (event_idx, event) in ch.events.iter().enumerate() {
+        if ch.loop_event_index == Some(event_idx) && loop_tick.is_none() {
+            loop_tick = Some(cursor.round() as u64);
+        }
         match event {
             SmpsEvent::SetVoice(v) => {
                 current_inst_id = voice_to_fm_id.get(v).copied().or_else(|| {
@@ -373,18 +443,25 @@ fn map_fm_channel_flat(
                 let midi = smps_to_midi(*pitch, transpose);
                 if tying {
                     if let Some(last) = notes.last_mut() {
-                        last.duration_ticks += daw_dur;
-                        tying = false;
-                        cursor += *duration as f64 * daw_per_smps;
-                        continue;
+                        if last.pitch == midi {
+                            last.duration_ticks += daw_dur;
+                            tying = false;
+                            cursor += *duration as f64 * daw_per_smps;
+                            continue;
+                        }
                     }
                 }
-                let velocity = smps_vol_to_velocity(volume_delta);
+                let velocity = fm_effective_velocity(ch.initial_volume, volume_delta);
+                let audible_dur = if note_fill > 0 && *duration > note_fill {
+                    (note_fill as f64 * daw_per_smps).round() as u64
+                } else {
+                    daw_dur
+                };
                 notes.push(Note {
                     tick: cursor.round() as u64,
                     pitch: midi,
                     velocity,
-                    duration_ticks: daw_dur.max(1),
+                    duration_ticks: audible_dur.max(1),
                     instrument_id: current_inst_id,
                     detune: current_detune,
                     pan_override: current_pan,
@@ -401,7 +478,7 @@ fn map_fm_channel_flat(
                 transpose += *offset as i16;
             }
             SmpsEvent::VolumeChange(delta) => {
-                volume_delta = (volume_delta + *delta as i16).clamp(0, 127);
+                volume_delta += *delta as i16;
             }
             SmpsEvent::Tie => {
                 tying = true;
@@ -421,6 +498,9 @@ fn map_fm_channel_flat(
                 current_pan = Some(*p);
             }
             SmpsEvent::PsgForm(_) => {}
+            SmpsEvent::NoteFill(v) => {
+                note_fill = *v;
+            }
             SmpsEvent::Stop => break,
             SmpsEvent::Unsupported { name } => {
                 *unsupported_counts.entry(name.clone()).or_insert(0u32) += 1;
@@ -440,7 +520,7 @@ fn map_fm_channel_flat(
     }
 
     let total_daw_ticks = cursor.round() as u64;
-    (notes, first_inst_id, track_warnings, total_daw_ticks)
+    (notes, first_inst_id, track_warnings, total_daw_ticks, loop_tick)
 }
 
 fn map_channel_events(
@@ -449,7 +529,8 @@ fn map_channel_events(
     dac_sample_to_id: &mut HashMap<u8, Uuid>,
     psg_env_to_id: &mut HashMap<u8, Uuid>,
     instruments: &mut InstrumentBank,
-) -> (Vec<Note>, Vec<ImportWarning>, u64) {
+    driver_version: u8,
+) -> (Vec<Note>, Vec<ImportWarning>, u64, Option<u64>) {
     let mut notes = Vec::new();
     let mut warnings = Vec::new();
     let mut unsupported_counts: HashMap<String, u32> = HashMap::new();
@@ -461,14 +542,19 @@ fn map_channel_events(
     let mut current_pan: Option<u8> = None;
     let mut current_mod: Option<NoteModulation> = None;
     let mut current_detune: i8 = 0;
+    let mut note_fill: u8 = 0;
+    let mut loop_tick: Option<u64> = None;
 
     if ch.kind == SmpsChannelKind::Psg {
         if let Some(env_idx) = ch.psg_envelope {
-            current_psg_inst = resolve_psg_env(env_idx, psg_env_to_id, instruments);
+            current_psg_inst = resolve_psg_env(env_idx, psg_env_to_id, instruments, driver_version);
         }
     }
 
-    for event in &ch.events {
+    for (event_idx, event) in ch.events.iter().enumerate() {
+        if ch.loop_event_index == Some(event_idx) && loop_tick.is_none() {
+            loop_tick = Some(cursor.round() as u64);
+        }
         match event {
             SmpsEvent::Note { pitch, duration } => {
                 let daw_dur = (*duration as f64 * daw_per_smps).round() as u64;
@@ -494,18 +580,29 @@ fn map_channel_events(
                     };
                     if tying {
                         if let Some(last) = notes.last_mut() {
-                            last.duration_ticks += daw_dur;
-                            tying = false;
-                            cursor += *duration as f64 * daw_per_smps;
-                            continue;
+                            if last.pitch == midi {
+                                last.duration_ticks += daw_dur;
+                                tying = false;
+                                cursor += *duration as f64 * daw_per_smps;
+                                continue;
+                            }
                         }
                     }
-                    let velocity = smps_vol_to_velocity(volume_delta);
+                    let velocity = if matches!(ch.kind, SmpsChannelKind::Psg) {
+                        psg_effective_velocity(ch.initial_volume, volume_delta)
+                    } else {
+                        fm_effective_velocity(ch.initial_volume, volume_delta)
+                    };
+                    let audible_dur = if note_fill > 0 && *duration > note_fill {
+                        (note_fill as f64 * daw_per_smps).round() as u64
+                    } else {
+                        daw_dur
+                    };
                     notes.push(Note {
                         tick: cursor.round() as u64,
                         pitch: midi,
                         velocity,
-                        duration_ticks: daw_dur.max(1),
+                        duration_ticks: audible_dur.max(1),
                         instrument_id: current_psg_inst,
                         detune: current_detune,
                         pan_override: current_pan,
@@ -523,14 +620,14 @@ fn map_channel_events(
                 transpose += *offset as i16;
             }
             SmpsEvent::VolumeChange(delta) => {
-                volume_delta = (volume_delta + *delta as i16).clamp(0, 127);
+                volume_delta += *delta as i16;
             }
             SmpsEvent::Tie => {
                 tying = true;
             }
             SmpsEvent::SetVoice(v) => {
                 if ch.kind == SmpsChannelKind::Psg {
-                    current_psg_inst = resolve_psg_env(*v, psg_env_to_id, instruments);
+                    current_psg_inst = resolve_psg_env(*v, psg_env_to_id, instruments, driver_version);
                 }
             }
             SmpsEvent::Detune(d) => {
@@ -551,6 +648,9 @@ fn map_channel_events(
                 current_mod = None;
             }
             SmpsEvent::PsgForm(_) => {}
+            SmpsEvent::NoteFill(v) => {
+                note_fill = *v;
+            }
             SmpsEvent::Stop => break,
             SmpsEvent::Unsupported { name } => {
                 *unsupported_counts.entry(name.clone()).or_insert(0u32) += 1;
@@ -570,11 +670,18 @@ fn map_channel_events(
     }
 
     let total_daw_ticks = cursor.round() as u64;
-    (notes, warnings, total_daw_ticks)
+    (notes, warnings, total_daw_ticks, loop_tick)
 }
 
-fn smps_vol_to_velocity(smps_volume: i16) -> u8 {
-    (127 - smps_volume).clamp(0, 127) as u8
+
+fn fm_effective_velocity(initial_volume: u8, volume_delta: i16) -> u8 {
+    let tv = (initial_volume as i16 + volume_delta).rem_euclid(256) as u8;
+    if tv > 127 { 0 } else { 127 - tv }
+}
+
+fn psg_effective_velocity(initial_volume: u8, volume_delta: i16) -> u8 {
+    let atten = (initial_volume as i16 + volume_delta).clamp(0, 15) as u16;
+    127u8.saturating_sub(((atten * 127 + 14) / 15) as u8)
 }
 
 fn smps_to_midi(smps_byte: u8, transpose: i16) -> u8 {
@@ -642,7 +749,20 @@ fn resolve_dac_sample(
     id
 }
 
-fn load_dac_wav(dac_dir: &Path, sample_byte: u8) -> Option<Vec<u8>> {
+fn dac_rate_scale(sample_byte: u8) -> f64 {
+    match sample_byte {
+        0x83 => 0.80, 0x84 => 0.67, 0x85 => 0.58,
+        0x8B => 0.82, 0x8E => 0.77,
+        0x91 => 0.78, 0x92 => 0.66, 0x93 => 0.56,
+        0x95 => 0.79, 0x96 => 0.70, 0x97 => 0.58,
+        0x99 => 0.73, 0x9A => 0.66,
+        0xAE => 0.76,
+        0xB0 => 0.68, 0xB3 => 0.76,
+        _ => 1.0,
+    }
+}
+
+fn load_dac_wav(dac_dir: &Path, sample_byte: u8) -> Option<(Vec<u8>, u32)> {
     let hex = format!("{:02X}", sample_byte);
     let exact_path = dac_dir.join(format!("{hex}.wav"));
     if exact_path.exists() {
@@ -673,24 +793,29 @@ fn load_dac_wav(dac_dir: &Path, sample_byte: u8) -> Option<Vec<u8>> {
     None
 }
 
-fn read_wav_as_unsigned_u8(path: &Path) -> Option<Vec<u8>> {
+fn read_wav_as_unsigned_u8(path: &Path) -> Option<(Vec<u8>, u32)> {
     let data = std::fs::read(path).ok()?;
     if data.len() < 44 || &data[0..4] != b"RIFF" || &data[8..12] != b"WAVE" {
         return None;
     }
+    let mut sample_rate: u32 = 18790;
+    let mut pcm_data: Option<Vec<u8>> = None;
     let mut pos = 12;
     while pos + 8 <= data.len() {
         let chunk_id = &data[pos..pos + 4];
         let chunk_size = u32::from_le_bytes(data[pos + 4..pos + 8].try_into().ok()?) as usize;
+        if chunk_id == b"fmt " && chunk_size >= 16 {
+            sample_rate = u32::from_le_bytes(data[pos + 12..pos + 16].try_into().ok()?);
+        }
         if chunk_id == b"data" {
             let start = pos + 8;
             let end = (start + chunk_size).min(data.len());
-            return Some(data[start..end].to_vec());
+            pcm_data = Some(data[start..end].to_vec());
         }
         pos += 8 + chunk_size;
         if pos % 2 != 0 { pos += 1; }
     }
-    None
+    pcm_data.map(|d| (d, sample_rate))
 }
 
 fn dac_name_for_byte(byte: u8) -> &'static str {
@@ -713,6 +838,7 @@ mod tests {
         SmpsFile {
             song_label: "Test_Song".into(),
             voice_ref: VoiceRef::Inline("Test_Song_Voices".into()),
+            driver_version: 2,
             fm_count: 1,
             psg_count: 0,
             tempo_divider: 1,
@@ -731,6 +857,7 @@ mod tests {
                         SmpsEvent::Note { pitch: 0x95, duration: 0x0C },
                         SmpsEvent::Stop,
                     ],
+                    loop_event_index: None,
                 },
             ],
             voices: vec![[0u8; 25]],
@@ -791,6 +918,7 @@ mod tests {
     fn test_map_tie_extends_previous_note() {
         let smps = SmpsFile {
             song_label: "Tie_Test".into(),
+            driver_version: 2,
             voice_ref: VoiceRef::Inline("Tie_Test_Voices".into()),
             fm_count: 1,
             psg_count: 0,
@@ -809,6 +937,7 @@ mod tests {
                     SmpsEvent::Note { pitch: 0xB1, duration: 0x29 },
                     SmpsEvent::Stop,
                 ],
+                loop_event_index: None,
             }],
             voices: vec![[0u8; 25]],
         };
@@ -847,6 +976,7 @@ mod tests {
         let driver = FlamedriverProfile;
         let smps = SmpsFile {
             song_label: "DAC_Test".into(),
+            driver_version: 2,
             voice_ref: VoiceRef::Inline("DAC_Test_Voices".into()),
             fm_count: 0, psg_count: 0,
             tempo_divider: 1, tempo_modifier: 0x18,
@@ -861,6 +991,7 @@ mod tests {
                     SmpsEvent::Note { pitch: 0x86, duration: 0x0C },
                     SmpsEvent::Stop,
                 ],
+                loop_event_index: None,
             }],
             voices: vec![],
         };
@@ -1013,6 +1144,7 @@ mod tests {
     fn test_map_uvb_resolves_from_bundled_bank() {
         let smps = SmpsFile {
             song_label: "UVB_Test".into(),
+            driver_version: 2,
             voice_ref: VoiceRef::Uvb,
             fm_count: 1,
             psg_count: 0,
@@ -1029,6 +1161,7 @@ mod tests {
                     SmpsEvent::Note { pitch: 0xB1, duration: 0x18 },
                     SmpsEvent::Stop,
                 ],
+                loop_event_index: None,
             }],
             voices: vec![],
         };

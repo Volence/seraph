@@ -32,6 +32,7 @@ if (t.color.channel) for (const [k, val] of Object.entries(t.color.channel)) pus
 // fonts
 push("font-ui", t.type.font.ui);
 push("font-mono", t.type.font.mono);
+// type.weight intentionally omitted — weights are used as literal numbers in CSS.
 // type scale
 for (const [k, s] of Object.entries(t.type.scale)) { push(`fs-${k}`, s.size); push(`lh-${k}`, s.line); }
 // space + radius
@@ -65,10 +66,15 @@ ${ALIASES}
 }
 `;
 
-writeFileSync(OUT, css);
-
-// self-check: required vars must be present
-const required = ["--surface-void", "--surface", "--accent", "--text-hi", "--success", "--channel-fm", "--bg-app", "--accent-fm"];
+// self-check: required vars must be present (before we write anything)
+const required = [
+  "--surface-void", "--surface", "--surface-raised", "--surface-overlay",
+  "--accent", "--text-hi", "--text-lo", "--text-faint",
+  "--success", "--channel-fm", "--channel-psg", "--channel-dac",
+  "--bg-app", "--accent-fm",
+];
 const missing = required.filter((r) => !css.includes(`${r}:`));
 if (missing.length) { console.error("gen-theme: MISSING vars:", missing); process.exit(1); }
+
+writeFileSync(OUT, css);
 console.log(`gen-theme: wrote src/theme/tokens.css (${v.length} tokens + aliases)`);

@@ -71,7 +71,7 @@
 
 .item.selected {
   background: var(--bg-surface);
-  border-left: 2px solid var(--accent-fm);
+  border-left: 2px solid var(--accent);
   padding-left: 18px;
 }
 

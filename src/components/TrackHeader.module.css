@@ -15,7 +15,7 @@
 
 .header.selected {
   background: var(--bg-surface);
-  border-left: 3px solid var(--accent-fm);
+  border-left: 3px solid var(--accent);
   padding-left: 5px;
 }
 

@@ -24,7 +24,7 @@
 .btn.active {
   background: var(--accent);
   color: var(--surface-void);
-  border-color: var(--accent-fm);
+  border-color: var(--accent);
 }
 
 .position {

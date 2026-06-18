@@ -1,0 +1,23 @@
+/* src/components/StatusBar.module.css */
+.statusBar {
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--text-lo);
+  font-family: var(--font-mono);
+}
+
+.aether {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diamond {
+  color: var(--text-faint);
+}

@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import type { SongMetadata, SelectedInstrument, SelectedRegion } from "./types/model";
 import * as ipc from "./api/ipc";
 import { TopBar } from "./components/TopBar";
+import { SpectrumAnalyzer } from "./components/SpectrumAnalyzer";
 import { MainArea } from "./components/MainArea";
 import { BottomPanel } from "./components/BottomPanel";
+import { StatusBar } from "./components/StatusBar";
 import { NewProjectDialog } from "./components/NewProjectDialog";
+import { ImportDialog } from "./components/ImportDialog";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -21,6 +24,7 @@ export default function App() {
     | null
   >(null);
   const [importWarnings, setImportWarnings] = useState<ipc.ImportWarning[] | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const projectOpen = projectMeta !== null;
 
@@ -114,41 +118,14 @@ export default function App() {
     }
   }
 
-  async function handleImport() {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const sourcePath = await open({
-      title: "Select SMPS Assembly File",
-      filters: [{ name: "SMPS Assembly", extensions: ["asm"] }],
-    });
-    if (!sourcePath) return;
-
-    const parentDir = await open({
-      directory: true,
-      title: "Choose Where to Save Imported Project",
-    });
-    if (!parentDir) return;
-
-    const dacDir = await open({
-      directory: true,
-      title: "Select DAC Samples Directory (optional — e.g. skdisasm/Sound/DAC/)",
-    });
-
-    try {
-      if (projectOpen) await ipc.closeProject();
-      setPlaying(false);
-
-      const result = await ipc.importSong(sourcePath as string, parentDir as string, dacDir as string | undefined);
-      const song = await ipc.openProject(result.projectDir);
-      setProjectMeta(song.metadata);
-      setSelectedInstrument(null);
-      setSelectedRegions([]);
-
-      if (result.warnings.length > 0) {
-        setImportWarnings(result.warnings);
-      }
-    } catch (e: any) {
-      console.error("Import failed:", e);
-      alert(`Import failed: ${e?.message ?? e}`);
+  function handleImported(meta: SongMetadata, warnings: ipc.ImportWarning[]) {
+    setPlaying(false);
+    setProjectMeta(meta);
+    setSelectedInstrument(null);
+    setSelectedRegions([]);
+    setShowImportDialog(false);
+    if (warnings.length > 0) {
+      setImportWarnings(warnings);
     }
   }
 
@@ -160,13 +137,14 @@ export default function App() {
         onOpenProject={handleOpenProject}
         onSave={handleSave}
         onExport={projectOpen ? handleExport : undefined}
-        onImport={handleImport}
+        onImport={() => setShowImportDialog(true)}
         showSaved={showSaved}
         playing={playing}
         loopEnabled={loopEnabled}
         onPlayingChange={setPlaying}
         onLoopChange={setLoopEnabled}
       />
+      <SpectrumAnalyzer height={100} />
       {exportStatus?.type === "success" && (
         <div className={styles.exportSuccess}>
           Exported {exportStatus.files.length} files
@@ -226,10 +204,18 @@ export default function App() {
           projectMeta={projectMeta!}
         />
       )}
+      <StatusBar />
       {showNewProject && (
         <NewProjectDialog
           onClose={() => setShowNewProject(false)}
           onCreated={handleProjectCreated}
+        />
+      )}
+      {showImportDialog && (
+        <ImportDialog
+          onClose={() => setShowImportDialog(false)}
+          onImported={handleImported}
+          projectOpen={projectOpen}
         />
       )}
     </div>

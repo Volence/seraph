@@ -1,0 +1,36 @@
+/* Static base styles. Variables come from tokens.css (generated). */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  color-scheme: dark;
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+}
+
+#root { height: 100%; }
+
+button { font-family: inherit; font-size: inherit; cursor: pointer; }
+
+input, select {
+  font-family: inherit;
+  font-size: inherit;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+select option { background: var(--bg-panel); color: var(--text-primary); }
+
+/* amber focus ring (interaction accent) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

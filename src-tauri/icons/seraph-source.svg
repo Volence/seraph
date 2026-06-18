@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- deep-space plate -->
+  <rect x="0" y="0" width="1024" height="1024" rx="184" ry="184" fill="#0A0C12"/>
+  <rect x="28" y="28" width="968" height="968" rx="160" ry="160" fill="#12151E"/>
+  <!-- Seraph mark (from design/icons/seraph.svg), amber, strokes thickened for small sizes.
+       Source viewBox is 96x96; scaled to ~690px and centered. -->
+  <g transform="translate(167 167) scale(7.1875)" fill="none" stroke="#FBBF24"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- halo -->
+    <circle cx="48" cy="48" r="42" stroke-width="2"/>
+    <circle cx="48" cy="48" r="38" stroke-width="1.4" opacity="0.30"/>
+    <!-- six wings -->
+    <g stroke-width="2">
+      <path d="M48 30 Q26 22 18 40"/>
+      <path d="M48 30 Q70 22 78 40"/>
+      <path d="M48 46 Q22 44 14 60"/>
+      <path d="M48 46 Q74 44 82 60"/>
+      <path d="M48 62 Q30 66 26 82"/>
+      <path d="M48 62 Q66 66 70 82"/>
+    </g>
+    <!-- feather ribs -->
+    <g stroke-width="1.4" opacity="0.5">
+      <line x1="48" y1="33" x2="30" y2="29"/>
+      <line x1="48" y1="33" x2="66" y2="29"/>
+      <line x1="48" y1="48" x2="26" y2="49"/>
+      <line x1="48" y1="48" x2="70" y2="49"/>
+    </g>
+    <!-- holy flame -->
+    <path d="M48 22 Q42 32 48 42 Q54 32 48 22 Z" stroke-width="2.4"/>
+    <!-- the eye -->
+    <path d="M38 52 Q48 45 58 52 Q48 59 38 52 Z" stroke-width="2"/>
+    <circle cx="48" cy="52" r="3.6" fill="#FBBF24" stroke="none"/>
+    <!-- wing-eyes -->
+    <circle cx="28" cy="40" r="2.4" stroke-width="1.4" opacity="0.5"/>
+    <circle cx="68" cy="40" r="2.4" stroke-width="1.4" opacity="0.5"/>
+  </g>
+</svg>

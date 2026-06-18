@@ -1,6 +1,9 @@
+import { useState, useCallback } from "react";
 import type { SongMetadata } from "../types/model";
 import { TransportControls } from "./TransportControls";
+import * as ipc from "../api/ipc";
 import styles from "./TopBar.module.css";
+import { SeraphMark } from "../assets/SeraphMark";
 
 interface TopBarProps {
   projectMeta: SongMetadata | null;
@@ -29,10 +32,37 @@ export function TopBar({
   onPlayingChange,
   onLoopChange,
 }: TopBarProps) {
+  const [masterVol, setMasterVol] = useState(100);
+  const [exporting, setExporting] = useState(false);
+  const handleMasterVol = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseInt(e.target.value);
+    setMasterVol(v);
+    ipc.setMasterVolume(v / 100);
+  }, []);
+
+  const handleExportWav = useCallback(async () => {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const path = await save({
+      defaultPath: "export.wav",
+      filters: [{ name: "WAV Audio", extensions: ["wav"] }],
+    });
+    if (!path) return;
+    setExporting(true);
+    try {
+      await ipc.exportWav(path, 60);
+      alert(`Exported to ${path}`);
+    } catch (e) {
+      alert(`Export failed: ${e}`);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
   return (
     <div className={styles.topBar}>
       <div className={styles.projectInfo}>
-        <span className={styles.projectName}>{projectMeta?.name ?? "MegaDAW"}</span>
+        <SeraphMark className={styles.mark} />
+        <span className={styles.projectName}>{projectMeta?.name ?? "Seraph"}</span>
         {projectMeta && (
           <>
             <span className={styles.separator}>|</span>
@@ -54,6 +84,11 @@ export function TopBar({
         {onExport && (
           <button className={styles.btn} onClick={onExport}>Export</button>
         )}
+        {projectMeta && (
+          <button className={styles.btn} onClick={handleExportWav} disabled={exporting}>
+            {exporting ? "Rendering..." : "Export WAV"}
+          </button>
+        )}
         {showSaved && <span className={styles.saved}>Saved</span>}
       </div>
       {projectMeta ? (
@@ -71,6 +106,19 @@ export function TopBar({
           <button className={styles.transportBtn} disabled>&#8635;</button>
         </div>
       )}
+      <div className={styles.masterVol}>
+        <span className={styles.masterVolLabel}>Vol</span>
+        <input
+          type="range"
+          min="0"
+          max="150"
+          value={masterVol}
+          onChange={handleMasterVol}
+          className={styles.masterVolSlider}
+          title={`Master: ${masterVol}%`}
+        />
+        <span className={styles.masterVolValue}>{masterVol}%</span>
+      </div>
     </div>
   );
 }

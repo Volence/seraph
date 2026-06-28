@@ -2128,24 +2128,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "megadaw"
-version = "0.1.0"
-dependencies = [
- "cc",
- "cpal",
- "hound",
- "rtrb",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-opener",
- "tempfile",
- "uuid",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3225,6 +3207,25 @@ checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 dependencies = [
  "serde",
  "serde_core",
+]
+
+[[package]]
+name = "seraph"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "cpal",
+ "flate2",
+ "hound",
+ "rtrb",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]

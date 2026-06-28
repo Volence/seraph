@@ -223,7 +223,7 @@ export function ArrangementView({
           onScrollChange={zoom.setScrollLeft}
         />
       </div>
-      <div className={styles.body}>
+      <div className={styles.body} ref={zoom.bodyRef}>
         <div className={styles.headers}>
           {visibleTracks.map((track) => {
             const gh = groupHeads.get(track.id);

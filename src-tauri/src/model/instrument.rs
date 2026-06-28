@@ -36,6 +36,29 @@ pub struct FmOperator {
     pub ssg_eg: u8,
 }
 
+const CARRIER_MASKS: [u8; 8] = [
+    0b0001, 0b0001, 0b0001, 0b0001,
+    0b0101, 0b0111, 0b0111, 0b1111,
+];
+
+impl FmInstrument {
+    pub fn pack_patch(&self) -> [u8; 25] {
+        let mut b = [0u8; 25];
+        let cm = CARRIER_MASKS[self.algorithm as usize];
+        for i in 0..4 {
+            let op = &self.operators[i];
+            b[i]      = (op.detune << 4) | op.multiple;
+            b[4 + i]  = (op.rate_scale << 6) | op.attack_rate;
+            b[8 + i]  = ((op.amp_mod as u8) << 7) | op.d1r;
+            b[12 + i] = op.d2r;
+            b[16 + i] = (op.sustain_level << 4) | op.release_rate;
+            b[20 + i] = op.total_level | if (cm >> i) & 1 == 1 { 0x80 } else { 0 };
+        }
+        b[24] = (self.feedback << 3) | self.algorithm;
+        b
+    }
+}
+
 impl Default for FmOperator {
     fn default() -> Self {
         Self {
@@ -53,6 +76,8 @@ pub struct PsgInstrument {
     pub name: String,
     pub volume_sequence: Vec<u8>,
     pub loop_point: Option<usize>,
+    #[serde(default)]
+    pub silence_on_end: bool,
     pub noise_mode: Option<NoiseMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub smps_envelope_index: Option<u8>,
@@ -123,6 +148,7 @@ mod tests {
             name: "Pluck".into(),
             volume_sequence: vec![15, 14, 12, 10, 8, 6, 4, 2, 0],
             loop_point: Some(5),
+            silence_on_end: true,
             noise_mode: None,
             smps_envelope_index: None,
             metadata: InstrumentMetadata::default(),

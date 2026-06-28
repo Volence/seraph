@@ -55,7 +55,7 @@ impl ProjectManager {
 
         let version = serde_json::json!({ "version": "0.1.0" });
         fs::write(
-            path.join(".megadaw"),
+            path.join(".seraph"),
             serde_json::to_string_pretty(&version).unwrap(),
         )
         .map_err(|e| e.to_string())?;
@@ -86,8 +86,9 @@ impl ProjectManager {
     }
 
     pub fn open(&mut self, path: &Path) -> Result<Song, String> {
-        if !path.join(".megadaw").exists() {
-            return Err("not a MegaDAW project (no .megadaw file)".into());
+        // `.seraph` is the current marker; `.megadaw` is accepted for legacy projects.
+        if !path.join(".seraph").exists() && !path.join(".megadaw").exists() {
+            return Err("not a Seraph project (no .seraph file)".into());
         }
 
         let json = fs::read_to_string(path.join("project.json")).map_err(|e| e.to_string())?;
@@ -601,7 +602,7 @@ impl ProjectManager {
                     arr[..len].copy_from_slice(&vec[..len]);
                     arr
                 } else {
-                    [0u8; 25]
+                    inst.pack_patch()
                 };
                 let ssg_eg = [
                     inst.operators[0].ssg_eg,
@@ -617,6 +618,7 @@ impl ProjectManager {
                     period: 0,
                     envelope: Arc::new(inst.volume_sequence.clone()),
                     loop_point: inst.loop_point,
+                    silence_on_end: inst.silence_on_end,
                 })
             }
             ChannelAssignment::Dac(_) => {
@@ -646,7 +648,7 @@ impl ProjectManager {
                     arr[..len].copy_from_slice(&vec[..len]);
                     arr
                 } else {
-                    [0u8; 25]
+                    inst.pack_patch()
                 };
                 let ssg_eg = [
                     inst.operators[0].ssg_eg,
@@ -662,6 +664,7 @@ impl ProjectManager {
                     period: 0,
                     envelope: Arc::new(inst.volume_sequence.clone()),
                     loop_point: inst.loop_point,
+                    silence_on_end: inst.silence_on_end,
                 })
             }
             ChannelAssignment::Dac(_) => {
@@ -691,7 +694,7 @@ impl ProjectManager {
                     arr[..len].copy_from_slice(&vec[..len]);
                     arr
                 } else {
-                    [0u8; 25]
+                    inst.pack_patch()
                 };
                 let ssg_eg = [
                     inst.operators[0].ssg_eg,
@@ -707,6 +710,7 @@ impl ProjectManager {
                     period: 0,
                     envelope: Arc::new(inst.volume_sequence.clone()),
                     loop_point: inst.loop_point,
+                    silence_on_end: inst.silence_on_end,
                 })
             }
             ChannelAssignment::Dac(_) => {
@@ -911,7 +915,7 @@ mod tests {
     }
 
     fn temp_project_path(name: &str) -> PathBuf {
-        env::temp_dir().join(format!("megadaw_test_{name}_{}", Uuid::new_v4()))
+        env::temp_dir().join(format!("seraph_test_{name}_{}", Uuid::new_v4()))
     }
 
     fn cleanup(path: &Path) {
@@ -925,7 +929,7 @@ mod tests {
 
         mgr.create(&path, "Test Song", "flamedriver", 120.0, (4, 4)).unwrap();
 
-        assert!(path.join(".megadaw").exists());
+        assert!(path.join(".seraph").exists());
         assert!(path.join("project.json").exists());
         assert!(path.join("instruments/fm").is_dir());
         assert!(path.join("instruments/psg").is_dir());
@@ -977,6 +981,7 @@ mod tests {
             name: "Pluck".into(),
             volume_sequence: vec![15, 12, 8, 4, 0],
             loop_point: None,
+            silence_on_end: true,
             noise_mode: None,
             smps_envelope_index: None,
             metadata: InstrumentMetadata::default(),

@@ -32,9 +32,8 @@ function channelLabel(track: Track): string {
 }
 
 function levelColor(pct: number): string {
-  if (pct >= 1.0) return "#f44";
-  if (pct > 0.85) return "#fa0";
-  if (pct > 0.7) return "#ff0";
+  if (pct > 0.95) return "#fa0";
+  if (pct > 0.8) return "#ff0";
   return "#4f4";
 }
 

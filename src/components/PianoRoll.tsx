@@ -34,7 +34,18 @@ const CHANNEL_COLORS: Record<string, string> = {
 const PITCH_RANGES: Record<string, [number, number]> = {
   fm: [24, 106],
   psg: [33, 106],
-  dac: [0, 0],
+  dac: [24, 72],
+};
+
+const DAC_SAMPLE_NAMES: Record<number, string> = {
+  36: "Snare S3", 37: "High Tom", 38: "Mid Tom S3", 39: "Low Tom S3",
+  40: "Floor Tom S3", 41: "Kick S3", 42: "Muffled Snare", 43: "Crash Cymbal",
+  44: "Ride Cymbal", 45: "Low Metal Hit", 46: "Metal Hit", 47: "Hi Metal Hit",
+  48: "Higher Metal", 49: "Mid Metal Hit", 50: "Clap S3", 51: "Elec Hi Tom",
+  52: "Elec Mid Tom", 53: "Elec Lo Tom", 54: "Elec Floor Tom", 55: "Tight Snare",
+  56: "Midpitch Snare", 57: "Loose Snare", 58: "Looser Snare", 59: "Hi Timpani",
+  60: "Lo Timpani", 61: "Mid Timpani", 62: "Quick Loose Snr", 63: "Click",
+  64: "Power Kick",
 };
 
 export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollProps) {
@@ -44,10 +55,24 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const [scrollTop, setScrollTop] = useState(0);
   const ticksPerBeat = 480;
   const gridSnapTicks = Math.round(ticksPerBeat * 4 / GRID_OPTIONS[gridIdx].divisor);
-  const [minPitch, maxPitch] = PITCH_RANGES[region.channelType] || [24, 95];
-  const rowHeight = 14;
+
+  const isDac = region.channelType === "dac";
+  const computedRange = (() => {
+    const [defaultMin, defaultMax] = PITCH_RANGES[region.channelType] || [24, 95];
+    if (notes.length === 0) return [defaultMin, defaultMax] as [number, number];
+    const pitches = notes.map(n => n.pitch);
+    const lo = Math.min(...pitches);
+    const hi = Math.max(...pitches);
+    if (isDac) {
+      return [Math.max(0, lo - 1), hi + 1] as [number, number];
+    }
+    return [Math.min(defaultMin, lo), Math.max(defaultMax, hi)] as [number, number];
+  })();
+  const [minPitch, maxPitch] = computedRange;
+  const drumLabels: Record<number, string> | undefined = isDac ? DAC_SAMPLE_NAMES : undefined;
+  const rowHeight = isDac ? 22 : 14;
   const ticksPerBar = ticksPerBeat * 4;
-  const defaultTpp = region.durationTicks / 800;
+  const defaultTpp = Math.min(region.durationTicks / 800, ticksPerBar * 8 / 800);
   const [ticksPerPixel, setTicksPerPixel] = useState(defaultTpp);
   const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
@@ -162,7 +187,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     } else if (region.channelType === "psg") {
       await ipc.previewPsgInstrument(track.instrumentId, pitch);
     } else {
-      await ipc.previewDac(track.instrumentId);
+      const dacNote = notes.find(n => n.pitch === pitch && n.instrumentId);
+      const dacInstId = dacNote?.instrumentId ?? track.instrumentId;
+      if (dacInstId) await ipc.previewDac(dacInstId);
     }
   }
 
@@ -212,6 +239,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           rowHeight={rowHeight}
           scrollTop={scrollTop}
           onAudition={handleAudition}
+          drumLabels={drumLabels}
         />
         <PianoRollCanvas
           notes={notes}

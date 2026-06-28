@@ -50,4 +50,7 @@ extern "C" {
 
     /// Read a byte from the chip (status register etc.).
     pub fn OPN2_Read(chip: *mut ym3438_t, port: c_uint) -> u8;
+
+    /// Read summed per-channel outputs with panning (bypasses DAC time-multiplexing).
+    pub fn OPN2_ReadChannels(chip: *mut ym3438_t, left: *mut i16, right: *mut i16);
 }

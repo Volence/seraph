@@ -314,6 +314,7 @@ mod tests {
             name: "Bad".into(),
             volume_sequence: vec![],
             loop_point: None,
+            silence_on_end: true,
             noise_mode: None,
             smps_envelope_index: None,
             metadata: InstrumentMetadata::default(),

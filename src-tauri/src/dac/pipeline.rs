@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_import_wav_file() {
-        let dir = std::env::temp_dir().join(format!("megadaw_wav_test_{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("seraph_wav_test_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let wav_path = dir.join("test.wav");
 
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_import_wav_stereo_to_mono() {
-        let dir = std::env::temp_dir().join(format!("megadaw_stereo_test_{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("seraph_stereo_test_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let wav_path = dir.join("stereo.wav");
 

@@ -1425,3 +1425,17 @@ Bit8u OPN2_Read(ym3438_t *chip, Bit32u port)
     }
     return 0;
 }
+
+void OPN2_ReadChannels(ym3438_t *chip, Bit16s *left, Bit16s *right)
+{
+    Bit16s l = 0, r = 0;
+    Bit32u i;
+    for (i = 0; i < 6; i++)
+    {
+        Bit16s out = chip->ch_out[i];
+        if (chip->pan_l[i]) l += out;
+        if (chip->pan_r[i]) r += out;
+    }
+    *left = l;
+    *right = r;
+}

@@ -17,6 +17,7 @@ pub enum AudioCommand {
     TransportClearLoop,
     LoadSequence { snapshot: crate::sequencer::SequencerSnapshot },
     ReloadSequence { snapshot: crate::sequencer::SequencerSnapshot },
+    SetMasterVolume { volume: f32 },
 }
 
 #[cfg(test)]

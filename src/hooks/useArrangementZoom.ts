@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 interface ZoomState {
   ticksPerPixel: number;
   scrollLeft: number;
   setScrollLeft: (v: number) => void;
   handleWheel: (e: React.WheelEvent) => void;
+  bodyRef: React.RefObject<HTMLDivElement | null>;
   tickToPixel: (tick: number) => number;
   pixelToTick: (px: number) => number;
 }
@@ -14,6 +15,22 @@ export function useArrangementZoom(ticksPerBeat: number): ZoomState {
   const defaultTicksPerPixel = (ticksPerBar * 16) / 1200;
   const [ticksPerPixel, setTicksPerPixel] = useState(defaultTicksPerPixel);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const ticksPerBarRef = useRef(ticksPerBar);
+  ticksPerBarRef.current = ticksPerBar;
+
+  // Non-passive wheel listener on the scrollable body to block native scroll during Ctrl+zoom
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -43,5 +60,5 @@ export function useArrangementZoom(ticksPerBeat: number): ZoomState {
     [ticksPerPixel, scrollLeft],
   );
 
-  return { ticksPerPixel, scrollLeft, setScrollLeft, handleWheel, tickToPixel, pixelToTick };
+  return { ticksPerPixel, scrollLeft, setScrollLeft, handleWheel, bodyRef, tickToPixel, pixelToTick };
 }

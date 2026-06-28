@@ -1,4 +1,5 @@
 pub mod smps;
+pub mod vgm;
 
 use serde::Serialize;
 

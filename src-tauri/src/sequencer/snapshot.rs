@@ -12,7 +12,7 @@ pub enum ChannelType {
 #[derive(Debug, Clone)]
 pub enum InstrumentData {
     FmPatch { bytes: [u8; 25], ssg_eg: [u8; 4] },
-    PsgEnvelope { period: u16, envelope: Arc<Vec<u8>>, loop_point: Option<usize> },
+    PsgEnvelope { period: u16, envelope: Arc<Vec<u8>>, loop_point: Option<usize>, silence_on_end: bool },
     DacSample { samples: Arc<Vec<u8>>, sample_rate: u32 },
 }
 

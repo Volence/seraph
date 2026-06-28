@@ -28,7 +28,7 @@ export function MainArea({
   if (!projectOpen || !projectMeta) {
     return (
       <div className={styles.welcome}>
-        <h1 className={styles.title}>MegaDAW</h1>
+        <h1 className={styles.title}>Seraph</h1>
         <p className={styles.subtitle}>Mega Drive Digital Audio Workstation</p>
         <div className={styles.welcomeActions}>
           <button className={styles.welcomeBtn} onClick={onNewProject}>New Project</button>

@@ -1,6 +1,10 @@
+pub mod fm_formats;
 pub mod psg_envelopes;
 pub mod smps_mapper;
 pub mod smps_parser;
+pub mod vgm_import;
+pub mod zyrinx_mapper;
+pub mod zyrinx_parser;
 
 use serde::Serialize;
 
@@ -19,6 +23,63 @@ pub struct ImportResult {
 pub struct ImportWarning {
     pub channel: String,
     pub message: String,
+}
+
+pub fn import_zyrinx_rom(
+    rom_path: &std::path::Path,
+    parent_dir: &std::path::Path,
+    game_id: u8,
+) -> Result<ImportResult, String> {
+    let rom = std::fs::read(rom_path)
+        .map_err(|e| format!("failed to read ROM {}: {e}", rom_path.display()))?;
+
+    let zy = zyrinx_parser::parse_zyrinx_song(&rom, game_id)?;
+    let mapped = zyrinx_mapper::map_zyrinx_to_song(&zy);
+    let song = mapped.song;
+
+    let dir_name = zyrinx_parser::GAME_SONG_NAMES
+        .get(game_id as usize)
+        .unwrap_or(&"Zyrinx Import")
+        .replace(' ', "_");
+    let project_dir = parent_dir.join(&dir_name);
+
+    std::fs::create_dir_all(&project_dir)
+        .map_err(|e| format!("create dir {}: {e}", project_dir.display()))?;
+    std::fs::create_dir_all(project_dir.join("instruments/fm")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("instruments/psg")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("instruments/dac")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(project_dir.join("exports")).map_err(|e| e.to_string())?;
+
+    let version = serde_json::json!({ "version": "0.1.0" });
+    std::fs::write(
+        project_dir.join(".seraph"),
+        serde_json::to_string_pretty(&version).unwrap(),
+    ).map_err(|e| e.to_string())?;
+
+    let project_file = crate::model::song::ProjectFile {
+        metadata: song.metadata.clone(),
+        tracks: song.tracks.clone(),
+    };
+    let json = serde_json::to_string_pretty(&project_file).map_err(|e| e.to_string())?;
+    std::fs::write(project_dir.join("project.json"), json).map_err(|e| e.to_string())?;
+
+    let mut instrument_count = 0;
+    for inst in &song.instruments.fm {
+        let json = serde_json::to_string_pretty(inst).map_err(|e| e.to_string())?;
+        std::fs::write(
+            project_dir.join(format!("instruments/fm/{}.json", inst.id)),
+            json,
+        ).map_err(|e| e.to_string())?;
+        instrument_count += 1;
+    }
+
+    Ok(ImportResult {
+        project_dir: project_dir.to_string_lossy().into_owned(),
+        metadata: song.metadata,
+        track_count: song.tracks.len(),
+        instrument_count,
+        warnings: mapped.warnings,
+    })
 }
 
 pub fn import_smps_file(
@@ -57,7 +118,7 @@ pub fn import_smps_file_with_dac(
 
     let version = serde_json::json!({ "version": "0.1.0" });
     std::fs::write(
-        project_dir.join(".megadaw"),
+        project_dir.join(".seraph"),
         serde_json::to_string_pretty(&version).unwrap(),
     ).map_err(|e| e.to_string())?;
 
@@ -126,7 +187,7 @@ mod tests {
         let project_dir = PathBuf::from(&result.project_dir);
 
         assert!(project_dir.join("project.json").exists());
-        assert!(project_dir.join(".megadaw").exists());
+        assert!(project_dir.join(".seraph").exists());
         assert!(project_dir.join("instruments/fm").exists());
         assert!(result.track_count >= 9);
         assert!(result.instrument_count > 0);
@@ -1349,5 +1410,80 @@ mod tests {
             rt_fm.len(),
             "FM channel count must survive roundtrip"
         );
+    }
+
+    #[test]
+    fn test_import_zyrinx_batman_main_title() {
+        let rom_path = std::path::PathBuf::from(
+            "/home/volence/sonic_hacks/The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md"
+        );
+        if !rom_path.exists() {
+            eprintln!("Batman ROM not found, skipping Zyrinx test");
+            return;
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+        let result = super::import_zyrinx_rom(&rom_path, tmp.path(), 1).unwrap();
+        let project_dir = PathBuf::from(&result.project_dir);
+
+        assert!(project_dir.join("project.json").exists());
+        assert!(project_dir.join(".seraph").exists());
+        assert!(project_dir.join("instruments/fm").exists());
+        assert!(result.track_count >= 1);
+        assert!(result.instrument_count > 0);
+
+        eprintln!("=== Zyrinx Import: {} ===", result.metadata.name);
+        eprintln!("  BPM: {:.1}", result.metadata.tempo);
+        eprintln!("  Tracks: {}", result.track_count);
+        eprintln!("  FM Instruments: {}", result.instrument_count);
+        eprintln!("  Warnings: {}", result.warnings.len());
+        for w in &result.warnings {
+            eprintln!("    [{}] {}", w.channel, w.message);
+        }
+
+        let json = std::fs::read_to_string(project_dir.join("project.json")).unwrap();
+        let pf: crate::model::song::ProjectFile = serde_json::from_str(&json).unwrap();
+        assert_eq!(pf.metadata.driver_id, "zyrinx");
+
+        let total_notes: usize = pf.tracks.iter()
+            .flat_map(|t| t.regions.iter())
+            .map(|r| r.notes.len())
+            .sum();
+        eprintln!("  Total notes: {}", total_notes);
+        assert!(total_notes > 0, "imported song must have notes");
+    }
+
+    #[test]
+    fn test_import_all_zyrinx_songs() {
+        let rom_path = std::path::PathBuf::from(
+            "/home/volence/sonic_hacks/The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md"
+        );
+        if !rom_path.exists() {
+            eprintln!("Batman ROM not found, skipping Zyrinx batch test");
+            return;
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+        for game_id in 1u8..20 {
+            let result = super::import_zyrinx_rom(&rom_path, tmp.path(), game_id);
+            match result {
+                Ok(r) => {
+                    let notes: usize = {
+                        let json = std::fs::read_to_string(
+                            PathBuf::from(&r.project_dir).join("project.json")
+                        ).unwrap();
+                        let pf: crate::model::song::ProjectFile = serde_json::from_str(&json).unwrap();
+                        pf.tracks.iter().flat_map(|t| t.regions.iter()).map(|r| r.notes.len()).sum()
+                    };
+                    eprintln!(
+                        "[{:02}] {}: {} tracks, {} instruments, {} notes, {} warnings",
+                        game_id, r.metadata.name, r.track_count, r.instrument_count, notes, r.warnings.len()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[{:02}] ERROR: {}", game_id, e);
+                }
+            }
+        }
     }
 }

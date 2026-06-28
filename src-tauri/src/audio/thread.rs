@@ -6,6 +6,7 @@ use rtrb::RingBuffer;
 
 use crate::audio::command::AudioCommand;
 use crate::audio::engine::AudioEngine;
+use crate::audio::spectrum::SpectrumBuffer;
 
 const RING_BUFFER_CAPACITY: usize = 1024;
 
@@ -24,6 +25,7 @@ pub struct AudioThread {
     running: Arc<AtomicBool>,
     position_tick: Arc<AtomicU64>,
     channel_levels: Arc<Vec<AtomicU8>>,
+    spectrum_buffer: Arc<SpectrumBuffer>,
 }
 
 impl AudioThread {
@@ -38,12 +40,10 @@ impl AudioThread {
         let sample_rate = supported_config.sample_rate().0;
         let channels = supported_config.channels() as usize;
 
-        // Use the device's native config but force f32 sample format.
-        // cpal will handle any necessary conversion if the device doesn't natively support f32.
         let stream_config = cpal::StreamConfig {
             channels: supported_config.channels(),
             sample_rate: supported_config.sample_rate(),
-            buffer_size: cpal::BufferSize::Default,
+            buffer_size: cpal::BufferSize::Fixed(1024),
         };
 
         let (producer, mut consumer) = RingBuffer::<AudioCommand>::new(RING_BUFFER_CAPACITY);
@@ -55,6 +55,7 @@ impl AudioThread {
         let mut engine = AudioEngine::new(sample_rate);
         let position_tick = engine.position_tick();
         let channel_levels = engine.channel_levels();
+        let spectrum_buffer = engine.spectrum_buffer();
 
         let err_fn = |err| eprintln!("[AudioThread] stream error: {err}");
 
@@ -92,6 +93,7 @@ impl AudioThread {
             running,
             position_tick,
             channel_levels,
+            spectrum_buffer,
         })
     }
 
@@ -109,6 +111,10 @@ impl AudioThread {
 
     pub fn channel_levels(&self) -> &Arc<Vec<AtomicU8>> {
         &self.channel_levels
+    }
+
+    pub fn spectrum_buffer(&self) -> &Arc<SpectrumBuffer> {
+        &self.spectrum_buffer
     }
 
     /// Signal the audio callback to stop rendering (output silence instead).

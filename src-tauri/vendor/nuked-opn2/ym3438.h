@@ -204,6 +204,7 @@ void OPN2_SetTestPin(ym3438_t *chip, Bit32u value);
 Bit32u OPN2_ReadTestPin(ym3438_t *chip);
 Bit32u OPN2_ReadIRQPin(ym3438_t *chip);
 Bit8u OPN2_Read(ym3438_t *chip, Bit32u port);
+void OPN2_ReadChannels(ym3438_t *chip, Bit16s *left, Bit16s *right);
 
 #ifdef __cplusplus
 }

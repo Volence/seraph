@@ -33,7 +33,7 @@ pub enum SequencerOutput {
     FmWrite(FmRegisterWrite),
     PsgWrite(u8),
     DacPlayback { samples: Arc<Vec<u8>>, sample_rate: u32 },
-    PsgEnvelopeStart { hw_ch: u8, envelope: Arc<Vec<u8>>, loop_point: Option<usize>, volume_atten: u8 },
+    PsgEnvelopeStart { hw_ch: u8, envelope: Arc<Vec<u8>>, loop_point: Option<usize>, volume_atten: u8, silence_on_end: bool },
     PsgEnvelopeStop { hw_ch: u8 },
     FmModulationStart { hw_ch: u8, wait: u8, speed: u8, delta: i8, steps: u8, base_freq: u16 },
     FmModulationStop { hw_ch: u8 },
@@ -326,13 +326,14 @@ impl Sequencer {
         let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127
             + (127u16.saturating_sub(velocity as u16)) * 15 / 127).min(15) as u8;
 
-        if let InstrumentData::PsgEnvelope { envelope, loop_point, .. } = instrument {
+        if let InstrumentData::PsgEnvelope { envelope, loop_point, silence_on_end, .. } = instrument {
             if !envelope.is_empty() {
                 output.push(SequencerOutput::PsgEnvelopeStart {
                     hw_ch,
                     envelope: envelope.clone(),
                     loop_point: *loop_point,
                     volume_atten: vol_atten,
+                    silence_on_end: *silence_on_end,
                 });
                 return;
             }
@@ -340,19 +341,23 @@ impl Sequencer {
         output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | (vol_atten & 0x0F)));
     }
 
-    fn program_psg_noise(&self, noise_reg: u8, volume: u8, velocity: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+    fn program_psg_noise(&mut self, noise_reg: u8, volume: u8, velocity: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
+        // Always re-write the noise register on each note-on.
+        // This resets the SN76489 LFSR, providing proper attack articulation
+        // between consecutive noise notes.
         output.push(SequencerOutput::PsgWrite(noise_reg));
 
         let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127
             + (127u16.saturating_sub(velocity as u16)) * 15 / 127).min(15) as u8;
 
-        if let InstrumentData::PsgEnvelope { envelope, loop_point, .. } = instrument {
+        if let InstrumentData::PsgEnvelope { envelope, loop_point, silence_on_end, .. } = instrument {
             if !envelope.is_empty() {
                 output.push(SequencerOutput::PsgEnvelopeStart {
                     hw_ch: 3,
                     envelope: envelope.clone(),
                     loop_point: *loop_point,
                     volume_atten: vol_atten,
+                    silence_on_end: *silence_on_end,
                 });
                 return;
             }
@@ -390,6 +395,12 @@ impl Sequencer {
                 self.active_notes[ch_idx] = None;
             }
         }
+        for hw_ch in 0..3u8 {
+            output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | 0x0F));
+            output.push(SequencerOutput::PsgEnvelopeStop { hw_ch });
+        }
+        output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | 0x0F));
+        output.push(SequencerOutput::PsgEnvelopeStop { hw_ch: 3 });
     }
 
     fn seek_cursors(&mut self) {

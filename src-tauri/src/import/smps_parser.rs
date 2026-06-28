@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub struct SmpsFile {
     pub song_label: String,
     pub voice_ref: VoiceRef,
+    pub driver_version: u8,
     pub fm_count: u8,
     pub psg_count: u8,
     pub tempo_divider: u8,
@@ -34,6 +35,7 @@ pub struct SmpsChannel {
     pub initial_volume: u8,
     pub psg_envelope: Option<u8>,
     pub events: Vec<SmpsEvent>,
+    pub loop_event_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +51,7 @@ pub enum SmpsEvent {
     ModOff,
     Tie,
     PsgForm(u8),
+    NoteFill(u8),
     Stop,
     Unsupported { name: String },
 }
@@ -70,6 +73,7 @@ struct ChannelHeader {
 struct ParsedHeader {
     song_label: String,
     voice_ref: VoiceRef,
+    driver_version: u8,
     fm_count: u8,
     psg_count: u8,
     tempo_divider: u8,
@@ -145,6 +149,7 @@ fn collect_labels(lines: &[&str]) -> HashMap<String, usize> {
 fn parse_header(lines: &[&str]) -> Result<ParsedHeader, String> {
     let mut song_label = String::new();
     let mut voice_ref = VoiceRef::External(String::new());
+    let mut driver_version = 2u8;
     let mut fm_count = 0u8;
     let mut psg_count = 0u8;
     let mut tempo_divider = 1u8;
@@ -155,6 +160,10 @@ fn parse_header(lines: &[&str]) -> Result<ParsedHeader, String> {
         let trimmed = strip_comment(line).trim();
 
         if trimmed.starts_with("smpsHeaderStartSong") && song_label.is_empty() {
+            let args = extract_macro_args(trimmed, "smpsHeaderStartSong");
+            if let Some(ver) = args.first().and_then(|a| a.trim().parse::<u8>().ok()) {
+                driver_version = ver;
+            }
             for j in (0..i).rev() {
                 let prev = strip_comment(lines[j]).trim();
                 if let Some(label) = try_extract_label(prev) {
@@ -237,6 +246,7 @@ fn parse_header(lines: &[&str]) -> Result<ParsedHeader, String> {
     Ok(ParsedHeader {
         song_label,
         voice_ref,
+        driver_version,
         fm_count,
         psg_count,
         tempo_divider,
@@ -349,10 +359,15 @@ fn parse_macro_line(trimmed: &str, tables: &Tables) -> Option<Vec<SmpsEvent>> {
         return Some(vec![]);
     }
 
+    if trimmed.starts_with("smpsNoteFill") {
+        let args = extract_macro_args(trimmed, "smpsNoteFill");
+        let val = args.first().and_then(|a| parse_hex(a)).unwrap_or(0);
+        return Some(vec![SmpsEvent::NoteFill(val)]);
+    }
+
     let known_skips: &[&str] = &[
         "smpsModChange",
         "smpsModOn",
-        "smpsNoteFill",
         "smpsSetTempoMod",
         "smpsSetTempoDiv",
         "smpsSSGEG",
@@ -387,6 +402,7 @@ fn parse_dcb_tokens(
     data: &str,
     events: &mut Vec<SmpsEvent>,
     current_duration: &mut Option<u8>,
+    last_pitch: &mut Option<u8>,
     _kind: SmpsChannelKind,
     tables: &Tables,
 ) {
@@ -405,6 +421,7 @@ fn parse_dcb_tokens(
             if byte == 0x80 {
                 events.push(SmpsEvent::Rest { duration: dur });
             } else {
+                *last_pitch = Some(byte);
                 events.push(SmpsEvent::Note {
                     pitch: byte,
                     duration: dur,
@@ -416,6 +433,7 @@ fn parse_dcb_tokens(
 
         if let Some(&byte) = tables.dac.get(token) {
             let (dur, consumed) = peek_duration(&tokens, i + 1, current_duration);
+            *last_pitch = Some(byte);
             events.push(SmpsEvent::Note {
                 pitch: byte,
                 duration: dur,
@@ -436,6 +454,7 @@ fn parse_dcb_tokens(
                 if byte == 0x80 {
                     events.push(SmpsEvent::Rest { duration: dur });
                 } else {
+                    *last_pitch = Some(byte);
                     events.push(SmpsEvent::Note {
                         pitch: byte,
                         duration: dur,
@@ -443,6 +462,15 @@ fn parse_dcb_tokens(
                 }
                 i += 1 + consumed;
             } else {
+                // Bare duration byte: in SMPS, this means "replay previous
+                // note with this new duration" (the Z80 driver falls through
+                // to zFinishTrackUpdate with the previous frequency intact).
+                if let Some(pitch) = *last_pitch {
+                    events.push(SmpsEvent::Note {
+                        pitch,
+                        duration: byte,
+                    });
+                }
                 *current_duration = Some(byte);
                 i += 1;
             }
@@ -478,12 +506,14 @@ fn parse_channel_events(
     start_line: usize,
     kind: SmpsChannelKind,
     tables: &Tables,
-) -> Result<Vec<SmpsEvent>, String> {
+) -> Result<(Vec<SmpsEvent>, Option<usize>), String> {
     let mut events = Vec::new();
     let mut current_duration: Option<u8> = None;
+    let mut last_pitch: Option<u8> = None;
     let mut label_positions: HashMap<String, usize> = HashMap::new();
     let mut line_idx = start_line;
     let mut call_stack: Vec<usize> = Vec::new();
+    let mut loop_event_index: Option<usize> = None;
 
     while line_idx < lines.len() {
         let raw = strip_comment(lines[line_idx]);
@@ -495,10 +525,8 @@ fn parse_channel_events(
         }
 
         if trimmed.starts_with("if ") || trimmed == "if" {
-            line_idx += 1;
-            continue;
-        }
-        if trimmed == "else" {
+            // Skip the if-branch (bug-fix code) and take the else-branch
+            // (original ROM behavior) since we're reproducing hardware output.
             let mut depth = 1u32;
             line_idx += 1;
             while line_idx < lines.len() && depth > 0 {
@@ -507,6 +535,10 @@ fn parse_channel_events(
                     depth += 1;
                 } else if inner == "endif" || inner == "endc" {
                     depth -= 1;
+                    if depth == 0 { line_idx += 1; break; }
+                } else if inner == "else" && depth == 1 {
+                    line_idx += 1;
+                    break;
                 }
                 line_idx += 1;
             }
@@ -546,6 +578,7 @@ fn parse_channel_events(
             if let Some(target) = args.first() {
                 if let Some(&target_line) = all_labels.get(target.as_str()) {
                     if target_line <= line_idx {
+                        loop_event_index = label_positions.get(target.as_str()).copied();
                         break;
                     }
                     line_idx = target_line;
@@ -598,7 +631,7 @@ fn parse_channel_events(
                     break;
                 }
             }
-            parse_dcb_tokens(&merged, &mut events, &mut current_duration, kind, tables);
+            parse_dcb_tokens(&merged, &mut events, &mut current_duration, &mut last_pitch, kind, tables);
             continue;
         }
 
@@ -611,7 +644,7 @@ fn parse_channel_events(
         line_idx += 1;
     }
 
-    Ok(events)
+    Ok((events, loop_event_index))
 }
 
 fn build_voice_bytes(
@@ -763,7 +796,7 @@ pub fn parse_smps(source: &str) -> Result<SmpsFile, String> {
             .get(&ch.label)
             .ok_or(format!("channel label not found: {}", ch.label))?;
 
-        let events =
+        let (events, loop_event_index) =
             parse_channel_events(&lines, &all_labels, *start_line, ch.kind, &tables)?;
 
         channels.push(SmpsChannel {
@@ -773,6 +806,7 @@ pub fn parse_smps(source: &str) -> Result<SmpsFile, String> {
             initial_volume: ch.initial_volume,
             psg_envelope: ch.psg_envelope,
             events,
+            loop_event_index,
         });
     }
 
@@ -785,6 +819,7 @@ pub fn parse_smps(source: &str) -> Result<SmpsFile, String> {
     Ok(SmpsFile {
         song_label: header.song_label,
         voice_ref: header.voice_ref,
+        driver_version: header.driver_version,
         fm_count: header.fm_count,
         psg_count: header.psg_count,
         tempo_divider: header.tempo_divider,
@@ -1093,6 +1128,7 @@ mod tests {
                     | SmpsEvent::SetModulation { .. }
                     | SmpsEvent::ModOff
                     | SmpsEvent::VolumeChange(_)
+                    | SmpsEvent::NoteFill(_)
                     | SmpsEvent::Unsupported { .. } => {}
                 }
             }

@@ -260,6 +260,10 @@ export async function reloadSequence(): Promise<void> {
   return invoke("reload_sequence");
 }
 
+export async function setMasterVolume(volume: number): Promise<void> {
+  return invoke("set_master_volume", { volume });
+}
+
 export async function getPlaybackState(): Promise<PlaybackState> {
   return invoke<PlaybackState>("get_playback_state");
 }
@@ -304,4 +308,36 @@ export interface ImportResult {
 
 export async function importSong(sourcePath: string, parentDir: string, dacDir?: string): Promise<ImportResult> {
   return invoke<ImportResult>("import_song", { sourcePath, parentDir, dacDir: dacDir ?? null });
+}
+
+export async function importZyrinxSong(romPath: string, parentDir: string, gameId: number): Promise<ImportResult> {
+  return invoke<ImportResult>("import_zyrinx_song", { romPath, parentDir, gameId });
+}
+
+export async function importVgm(vgmPath: string, parentDir: string): Promise<ImportResult> {
+  return invoke<ImportResult>("import_vgm", { vgmPath, parentDir });
+}
+
+// --- WAV Export ---
+
+export async function exportWav(outputPath: string, durationSeconds: number): Promise<string> {
+  return invoke<string>("export_wav", { outputPath, durationSeconds });
+}
+
+// --- VGM Export ---
+
+export async function exportVgm(outputPath: string, durationSeconds: number): Promise<string> {
+  return invoke<string>("export_vgm", { outputPath, durationSeconds });
+}
+
+// --- FM File Import ---
+
+export interface FmFileImportResponse {
+  format: string;
+  count: number;
+  ids: string[];
+}
+
+export async function importFmFile(filePath: string): Promise<FmFileImportResponse> {
+  return invoke<FmFileImportResponse>("import_fm_file", { filePath });
 }

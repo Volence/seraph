@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "exodus": {
+      "command": "python3",
+      "args": ["/home/volence/sonic_hacks/Exodus/linux-port/mcp/exodus_mcp.py"]
+    }
+  }
+}

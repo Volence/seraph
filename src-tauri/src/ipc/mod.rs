@@ -26,11 +26,14 @@ pub use commands::{
     add_note, update_note, delete_note,
     // Transport
     transport_play, transport_stop, transport_seek,
-    transport_set_loop, transport_clear_loop, get_playback_state, reload_sequence,
+    transport_set_loop, transport_clear_loop, get_playback_state, reload_sequence, set_master_volume,
     // Validation
     get_channel_overlaps,
     // Export
-    export_song,
+    export_song, export_wav, export_vgm,
     // Import
     import_song,
+    import_zyrinx_song,
+    import_fm_file,
+    import_vgm,
 };

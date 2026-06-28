@@ -1,5 +1,19 @@
 .keys {
-  width: 48px;
   flex-shrink: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.resizeHandle:hover {
+  background: rgba(255, 255, 255, 0.15);
 }

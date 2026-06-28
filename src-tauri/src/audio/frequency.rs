@@ -32,6 +32,40 @@ const PSG_PERIOD_TABLE: [u16; 84] = [
     0x01B,0x01A,0x018,0x017,0x016,0x015,0x013,0x012,0x011,0x010,0x000,0x000,
 ];
 
+pub fn fm_freq_to_midi(block: u8, fnum: u16) -> (u8, i16) {
+    let mut best_idx = 0;
+    let mut best_diff = i32::MAX;
+    for (i, &table_fnum) in FM_FNUM_TABLE.iter().enumerate() {
+        let diff = (fnum as i32 - table_fnum as i32).abs();
+        if diff < best_diff {
+            best_diff = diff;
+            best_idx = i;
+        }
+    }
+    let midi = ((block as u16 + 1) * 12 + best_idx as u16).min(127) as u8;
+    let detune = fnum as i16 - FM_FNUM_TABLE[best_idx] as i16;
+    (midi, detune)
+}
+
+pub fn psg_period_to_midi(period: u16) -> u8 {
+    if period == 0 {
+        return 119;
+    }
+    let mut best_idx = 0;
+    let mut best_diff = u32::MAX;
+    for (i, &table_period) in PSG_PERIOD_TABLE.iter().enumerate() {
+        if table_period == 0 {
+            continue;
+        }
+        let diff = (period as i32 - table_period as i32).unsigned_abs();
+        if diff < best_diff {
+            best_diff = diff;
+            best_idx = i;
+        }
+    }
+    ((best_idx as u16) + 36).min(127) as u8
+}
+
 pub fn midi_to_psg_period(midi_note: u8) -> u16 {
     let idx = midi_note as i16 - 36;
     if idx >= 0 && idx < 84 {
@@ -94,5 +128,46 @@ mod tests {
         let p_low = midi_to_psg_period(48);
         let p_high = midi_to_psg_period(72);
         assert!(p_low > p_high);
+    }
+
+    #[test]
+    fn test_fm_freq_to_midi_a4() {
+        let (midi, detune) = fm_freq_to_midi(4, 1084);
+        assert_eq!(midi, 69);
+        assert_eq!(detune, 0);
+    }
+
+    #[test]
+    fn test_fm_freq_to_midi_c5() {
+        let (midi, detune) = fm_freq_to_midi(4, 644);
+        assert_eq!(midi, 60);
+        assert_eq!(detune, 0);
+    }
+
+    #[test]
+    fn test_fm_freq_to_midi_detuned() {
+        let (midi, detune) = fm_freq_to_midi(4, 650);
+        assert_eq!(midi, 60);
+        assert_eq!(detune, 6);
+    }
+
+    #[test]
+    fn test_psg_period_to_midi_a4() {
+        assert_eq!(psg_period_to_midi(0x0FE), 69);
+    }
+
+    #[test]
+    fn test_psg_period_to_midi_zero() {
+        assert_eq!(psg_period_to_midi(0), 119);
+    }
+
+    #[test]
+    fn test_fm_freq_roundtrip() {
+        for midi_note in 12..=107 {
+            let (block, fnum) = midi_to_fm_freq(midi_note);
+            let (recovered, detune) = fm_freq_to_midi(block, fnum);
+            assert_eq!(recovered, midi_note, "roundtrip failed for MIDI {}", midi_note);
+            assert_eq!(detune, 0, "roundtrip detune nonzero for MIDI {}", midi_note);
+        }
     }
 }

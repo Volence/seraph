@@ -36,6 +36,14 @@ impl Ym2612 {
         buf
     }
 
+    pub fn read_channels(&mut self) -> [i16; 2] {
+        let mut buf = [0i16; 2];
+        unsafe {
+            OPN2_ReadChannels(self.chip.as_mut(), &mut buf[0], &mut buf[1]);
+        }
+        buf
+    }
+
     pub fn read_status(&mut self) -> u8 {
         unsafe { OPN2_Read(self.chip.as_mut(), 0) }
     }

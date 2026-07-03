@@ -16,7 +16,7 @@ guarantee; Aeon-native model / wide import / narrow export; manifest lives in
 
 | # | Package | Deliverables | Status |
 |---|---------|-------------|--------|
-| S0 | **Memra contract** — capability manifest in empyrean, generated-from/validated-against aeon source; Memra naming pass; budget-gate feature flags | spec + plan | **IN PROGRESS** (spec session started 2026-07-03) |
+| S0 | **Memra contract** — capability manifest in empyrean, generated-from/validated-against aeon source; Memra naming pass; budget-gate feature flags | spec + plan | **BANKED** — spec APPROVED (user, 2026-07-03) + plan `plans/2026-07-03-s0-memra-contract.md` |
 | S1 | Aeon-native project model + compiler (project → packer input → MEV) | spec + plan | queued |
 | S2 | Verification gate (export-time oracle/VGM A/B; permanent CI-style) | plan (+ spec §) | queued |
 | S3 | Driver-in-the-loop preview (embedded Z80 + real Memra blob) | spec + plan | queued |

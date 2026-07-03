@@ -33,3 +33,9 @@ designs target the banked specs (normative); manifest flags carry the gates.
 
 - 2026-07-03: Master design + inventory committed (fd14c4b). Queue doc created.
   S0 spec session opened.
+- 2026-07-03: S0 BANKED — spec (c56e1aa) + plan (44520a4). Research: 3-agent pass
+  (aeon extractability ~70% generated / 30% curated; prior art Furnace/LV2/CLAP/
+  MIDI-CI/MDSDRV/Echo/XGM2/Vulkan/Wayland/buf; Seraph DriverProfile trait exists).
+  Plan decisions: curated overlay = Python module (no PyYAML dep); song-header
+  compat byte DEFERRED (zero engine changes); parity-baseline + ROM byte-identity
+  gate the packer refactor.

@@ -50,3 +50,25 @@ designs target the banked specs (normative); manifest flags carry the gates.
   ImportReport everywhere). S6 plan (SFX kind, sfx_transcode byte-parity, header
   form manifest-gated, audition-in-context). QUEUE FULLY BANKED — next: execution
   sessions in order S0->S6 (S0 gates all; engine packages 1-6 still to execute in aeon).
+
+## EXECUTION HANDOFF (cold start — read this first)
+
+For any future session executing this queue:
+1. **Start with S0** — it gates everything Seraph-side. Open its plan, follow
+   the subagent-driven-development skill per the plan header. Each plan is
+   self-contained: exact paths, code, commands, gates.
+2. **Interleaving with the aeon engine queue** (`aeon/docs/superpowers/2026-07-03-sound-banking-queue.md`):
+   Seraph **S0–S3 are executable IMMEDIATELY** — they depend only on the
+   SHIPPED driver (manifest flags mark unshipped features `reserved`).
+   S4 is executable too (reserved features render greyed); only flipping those
+   flags to `shipped` — and S6's full header form — waits on aeon packages
+   1/2/5. After any aeon package lands, regenerate the manifest
+   (`python3 tools/gen_capability_manifest.py`), re-release to empyrean, and
+   flip the affected feature statuses in the curated overlay.
+3. **Standing verification norms** (from repo memory — they bind every plan):
+   sound builds need `SOUND_DRIVER_ENABLED=1 DEBUG=1` (+`SOUND_DEBUG_HOTKEYS=1`
+   for sound testing); oracle = ONE instance, controller-session only (never
+   subagents); verify rendered audio, never register proxies; commit exact
+   paths, never `-A`; never leave master broken.
+4. **User gates:** by-ear passes in S3 Task 5 and S6 Task 4; everything else
+   is mechanical against the written gates.

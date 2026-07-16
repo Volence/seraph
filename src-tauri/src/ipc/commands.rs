@@ -314,11 +314,31 @@ pub fn list_fm_instruments(state: State<'_, ProjectState>) -> Result<Vec<FmInstr
     Ok(mgr.list_fm_instruments().to_vec())
 }
 
-const OP_REG_OFFSETS: [u8; 4] = [0x00, 0x08, 0x04, 0x0C];
-
 fn ym_write_port(thread: &mut AudioThread, port: u8, addr: u8, data: u8) {
     thread.send(AudioCommand::Ym2612Write { port: port as u32, data: addr });
     thread.send(AudioCommand::Ym2612Write { port: (port + 1) as u32, data });
+}
+
+/// Pure register-write generation for the FM preview: `(addr, data)` pairs
+/// programming `inst` onto the given part-I channel (feedback/algorithm,
+/// pan, then per-operator params). Operator slots come from the shared
+/// `PACKED_OP_SLOTS` (operators[0] = Yamaha Op4 carrier → slot +$0C) — the
+/// same table the sequencer programs patches with; a private reversed copy
+/// here once put the carrier on the feedback slot (audition static bug).
+fn fm_preview_writes(inst: &FmInstrument, channel: u8) -> Vec<(u8, u8)> {
+    let mut writes = Vec::with_capacity(26);
+    writes.push((0xB0 + channel, (inst.feedback << 3) | inst.algorithm));
+    writes.push((0xB4 + channel, 0xC0));
+    for (i, op) in inst.operators.iter().enumerate() {
+        let slot = PACKED_OP_SLOTS[i] + channel;
+        writes.push((0x30 + slot, (op.detune << 4) | op.multiple));
+        writes.push((0x40 + slot, op.total_level));
+        writes.push((0x50 + slot, (op.rate_scale << 6) | op.attack_rate));
+        writes.push((0x60 + slot, ((op.amp_mod as u8) << 7) | op.d1r));
+        writes.push((0x70 + slot, op.d2r));
+        writes.push((0x80 + slot, (op.sustain_level << 4) | op.release_rate));
+    }
+    writes
 }
 
 /// Stateless FM preview: program the patch onto channel 0 and key on.
@@ -331,17 +351,8 @@ fn do_preview_fm(audio_state: &AudioState, inst: &FmInstrument, midi_note: u8) -
 
     thread.send(AudioCommand::FmKeyOff { channel: ch });
 
-    ym_write_port(&mut thread, port, 0xB0 + ch, (inst.feedback << 3) | inst.algorithm);
-    ym_write_port(&mut thread, port, 0xB4 + ch, 0xC0);
-
-    for (i, op) in inst.operators.iter().enumerate() {
-        let slot = OP_REG_OFFSETS[i] + ch;
-        ym_write_port(&mut thread, port, 0x30 + slot, (op.detune << 4) | op.multiple);
-        ym_write_port(&mut thread, port, 0x40 + slot, op.total_level);
-        ym_write_port(&mut thread, port, 0x50 + slot, (op.rate_scale << 6) | op.attack_rate);
-        ym_write_port(&mut thread, port, 0x60 + slot, ((op.amp_mod as u8) << 7) | op.d1r);
-        ym_write_port(&mut thread, port, 0x70 + slot, op.d2r);
-        ym_write_port(&mut thread, port, 0x80 + slot, (op.sustain_level << 4) | op.release_rate);
+    for (addr, data) in fm_preview_writes(inst, ch) {
+        ym_write_port(&mut thread, port, addr, data);
     }
 
     let (block, fnum) = midi_to_fm_freq(midi_note);
@@ -406,7 +417,7 @@ pub fn library_stop_audition(
 
     let ch: u8 = 0;
     let port: u8 = 0;
-    for &off in &OP_REG_OFFSETS {
+    for &off in &PACKED_OP_SLOTS {
         // SL/RR register ($80+slot): $FF = SL 15, RR 15 (fastest release).
         ym_write_port(&mut thread, port, 0x80 + off + ch, 0xFF);
     }
@@ -1481,4 +1492,129 @@ pub fn library_root_remove(
     }
     state::rescan(&app, &lib);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Asymmetric voice in the shape of S3K LBZ2 voice 00 (alg 3, fb 0,
+    /// carrier TL 0, Op1 TL $2A): per-op values all differ so any slot
+    /// mix-up is detectable.
+    fn lbz2_like() -> FmInstrument {
+        let mut inst = FmInstrument {
+            id: Uuid::nil(),
+            name: "LBZ2 v00".into(),
+            algorithm: 3,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        inst.operators[0].total_level = 0x00; // Yamaha Op4 — the carrier
+        inst.operators[1].total_level = 0x2B;
+        inst.operators[2].total_level = 0x1A;
+        inst.operators[3].total_level = 0x2A; // Yamaha Op1 — feedback op
+        for (i, op) in inst.operators.iter_mut().enumerate() {
+            op.multiple = 1 + i as u8;
+            op.attack_rate = 31 - (i as u8 * 5);
+            op.d1r = 4 + i as u8;
+            op.sustain_level = i as u8;
+            op.release_rate = 7 + i as u8;
+        }
+        inst
+    }
+
+    #[test]
+    fn test_fm_preview_carrier_lands_on_slot_0c() {
+        let writes = fm_preview_writes(&lbz2_like(), 0);
+        // operators[0] (the carrier, Yamaha Op4) → TL register $40 + $0C.
+        assert!(
+            writes.contains(&(0x40 + 0x0C, 0x00)),
+            "carrier TL must be written to slot +$0C, got: {writes:02x?}"
+        );
+        // operators[3] (Yamaha Op1, the feedback operator) → TL $40 + $00.
+        assert!(
+            writes.contains(&(0x40 + 0x00, 0x2A)),
+            "Op1 TL must be written to slot +$00, got: {writes:02x?}"
+        );
+    }
+
+    /// Drift guard: the preview's register map must equal what the SEQUENCER
+    /// programs for the same instrument (full volume/velocity so carrier TL
+    /// scaling is a no-op). Reconstructs the sequencer's map from its real
+    /// port-0 (address latch) / port-1 (data) write stream, last write wins.
+    #[test]
+    fn test_fm_preview_matches_sequencer_patch_programming() {
+        use crate::sequencer::{
+            ChannelSequence, ChannelType, InstrumentData, Sequencer, SequencerEvent,
+            SequencerOutput, SequencerSnapshot,
+        };
+        use std::collections::HashMap;
+
+        let inst = lbz2_like();
+        let preview: HashMap<u8, u8> = fm_preview_writes(&inst, 0).into_iter().collect();
+
+        let snapshot = SequencerSnapshot {
+            tempo_bpm: 120.0,
+            ticks_per_beat: 480,
+            loop_start: None,
+            loop_end: None,
+            channels: vec![ChannelSequence {
+                channel_type: ChannelType::Fm(0),
+                volume: 127,
+                pan: 0xC0,
+                modulation: None,
+                noise_reg: 0xE4,
+                events: vec![
+                    SequencerEvent::NoteOn {
+                        tick: 0,
+                        pitch: 60,
+                        velocity: 127,
+                        detune: 0,
+                        duration_ticks: 480,
+                        instrument: InstrumentData::FmPatch {
+                            bytes: inst.pack_patch(),
+                            ssg_eg: [0; 4],
+                        },
+                        modulation: None,
+                        pan_override: None,
+                    },
+                    SequencerEvent::NoteOff { tick: 480, pitch: 60 },
+                ],
+                overlaps: vec![],
+            }],
+        };
+        let mut seq = Sequencer::new(44100);
+        seq.load_snapshot(snapshot);
+        seq.play();
+        let mut out = Vec::new();
+        for _ in 0..100 {
+            seq.advance(&mut out);
+        }
+
+        let mut seq_map: HashMap<u8, u8> = HashMap::new();
+        let mut latched_addr: Option<u8> = None;
+        for o in &out {
+            if let SequencerOutput::FmWrite(w) = o {
+                match w.port {
+                    0 => latched_addr = Some(w.data),
+                    1 => {
+                        if let Some(a) = latched_addr.take() {
+                            seq_map.insert(a, w.data);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for (addr, data) in &preview {
+            assert_eq!(
+                seq_map.get(addr),
+                Some(data),
+                "register {addr:#04x}: preview wrote {data:#04x}, sequencer wrote {:?} — op-slot mapping drifted",
+                seq_map.get(addr),
+            );
+        }
+    }
 }

@@ -45,6 +45,20 @@ const CARRIER_MASKS: [u8; 8] = [
     0b0101, 0b0111, 0b0111, 0b1111,
 ];
 
+/// YM2612 register slot offset for `FmInstrument::operators[i]`.
+///
+/// Seraph stores operators in SMPS macro-argument order — the REVERSE of
+/// Yamaha documentation order: `operators[0]` is Yamaha Op4 (the algorithm's
+/// primary carrier, hardware slot +$0C) down to `operators[3]` = Yamaha Op1
+/// (the feedback operator, slot +$00). Add the per-channel offset (0..=2) to
+/// form the low bits of the register address.
+///
+/// SINGLE AUTHORITY: the sequencer, VGM export and the IPC FM preview all
+/// program operators through this table. A private reversed copy in the
+/// preview path was the "FM audition static" bug (carrier programmed into
+/// the feedback slot) — do not re-derive this mapping locally.
+pub const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
+
 impl FmInstrument {
     pub fn pack_patch(&self) -> [u8; 25] {
         let mut b = [0u8; 25];

@@ -3,12 +3,8 @@ pub mod snapshot;
 pub use snapshot::*;
 
 use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
+use crate::model::instrument::PACKED_OP_SLOTS;
 use std::sync::Arc;
-
-// operators[0..3] = SMPS op1..op4 (macro arg order, NOT binary byte order).
-// S3K binary is [op4,op3,op2,op1]; Z80 register table [$30,$38,$34,$3C] maps:
-//   op1→$3C(+$0C), op2→$34(+$04), op3→$38(+$08), op4→$30(+$00).
-const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
 
 pub struct Sequencer {
     snapshot: SequencerSnapshot,

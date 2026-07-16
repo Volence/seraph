@@ -5,7 +5,7 @@ use crate::model::song::*;
 const VGM_SAMPLE_RATE: f64 = 44100.0;
 const SN76489_CLOCK: u32 = 3_579_545;
 const YM2612_CLOCK: u32 = 7_670_454;
-const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
+// PACKED_OP_SLOTS comes from `crate::model::instrument` (glob-imported above).
 
 pub struct VgmWriter {
     data: Vec<u8>,

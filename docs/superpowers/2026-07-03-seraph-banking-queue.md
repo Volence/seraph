@@ -65,6 +65,25 @@ designs target the banked specs (normative); manifest flags carry the gates.
   test. Two-stage review (spec ✅ + quality ✅). Merged to `main` (`437841e`),
   cargo test 180 pass, `npm run build` green. S1 Tasks 2–8 remain DEFERRED
   (blocked on the parked S0 manifest). Resume S0 when the sound format settles.
+- 2026-07-16: INSTRUMENT LIBRARY SHIPPED (independent of the parked S-queue;
+  spec + plan in docs/superpowers/{specs,plans}/2026-07-16-instrument-library*).
+  Merged to main (`1799c3c`, 26 commits). Shipped: default pack (571→606
+  entries: Sonic 2 123 FM, S3K 229 FM incl. the 35-voice UVB, Batman & Robin
+  212 FM via the zyrinx importer, 42 shape-tagged PSG presets); full browser
+  panel (search/filters/tags/favorites/warnings, detail card w/ op grid + PSG
+  sparkline, per-note PianoKeys audition); sha256 content-hash identity +
+  idempotent extraction CLI (smps/uvb/gyb/zyrinx/psg-table); drag-to-track
+  swap (hash-reuse); import recognition (imported voices auto-named from the
+  library by hash); save-from-project; first frontend test infra (vitest/RTL).
+  NOTABLE: by-ear testing root-caused and fixed a PRE-EXISTING audio bug —
+  the FM preview path wrote operators in reverse slot order vs the sequencer
+  (`OP_REG_OFFSETS` vs `PACKED_OP_SLOTS`, now one shared authority in
+  model/instrument.rs) — every FM audition/preview before this played wrong;
+  also fixed drag-swap inaudibility (per-note instrument_id precedence) and
+  a Wayland Error 71 crash (compositing disabled in main.rs). Deferrals
+  recorded: LBZ1.asm voices (channel-label parse failure, 1 song),
+  Sub-Terrania/Red Zone parser extension, DAC samples (library v2),
+  PSG preset name curation, keyboard/touch audition, list virtualization.
 
 ## EXECUTION HANDOFF (cold start — read this first)
 

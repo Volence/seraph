@@ -7,6 +7,9 @@ use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
 use crate::audio::{AudioCommand, AudioThread};
 use crate::dac;
 use crate::export::{ExportResult, ExportError};
+use crate::library::entry::{content_hash, LibraryEntryFile, LibraryInstrument, Provenance, LIBRARY_SCHEMA};
+use crate::library::state::{self, LibraryState, RootInfo};
+use crate::library::store::{self, LibraryFilter, LibraryListEntry};
 use crate::model::driver::{ChannelLayout, DriverFeature};
 use crate::model::instrument::*;
 use crate::model::song::{Song, SongMetadata};
@@ -318,22 +321,9 @@ fn ym_write_port(thread: &mut AudioThread, port: u8, addr: u8, data: u8) {
     thread.send(AudioCommand::Ym2612Write { port: (port + 1) as u32, data });
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn preview_fm_instrument(
-    audio_state: State<'_, AudioState>,
-    project_state: State<'_, ProjectState>,
-    id: String,
-    midi_note: u8,
-) -> Result<(), String> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
-    let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-    let inst = mgr
-        .get_fm_instrument(&uuid)
-        .ok_or("FM instrument not found")?
-        .clone();
-    drop(mgr);
-
+/// Stateless FM preview: program the patch onto channel 0 and key on.
+/// Shared by the project preview command and the library audition command.
+fn do_preview_fm(audio_state: &AudioState, inst: &FmInstrument, midi_note: u8) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
 
     let ch: u8 = 0;
@@ -363,6 +353,25 @@ pub fn preview_fm_instrument(
     thread.send(AudioCommand::FmKeyOn { channel: ch, operators: 0xF0 });
 
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn preview_fm_instrument(
+    audio_state: State<'_, AudioState>,
+    project_state: State<'_, ProjectState>,
+    id: String,
+    midi_note: u8,
+) -> Result<(), String> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let inst = mgr
+        .get_fm_instrument(&uuid)
+        .ok_or("FM instrument not found")?
+        .clone();
+    drop(mgr);
+
+    do_preview_fm(&audio_state, &inst, midi_note)
 }
 
 #[tauri::command]
@@ -415,6 +424,24 @@ pub fn list_psg_instruments(state: State<'_, ProjectState>) -> Result<Vec<PsgIns
     Ok(mgr.list_psg_instruments().to_vec())
 }
 
+/// Stateless PSG preview: envelope playback on channel 0.
+/// Shared by the project preview command and the library audition command.
+fn do_preview_psg(audio_state: &AudioState, inst: &PsgInstrument, midi_note: u8) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+
+    let period = midi_to_psg_period(midi_note);
+    let channel: u8 = 0;
+
+    thread.send(AudioCommand::PsgEnvelopePreview {
+        channel,
+        period,
+        envelope: Arc::new(inst.volume_sequence.clone()),
+        loop_point: inst.loop_point,
+    });
+
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn preview_psg_instrument(
@@ -431,19 +458,7 @@ pub fn preview_psg_instrument(
         .clone();
     drop(mgr);
 
-    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-
-    let period = midi_to_psg_period(midi_note);
-    let channel: u8 = 0;
-
-    thread.send(AudioCommand::PsgEnvelopePreview {
-        channel,
-        period,
-        envelope: Arc::new(inst.volume_sequence),
-        loop_point: inst.loop_point,
-    });
-
-    Ok(())
+    do_preview_psg(&audio_state, &inst, midi_note)
 }
 
 // --- DAC Instrument CRUD ---
@@ -1113,4 +1128,226 @@ pub fn import_vgm(
     let path = std::path::PathBuf::from(&vgm_path);
     let parent = std::path::PathBuf::from(&parent_dir);
     crate::import::vgm_import::import_vgm_file(&path, &parent)
+}
+
+// --- Instrument Library ---
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_list(
+    lib: State<'_, LibraryState>,
+    filter: LibraryFilter,
+) -> Result<Vec<LibraryListEntry>, String> {
+    let idx = lib.index.lock().unwrap();
+    let ov = lib.overrides.lock().unwrap();
+    let all: Vec<LibraryListEntry> = idx.iter().map(|e| store::to_list_entry(e, &ov)).collect();
+    Ok(store::apply_filter(&all, &filter))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_games(lib: State<'_, LibraryState>) -> Result<Vec<String>, String> {
+    let idx = lib.index.lock().unwrap();
+    let mut games: Vec<String> = idx.iter().map(|e| e.file.provenance.game.clone()).collect();
+    games.sort();
+    games.dedup();
+    Ok(games)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_rescan(app: tauri::AppHandle, lib: State<'_, LibraryState>) -> Result<u32, String> {
+    state::rescan(&app, &lib);
+    Ok(lib.index.lock().unwrap().len() as u32)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_audition(
+    audio_state: State<'_, AudioState>,
+    lib: State<'_, LibraryState>,
+    hash: String,
+    midi_note: u8,
+) -> Result<(), String> {
+    let idx = lib.index.lock().unwrap();
+    let e = idx.iter().find(|e| e.file.provenance.hash == hash)
+        .ok_or("library entry not found")?;
+    match &e.file.instrument {
+        LibraryInstrument::Fm(i) => do_preview_fm(&audio_state, i, midi_note),
+        LibraryInstrument::Psg(i) => do_preview_psg(&audio_state, i, midi_note),
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_add_to_project(
+    state_proj: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    hash: String,
+) -> Result<String, String> {
+    let inst = {
+        let idx = lib.index.lock().unwrap();
+        idx.iter().find(|e| e.file.provenance.hash == hash)
+            .map(|e| e.file.instrument.clone())
+            .ok_or("library entry not found")?
+    };
+    // Reuse the existing add paths (they assign fresh UUIDs + mark dirty) —
+    // same manager acquisition as add_fm_instrument / add_psg_instrument.
+    let mut mgr = state_proj.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    match inst {
+        LibraryInstrument::Fm(i) => {
+            let id = mgr.add_fm_instrument(i);
+            Ok(id.to_string())
+        }
+        LibraryInstrument::Psg(i) => {
+            let id = mgr.add_psg_instrument(i);
+            Ok(id.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_save_from_project(
+    app: tauri::AppHandle,
+    state_proj: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    kind: String,
+    id: String,
+    name: Option<String>,
+    tags: Vec<String>,
+) -> Result<String, String> {
+    // Fetch the instrument from the ProjectManager by kind+id (same lookup
+    // shape as update_fm_instrument: parse UUID, lock manager, find by id).
+    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let instrument = {
+        let mgr = state_proj.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+        match kind.as_str() {
+            "fm" => {
+                let mut i = mgr
+                    .get_fm_instrument(&uuid)
+                    .ok_or("FM instrument not found")?
+                    .clone();
+                // Library files carry nil ids — determinism, and hash-dedup in
+                // write_entry needs identical bytes.
+                i.id = Uuid::nil();
+                LibraryInstrument::Fm(i)
+            }
+            "psg" => {
+                let mut i = mgr
+                    .get_psg_instrument(&uuid)
+                    .ok_or("PSG instrument not found")?
+                    .clone();
+                i.id = Uuid::nil();
+                LibraryInstrument::Psg(i)
+            }
+            other => return Err(format!("unknown instrument kind: {other}")),
+        }
+    };
+    let inst_name = match &instrument {
+        LibraryInstrument::Fm(i) => i.name.clone(),
+        LibraryInstrument::Psg(i) => i.name.clone(),
+    };
+    let hash = content_hash(&instrument);
+    let file = LibraryEntryFile {
+        schema: LIBRARY_SCHEMA,
+        name: name.unwrap_or(inst_name),
+        tags,
+        provenance: Provenance { game: "User".into(), songs: vec![], slot: None, hash: hash.clone() },
+        instrument,
+    };
+    store::write_entry(&state::user_root(&app)?, &file)?;
+    state::rescan(&app, &lib);
+    Ok(hash)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_import_files(
+    app: tauri::AppHandle,
+    lib: State<'_, LibraryState>,
+    paths: Vec<String>,
+) -> Result<u32, String> {
+    let root = state::user_root(&app)?;
+    let mut written = 0u32;
+    for p in &paths {
+        let data = std::fs::read(p).map_err(|e| format!("{p}: {e}"))?;
+        let fname = std::path::Path::new(p).file_name()
+            .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let res = crate::import::fm_formats::import_fm_file(&data, &fname)?;
+        let game = format!("Imported: {}", res.format);
+        for mut inst in res.instruments {
+            inst.id = Uuid::nil(); // library files carry nil ids (determinism)
+            let name = inst.name.clone();
+            let li = LibraryInstrument::Fm(inst);
+            let hash = content_hash(&li);
+            let file = LibraryEntryFile {
+                schema: LIBRARY_SCHEMA, name, tags: vec![],
+                provenance: Provenance { game: game.clone(), songs: vec![], slot: None, hash },
+                instrument: li,
+            };
+            store::write_entry(&root, &file)?;
+            written += 1;
+        }
+    }
+    state::rescan(&app, &lib);
+    Ok(written)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_set_tags(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>,
+    hash: String, tags: Vec<String>,
+) -> Result<(), String> {
+    let mut ov = lib.overrides.lock().unwrap();
+    ov.entry(hash).or_default().tags = Some(tags);
+    store::save_overrides(&state::overrides_path(&app)?, &ov)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_set_favorite(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>,
+    hash: String, favorite: bool,
+) -> Result<(), String> {
+    let mut ov = lib.overrides.lock().unwrap();
+    ov.entry(hash).or_default().favorite = favorite;
+    store::save_overrides(&state::overrides_path(&app)?, &ov)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_roots_get(lib: State<'_, LibraryState>) -> Result<Vec<RootInfo>, String> {
+    Ok(lib.roots.lock().unwrap().clone())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_root_add(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>, path: String,
+) -> Result<(), String> {
+    if !std::path::Path::new(&path).is_dir() { return Err("not a directory".into()); }
+    {
+        let mut roots = lib.roots.lock().unwrap();
+        if roots.iter().any(|r| r.path == path) { return Ok(()); }
+        roots.push(RootInfo { label: path.clone(), path, kind: "custom".into() });
+        state::save_custom_roots(&app, &roots)?;
+    }
+    state::rescan(&app, &lib);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_root_remove(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>, path: String,
+) -> Result<(), String> {
+    {
+        let mut roots = lib.roots.lock().unwrap();
+        roots.retain(|r| !(r.kind == "custom" && r.path == path));
+        state::save_custom_roots(&app, &roots)?;
+    }
+    state::rescan(&app, &lib);
+    Ok(())
 }

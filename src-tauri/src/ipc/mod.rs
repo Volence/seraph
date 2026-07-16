@@ -36,4 +36,9 @@ pub use commands::{
     import_zyrinx_song,
     import_fm_file,
     import_vgm,
+    // Instrument library
+    library_list, library_games, library_rescan, library_audition,
+    library_add_to_project, library_save_from_project, library_import_files,
+    library_set_tags, library_set_favorite,
+    library_roots_get, library_root_add, library_root_remove,
 };

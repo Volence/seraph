@@ -453,6 +453,102 @@ async importVgm(vgmPath: string, parentDir: string) : Promise<Result<ImportResul
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async libraryList(filter: LibraryFilter) : Promise<Result<LibraryListEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_list", { filter }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryGames() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_games") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRescan() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_rescan") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryAudition(hash: string, midiNote: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_audition", { hash, midiNote }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryAddToProject(hash: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_add_to_project", { hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async librarySaveFromProject(kind: string, id: string, name: string | null, tags: string[]) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_save_from_project", { kind, id, name, tags }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryImportFiles(paths: string[]) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_import_files", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async librarySetTags(hash: string, tags: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_set_tags", { hash, tags }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async librarySetFavorite(hash: string, favorite: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_set_favorite", { hash, favorite }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRootsGet() : Promise<Result<RootInfo[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_roots_get") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRootAdd(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_root_add", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRootRemove(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_root_remove", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -484,6 +580,12 @@ export type ImportResult = { projectDir: string; metadata: SongMetadata; trackCo
 export type ImportWarning = { channel: string; message: string }
 export type InstrumentBank = { fm: FmInstrument[]; psg: PsgInstrument[]; dac: DacInstrument[] }
 export type InstrumentMetadata = { category: string; author: string; tags: string[] }
+export type LibraryFilter = { text?: string | null; kind?: string | null; game?: string | null; tag?: string | null; favoritesOnly?: boolean }
+export type LibraryListEntry = { hash: string; name: string; 
+/**
+ * "fm" | "psg"
+ */
+kind: string; game: string; tags: string[]; favorite: boolean; rootLabel: string }
 export type NoiseMode = { Periodic: number } | { White: number }
 export type Note = { tick: number; pitch: number; velocity: number; durationTicks: number; instrumentId?: string | null; detune?: number; panOverride?: number | null; modulation?: NoteModulation | null }
 export type NoteModulation = { wait: number; speed: number; delta: number; steps: number }
@@ -493,6 +595,11 @@ export type PlaybackState = { playing: boolean; tick: number; loopStart: number 
 export type PsgChannelInfo = { index: number; name: string; isNoise: boolean }
 export type PsgInstrument = { id: string; name: string; volumeSequence: number[]; loopPoint: number | null; silenceOnEnd?: boolean; noiseMode: NoiseMode | null; smpsEnvelopeIndex?: number | null; metadata: InstrumentMetadata }
 export type Region = { id: string; startTick: number; durationTicks: number; notes: Note[]; instrumentId?: string | null }
+export type RootInfo = { label: string; path: string; 
+/**
+ * "bundled" | "user" | "custom"
+ */
+kind: string }
 /**
  * Full in-memory song representation including instruments.
  */

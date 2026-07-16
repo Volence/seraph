@@ -8,6 +8,7 @@ import { BottomPanel } from "./components/BottomPanel";
 import { StatusBar } from "./components/StatusBar";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
+import { LibraryPanel } from "./components/LibraryPanel";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -177,6 +178,14 @@ export default function App() {
         </div>
       )}
       <div className={styles.body}>
+        {projectOpen && (
+          <LibraryPanel
+            // No global instrument-refresh callback exists yet — the
+            // BottomPanel editors refetch on selection. Task 8 threads a
+            // refreshToken + save-from-project callback through here.
+            onInstrumentAdded={() => {}}
+          />
+        )}
         <MainArea
           projectOpen={projectOpen}
           projectMeta={projectMeta}

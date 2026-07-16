@@ -25,17 +25,58 @@ pub struct ImportWarning {
     pub message: String,
 }
 
+/// Content hash → library entry name. Built by the command layer from the
+/// library index so `import/` stays decoupled from `LibraryState`.
+pub type RecognitionTable = std::collections::HashMap<String, String>;
+
+/// Import-time recognition: an imported instrument whose content hash matches
+/// a library entry takes the entry's name; its original generic name is
+/// preserved in the category ("Imported · Voice 3"). Misses stay untouched.
+/// Content hashes cover only sound fields, so instruments are hashed via a
+/// straight clone (id/name/metadata are excluded from the canonical bytes).
+pub fn recognize_instruments(
+    bank: &mut crate::model::instrument::InstrumentBank,
+    table: &RecognitionTable,
+) {
+    use crate::library::entry::{content_hash, LibraryInstrument};
+    if table.is_empty() {
+        return;
+    }
+    for inst in &mut bank.fm {
+        let hash = content_hash(&LibraryInstrument::Fm(inst.clone()));
+        if let Some(lib_name) = table.get(&hash) {
+            apply_recognition(&mut inst.name, &mut inst.metadata.category, lib_name);
+        }
+    }
+    for inst in &mut bank.psg {
+        let hash = content_hash(&LibraryInstrument::Psg(inst.clone()));
+        if let Some(lib_name) = table.get(&hash) {
+            apply_recognition(&mut inst.name, &mut inst.metadata.category, lib_name);
+        }
+    }
+}
+
+/// Category keeps its existing origin marker ("Imported", "Zyrinx Import",
+/// "VGM Import"…) and appends the pre-recognition name.
+fn apply_recognition(name: &mut String, category: &mut String, lib_name: &str) {
+    let origin = if category.is_empty() { "Imported" } else { category.as_str() };
+    *category = format!("{origin} · {name}");
+    *name = lib_name.to_string();
+}
+
 pub fn import_zyrinx_rom(
     rom_path: &std::path::Path,
     parent_dir: &std::path::Path,
     game_id: u8,
+    recognition: &RecognitionTable,
 ) -> Result<ImportResult, String> {
     let rom = std::fs::read(rom_path)
         .map_err(|e| format!("failed to read ROM {}: {e}", rom_path.display()))?;
 
     let zy = zyrinx_parser::parse_zyrinx_song(&rom, game_id)?;
     let mapped = zyrinx_mapper::map_zyrinx_to_song(&zy);
-    let song = mapped.song;
+    let mut song = mapped.song;
+    recognize_instruments(&mut song.instruments, recognition);
 
     let dir_name = zyrinx_parser::GAME_SONG_NAMES
         .get(game_id as usize)
@@ -87,7 +128,7 @@ pub fn import_smps_file(
     parent_dir: &std::path::Path,
     driver: &dyn crate::model::driver::DriverProfile,
 ) -> Result<ImportResult, String> {
-    import_smps_file_with_dac(source_path, parent_dir, driver, None)
+    import_smps_file_with_dac(source_path, parent_dir, driver, None, &RecognitionTable::new())
 }
 
 pub fn import_smps_file_with_dac(
@@ -95,13 +136,15 @@ pub fn import_smps_file_with_dac(
     parent_dir: &std::path::Path,
     driver: &dyn crate::model::driver::DriverProfile,
     dac_dir: Option<&std::path::Path>,
+    recognition: &RecognitionTable,
 ) -> Result<ImportResult, String> {
     let source = std::fs::read_to_string(source_path)
         .map_err(|e| format!("failed to read {}: {e}", source_path.display()))?;
 
     let smps = smps_parser::parse_smps(&source)?;
     let mapped = smps_mapper::map_smps_to_song_with_dac(&smps, driver, dac_dir)?;
-    let song = mapped.song;
+    let mut song = mapped.song;
+    recognize_instruments(&mut song.instruments, recognition);
 
     let dir_name = source_path.file_stem()
         .and_then(|s| s.to_str())
@@ -1423,7 +1466,7 @@ mod tests {
         }
 
         let tmp = tempfile::tempdir().unwrap();
-        let result = super::import_zyrinx_rom(&rom_path, tmp.path(), 1).unwrap();
+        let result = super::import_zyrinx_rom(&rom_path, tmp.path(), 1, &Default::default()).unwrap();
         let project_dir = PathBuf::from(&result.project_dir);
 
         assert!(project_dir.join("project.json").exists());
@@ -1465,7 +1508,7 @@ mod tests {
 
         let tmp = tempfile::tempdir().unwrap();
         for game_id in 1u8..20 {
-            let result = super::import_zyrinx_rom(&rom_path, tmp.path(), game_id);
+            let result = super::import_zyrinx_rom(&rom_path, tmp.path(), game_id, &Default::default());
             match result {
                 Ok(r) => {
                     let notes: usize = {
@@ -1485,5 +1528,37 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_recognize_instruments_renames_matches_only() {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+        use crate::model::instrument::{FmInstrument, FmOperator, InstrumentBank, InstrumentMetadata};
+        use uuid::Uuid;
+
+        let matching = FmInstrument {
+            id: Uuid::new_v4(),
+            name: "Voice 0".into(),
+            algorithm: 4,
+            feedback: 5,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata { category: "Imported".into(), ..Default::default() },
+        };
+        let mut other = matching.clone();
+        other.id = Uuid::new_v4();
+        other.name = "Voice 1".into();
+        other.algorithm = 2; // different sound -> different hash
+
+        let hash = content_hash(&LibraryInstrument::Fm(matching.clone()));
+        let table: RecognitionTable = [(hash, "EHZ Lead".to_string())].into_iter().collect();
+
+        let mut bank = InstrumentBank { fm: vec![matching, other], psg: vec![], dac: vec![] };
+        recognize_instruments(&mut bank, &table);
+
+        assert_eq!(bank.fm[0].name, "EHZ Lead", "hash hit takes the library name");
+        assert_eq!(bank.fm[0].metadata.category, "Imported \u{b7} Voice 0",
+            "origin marker kept, generic name preserved in category");
+        assert_eq!(bank.fm[1].name, "Voice 1", "miss keeps its generic name");
+        assert_eq!(bank.fm[1].metadata.category, "Imported", "miss category untouched");
     }
 }

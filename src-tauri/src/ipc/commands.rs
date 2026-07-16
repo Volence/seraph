@@ -1059,10 +1059,21 @@ pub fn export_wav(
 
 // --- Import ---
 
+/// Hash → name lookup from the library index, for import-time recognition
+/// (imported voices matching a library entry take the entry's name).
+fn library_recognition_table(lib: &State<'_, LibraryState>) -> crate::import::RecognitionTable {
+    lib.index.lock()
+        .map(|idx| idx.iter()
+            .map(|e| (e.file.provenance.hash.clone(), e.file.name.clone()))
+            .collect())
+        .unwrap_or_default()
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn import_song(
     state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
     source_path: String,
     parent_dir: String,
     dac_dir: Option<String>,
@@ -1075,8 +1086,9 @@ pub fn import_song(
     let source = std::path::PathBuf::from(&source_path);
     let parent = std::path::PathBuf::from(&parent_dir);
     let dac_path = dac_dir.as_ref().map(std::path::PathBuf::from);
+    let recognition = library_recognition_table(&lib);
 
-    crate::import::import_smps_file_with_dac(&source, &parent, driver, dac_path.as_deref())
+    crate::import::import_smps_file_with_dac(&source, &parent, driver, dac_path.as_deref(), &recognition)
 }
 
 // --- FM File Import ---
@@ -1142,24 +1154,28 @@ pub fn export_vgm(
 #[tauri::command]
 #[specta::specta]
 pub fn import_zyrinx_song(
+    lib: State<'_, LibraryState>,
     rom_path: String,
     parent_dir: String,
     game_id: u8,
 ) -> Result<crate::import::ImportResult, String> {
     let rom = std::path::PathBuf::from(&rom_path);
     let parent = std::path::PathBuf::from(&parent_dir);
-    crate::import::import_zyrinx_rom(&rom, &parent, game_id)
+    let recognition = library_recognition_table(&lib);
+    crate::import::import_zyrinx_rom(&rom, &parent, game_id, &recognition)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn import_vgm(
+    lib: State<'_, LibraryState>,
     vgm_path: String,
     parent_dir: String,
 ) -> Result<crate::import::ImportResult, String> {
     let path = std::path::PathBuf::from(&vgm_path);
     let parent = std::path::PathBuf::from(&parent_dir);
-    crate::import::vgm_import::import_vgm_file(&path, &parent)
+    let recognition = library_recognition_table(&lib);
+    crate::import::vgm_import::import_vgm_file(&path, &parent, &recognition)
 }
 
 // --- Instrument Library ---

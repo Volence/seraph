@@ -4,6 +4,7 @@
 // single source of truth.
 import { commands } from "../bindings";
 import type {
+  LibraryEntryDetail,
   LibraryFilter,
   LibraryImportResult,
   LibraryListEntry,
@@ -11,7 +12,14 @@ import type {
   RootInfo,
 } from "../bindings";
 
-export type { LibraryFilter, LibraryImportResult, LibraryListEntry, RootInfo } from "../bindings";
+export type {
+  LibraryEntryDetail,
+  LibraryFilter,
+  LibraryImportResult,
+  LibraryInstrument,
+  LibraryListEntry,
+  RootInfo,
+} from "../bindings";
 
 /** Unwrap a generated `Result<T, E>`: return `T` or throw the error payload. */
 function unwrap<T, E>(res: Result<T, E>): T {
@@ -25,6 +33,10 @@ export async function libraryList(filter: LibraryFilter): Promise<LibraryListEnt
 
 export async function libraryGames(): Promise<string[]> {
   return unwrap(await commands.libraryGames());
+}
+
+export async function libraryGetEntry(hash: string): Promise<LibraryEntryDetail> {
+  return unwrap(await commands.libraryGetEntry(hash));
 }
 
 export async function libraryRescan(): Promise<number> {

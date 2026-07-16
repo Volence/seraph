@@ -23,7 +23,7 @@ pub struct Provenance {
 }
 
 /// `{"type":"fm","instrument":{...}}` shape per the spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", content = "instrument", rename_all = "lowercase")]
 pub enum LibraryInstrument {
     Fm(FmInstrument),

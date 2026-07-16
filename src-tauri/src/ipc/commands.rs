@@ -1176,6 +1176,38 @@ pub fn library_list(
     Ok(store::apply_filter(&all, &filter))
 }
 
+/// Full instrument payload for the selected entry's detail card. A separate
+/// command (rather than fields on `LibraryListEntry`) keeps `library_list`
+/// lean — the list carries hundreds of entries, the card needs exactly one.
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryEntryDetail {
+    pub name: String,
+    pub game: String,
+    pub tags: Vec<String>,
+    pub instrument: LibraryInstrument,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_get_entry(
+    lib: State<'_, LibraryState>,
+    hash: String,
+) -> Result<LibraryEntryDetail, String> {
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let e = idx.iter().find(|e| e.file.provenance.hash == hash)
+        .ok_or("library entry not found")?;
+    // Same override precedence as `store::to_list_entry`.
+    let o = ov.get(&hash);
+    Ok(LibraryEntryDetail {
+        name: e.file.name.clone(),
+        game: e.file.provenance.game.clone(),
+        tags: o.and_then(|o| o.tags.clone()).unwrap_or_else(|| e.file.tags.clone()),
+        instrument: e.file.instrument.clone(),
+    })
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn library_games(lib: State<'_, LibraryState>) -> Result<Vec<String>, String> {

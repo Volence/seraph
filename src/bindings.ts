@@ -470,6 +470,14 @@ async libraryGames() : Promise<Result<string[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async libraryGetEntry(hash: string) : Promise<Result<LibraryEntryDetail, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_get_entry", { hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async libraryRescan() : Promise<Result<number, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("library_rescan") };
@@ -615,8 +623,18 @@ export type ImportResult = { projectDir: string; metadata: SongMetadata; trackCo
 export type ImportWarning = { channel: string; message: string }
 export type InstrumentBank = { fm: FmInstrument[]; psg: PsgInstrument[]; dac: DacInstrument[] }
 export type InstrumentMetadata = { category: string; author: string; tags: string[] }
+/**
+ * Full instrument payload for the selected entry's detail card. A separate
+ * command (rather than fields on `LibraryListEntry`) keeps `library_list`
+ * lean — the list carries hundreds of entries, the card needs exactly one.
+ */
+export type LibraryEntryDetail = { name: string; game: string; tags: string[]; instrument: LibraryInstrument }
 export type LibraryFilter = { text?: string | null; kind?: string | null; game?: string | null; tag?: string | null; favoritesOnly?: boolean }
 export type LibraryImportResult = { written: number; errors: string[] }
+/**
+ * `{"type":"fm","instrument":{...}}` shape per the spec.
+ */
+export type LibraryInstrument = { type: "fm"; instrument: FmInstrument } | { type: "psg"; instrument: PsgInstrument }
 export type LibraryListEntry = { hash: string; name: string; 
 /**
  * "fm" | "psg"

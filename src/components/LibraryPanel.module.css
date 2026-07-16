@@ -265,3 +265,93 @@
   color: var(--text-secondary);
   font-style: italic;
 }
+
+.itemSelected {
+  background: var(--bg-surface);
+  border-left: 2px solid var(--accent);
+  padding-left: 6px;
+}
+
+.detail {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-panel);
+}
+
+.detailHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.detailName {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detailGame {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.detailMeta {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.opTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+}
+
+.opTable th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: right;
+  padding: 1px 3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.opTable td {
+  text-align: right;
+  padding: 1px 3px;
+}
+
+.opTable th:first-child,
+.opTable td:first-child {
+  text-align: left;
+  color: var(--text-secondary);
+}
+
+.sparkline {
+  width: 100%;
+  height: 36px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.sparkLine {
+  stroke: var(--accent-psg);
+  stroke-width: 1.5;
+}
+
+.sparkLoop {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}

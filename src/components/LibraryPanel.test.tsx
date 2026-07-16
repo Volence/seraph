@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { LibraryPanel } from "./LibraryPanel";
 import * as lib from "../api/library";
-import type { LibraryListEntry } from "../api/library";
+import type { LibraryEntryDetail, LibraryListEntry } from "../api/library";
+import type { FmInstrument, FmOperator } from "../bindings";
 
 vi.mock("../api/library");
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
@@ -17,8 +18,28 @@ const entry = (name: string, kind: LibraryListEntry["kind"]): LibraryListEntry =
   rootLabel: "Seraph Pack",
 });
 
+const fmOp: FmOperator = {
+  detune: 1, multiple: 2, rateScale: 0, attackRate: 31, ampMod: false,
+  d1r: 5, d2r: 3, sustainLevel: 2, releaseRate: 7, totalLevel: 20,
+};
+
+const fmDetail = (name: string): LibraryEntryDetail => ({
+  name,
+  game: "Sonic 2",
+  tags: ["lead"],
+  instrument: {
+    type: "fm",
+    instrument: {
+      id: "lib", name, algorithm: 4, feedback: 3,
+      operators: [fmOp, fmOp, fmOp, fmOp] as FmInstrument["operators"],
+      metadata: { category: "", author: "", tags: [] },
+    },
+  },
+});
+
 describe("LibraryPanel", () => {
   beforeEach(() => {
+    vi.clearAllMocks(); // call counts must not leak across tests
     vi.mocked(lib.libraryGames).mockResolvedValue(["Sonic 2"]);
     vi.mocked(lib.libraryList).mockResolvedValue([entry("EHZ Lead", "fm"), entry("Env 3", "psg")]);
     vi.mocked(lib.libraryWarnings).mockResolvedValue([]);
@@ -81,5 +102,29 @@ describe("LibraryPanel", () => {
     );
     fireEvent.mouseLeave(name);
     expect(vi.mocked(lib.libraryStopAudition)).toHaveBeenCalledTimes(1);
+  });
+
+  it("selecting an entry fetches and renders the detail card; PianoKeys auditions at the played note", async () => {
+    vi.mocked(lib.libraryGetEntry).mockResolvedValue(fmDetail("EHZ Lead"));
+    render(<LibraryPanel onInstrumentAdded={() => {}} />);
+    const name = await screen.findByText("EHZ Lead");
+
+    fireEvent.click(name);
+    await waitFor(() =>
+      expect(vi.mocked(lib.libraryGetEntry)).toHaveBeenCalledWith("EHZ Lead")
+    );
+    await screen.findByText("ALG 4 · FB 3");
+    expect(screen.getByText("MUL")).toBeTruthy();
+
+    // PianoKeys renders plain divs; vitest maps CSS-module classes to
+    // stable names containing the original identifier, so match by
+    // substring. Second white key at the default C4 octave = semitone 2 =
+    // MIDI 62.
+    const keys = document.querySelectorAll('[class*="whiteKey"]');
+    expect(keys.length).toBe(7);
+    fireEvent.mouseDown(keys[1]);
+    expect(vi.mocked(lib.libraryAudition)).toHaveBeenCalledWith("EHZ Lead", 62);
+    fireEvent.mouseUp(window);
+    await waitFor(() => expect(vi.mocked(lib.libraryStopAudition)).toHaveBeenCalledTimes(1));
   });
 });

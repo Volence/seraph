@@ -134,3 +134,17 @@
 .previewBtn:hover {
   opacity: 0.9;
 }
+
+.saveToLibrary {
+  margin-top: 6px;
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.saveToLibrary:hover {
+  background: var(--border);
+}

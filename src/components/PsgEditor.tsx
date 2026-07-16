@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import type { PsgInstrument, NoiseMode } from "../types/model";
 import * as ipc from "../api/ipc";
+import { librarySaveFromProject } from "../api/library";
 import { StepGraphEditor } from "../widgets/StepGraphEditor";
 import styles from "./PsgEditor.module.css";
 
 interface PsgEditorProps {
   instrumentId: string;
+  /** Called after a successful save-to-library (refreshes the panel). */
+  onSavedToLibrary?: () => void;
 }
 
-export function PsgEditor({ instrumentId }: PsgEditorProps) {
+export function PsgEditor({ instrumentId, onSavedToLibrary }: PsgEditorProps) {
   const [instrument, setInstrument] = useState<PsgInstrument | null>(null);
 
   const load = useCallback(async () => {
@@ -138,6 +141,20 @@ export function PsgEditor({ instrumentId }: PsgEditorProps) {
             onClick={() => ipc.previewPsgInstrument(instrumentId, 60)}
           >
             Preview
+          </button>
+          <button
+            className={styles.saveToLibrary}
+            title="Save this instrument to My Library"
+            onClick={async () => {
+              try {
+                await librarySaveFromProject("psg", instrumentId, null, []);
+                onSavedToLibrary?.();
+              } catch (e) {
+                console.error("Save to library failed:", e);
+              }
+            }}
+          >
+            Save to library
           </button>
         </div>
       </div>

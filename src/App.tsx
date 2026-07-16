@@ -26,6 +26,8 @@ export default function App() {
   >(null);
   const [importWarnings, setImportWarnings] = useState<ipc.ImportWarning[] | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  // Bumped after save-from-project so the LibraryPanel re-queries.
+  const [libraryRefresh, setLibraryRefresh] = useState(0);
 
   const projectOpen = projectMeta !== null;
 
@@ -180,9 +182,9 @@ export default function App() {
       <div className={styles.body}>
         {projectOpen && (
           <LibraryPanel
-            // No global instrument-refresh callback exists yet — the
-            // BottomPanel editors refetch on selection. Task 8 threads a
-            // refreshToken + save-from-project callback through here.
+            refreshToken={libraryRefresh}
+            // No global instrument-refresh callback exists — the BottomPanel
+            // editors refetch on selection.
             onInstrumentAdded={() => {}}
           />
         )}
@@ -211,6 +213,7 @@ export default function App() {
           onCloseRegion={() => setSelectedRegions([])}
           playing={playing}
           projectMeta={projectMeta!}
+          onSavedToLibrary={() => setLibraryRefresh((n) => n + 1)}
         />
       )}
       <StatusBar />

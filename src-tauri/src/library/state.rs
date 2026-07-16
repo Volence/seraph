@@ -60,7 +60,45 @@ pub fn bundled_root(app: &AppHandle) -> Option<PathBuf> {
         .filter(|p| p.exists())
 }
 
-pub fn resolve_roots(app: &AppHandle) -> Vec<RootInfo> {
+/// Parse the custom-roots file body (a JSON array of directory paths).
+fn parse_custom_roots(s: &str) -> Result<Vec<String>, String> {
+    serde_json::from_str::<Vec<String>>(s).map_err(|e| e.to_string())
+}
+
+/// Load the custom-roots list WITHOUT silent data loss (same hazard as the
+/// overrides file: silently yielding zero roots on a corrupt file would let
+/// the next root add/remove rewrite — permanently clobber — the user's list).
+/// Missing file is a normal first run; exists-but-unparseable is warned AND
+/// quarantined to `library-roots.json.bak-corrupt` for hand recovery.
+fn load_custom_roots_guarded(path: &std::path::Path, warnings: &mut Vec<String>) -> Vec<String> {
+    let s = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
+        Err(e) => {
+            warnings.push(format!("could not read custom-roots file {}: {e}", path.display()));
+            return Vec::new();
+        }
+    };
+    match parse_custom_roots(&s) {
+        Ok(customs) => customs,
+        Err(e) => {
+            let bak = path.with_file_name("library-roots.json.bak-corrupt");
+            match std::fs::rename(path, &bak) {
+                Ok(()) => warnings.push(format!(
+                    "custom-roots file was corrupt ({e}); moved to {} — custom roots are gone until it is restored",
+                    bak.display()
+                )),
+                Err(re) => warnings.push(format!(
+                    "custom-roots file {} is corrupt ({e}) and could not be quarantined ({re}); the roots list may be lost on next save",
+                    path.display()
+                )),
+            }
+            Vec::new()
+        }
+    }
+}
+
+pub fn resolve_roots(app: &AppHandle, warnings: &mut Vec<String>) -> Vec<RootInfo> {
     let mut roots = Vec::new();
     if let Some(b) = bundled_root(app) {
         roots.push(RootInfo { label: "Seraph Pack".into(), path: b.to_string_lossy().into(), kind: "bundled".into() });
@@ -70,12 +108,8 @@ pub fn resolve_roots(app: &AppHandle) -> Vec<RootInfo> {
         roots.push(RootInfo { label: "My Library".into(), path: u.to_string_lossy().into(), kind: "user".into() });
     }
     if let Ok(p) = custom_roots_path(app) {
-        if let Ok(s) = std::fs::read_to_string(p) {
-            if let Ok(customs) = serde_json::from_str::<Vec<String>>(&s) {
-                for c in customs {
-                    roots.push(RootInfo { label: c.clone(), path: c, kind: "custom".into() });
-                }
-            }
+        for c in load_custom_roots_guarded(&p, warnings) {
+            roots.push(RootInfo { label: c.clone(), path: c, kind: "custom".into() });
         }
     }
     roots
@@ -89,11 +123,11 @@ pub fn save_custom_roots(app: &AppHandle, roots: &[RootInfo]) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
-/// Load overrides WITHOUT silent data loss. `store::load_overrides` returns
-/// empty on a corrupt file, and the next save would then permanently erase the
-/// user's favorites/tags. Distinguish missing (normal first run) from corrupt:
-/// warn AND quarantine the corrupt file to `library-overrides.json.bak-corrupt`
-/// so a later save can't clobber it and the user can recover by hand.
+/// Load overrides WITHOUT silent data loss: an empty result for a corrupt
+/// file would let the next save permanently erase the user's favorites/tags.
+/// Distinguish missing (normal first run) from corrupt: warn AND quarantine
+/// the corrupt file to `library-overrides.json.bak-corrupt` so a later save
+/// can't clobber it and the user can recover by hand.
 fn load_overrides_guarded(path: &std::path::Path, warnings: &mut Vec<String>) -> Overrides {
     let s = match std::fs::read_to_string(path) {
         Ok(s) => s,
@@ -123,9 +157,9 @@ fn load_overrides_guarded(path: &std::path::Path, warnings: &mut Vec<String>) ->
 }
 
 pub fn rescan(app: &AppHandle, state: &LibraryState) {
-    let roots = resolve_roots(app);
-    let mut all = Vec::new();
     let mut warns = Vec::new();
+    let roots = resolve_roots(app, &mut warns);
+    let mut all = Vec::new();
     for (i, r) in roots.iter().enumerate() {
         let (entries, w) = store::scan_root(std::path::Path::new(&r.path), &r.label, i);
         all.extend(entries);
@@ -135,10 +169,12 @@ pub fn rescan(app: &AppHandle, state: &LibraryState) {
     let overrides = overrides_path(app)
         .map(|p| load_overrides_guarded(&p, &mut warns))
         .unwrap_or_default();
-    *state.index.lock().unwrap() = merged;
-    *state.overrides.lock().unwrap() = overrides;
-    *state.roots.lock().unwrap() = roots;
-    *state.warnings.lock().unwrap() = warns;
+    // Self-healing: rescan replaces every value wholesale, so recovering a
+    // poisoned guard is safe — un-poison instead of propagating a panic.
+    *state.index.lock().unwrap_or_else(|p| p.into_inner()) = merged;
+    *state.overrides.lock().unwrap_or_else(|p| p.into_inner()) = overrides;
+    *state.roots.lock().unwrap_or_else(|p| p.into_inner()) = roots;
+    *state.warnings.lock().unwrap_or_else(|p| p.into_inner()) = warns;
 }
 
 #[cfg(test)]
@@ -168,5 +204,40 @@ mod tests {
         assert!(!p.exists());
         let bak = t.path().join("library-overrides.json.bak-corrupt");
         assert_eq!(std::fs::read_to_string(bak).unwrap(), "{not json");
+    }
+
+    #[test]
+    fn parse_custom_roots_accepts_array_rejects_junk() {
+        assert_eq!(
+            parse_custom_roots(r#"["/a/b", "/c"]"#).unwrap(),
+            vec!["/a/b".to_string(), "/c".to_string()]
+        );
+        assert!(parse_custom_roots("{not json").is_err());
+        assert!(parse_custom_roots(r#"{"roots": []}"#).is_err()); // wrong shape
+    }
+
+    #[test]
+    fn guarded_roots_missing_file_is_silent() {
+        let t = tempfile::tempdir().unwrap();
+        let mut warns = Vec::new();
+        let roots = load_custom_roots_guarded(&t.path().join("library-roots.json"), &mut warns);
+        assert!(roots.is_empty());
+        assert!(warns.is_empty());
+    }
+
+    #[test]
+    fn guarded_roots_corrupt_file_warns_and_quarantines() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("library-roots.json");
+        std::fs::write(&p, "[not json").unwrap();
+        let mut warns = Vec::new();
+        let roots = load_custom_roots_guarded(&p, &mut warns);
+        assert!(roots.is_empty());
+        assert_eq!(warns.len(), 1);
+        assert!(warns[0].contains("corrupt"));
+        // original is gone; quarantined copy holds the bytes
+        assert!(!p.exists());
+        let bak = t.path().join("library-roots.json.bak-corrupt");
+        assert_eq!(std::fs::read_to_string(bak).unwrap(), "[not json");
     }
 }

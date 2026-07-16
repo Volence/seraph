@@ -127,12 +127,6 @@ pub fn merge(mut entries: Vec<IndexedEntry>) -> Vec<IndexedEntry> {
     out
 }
 
-pub fn load_overrides(path: &Path) -> Overrides {
-    fs::read_to_string(path).ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
-}
-
 pub fn save_overrides(path: &Path, o: &Overrides) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;

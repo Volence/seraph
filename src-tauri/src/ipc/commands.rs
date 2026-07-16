@@ -1138,8 +1138,8 @@ pub fn library_list(
     lib: State<'_, LibraryState>,
     filter: LibraryFilter,
 ) -> Result<Vec<LibraryListEntry>, String> {
-    let idx = lib.index.lock().unwrap();
-    let ov = lib.overrides.lock().unwrap();
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let all: Vec<LibraryListEntry> = idx.iter().map(|e| store::to_list_entry(e, &ov)).collect();
     Ok(store::apply_filter(&all, &filter))
 }
@@ -1147,7 +1147,7 @@ pub fn library_list(
 #[tauri::command]
 #[specta::specta]
 pub fn library_games(lib: State<'_, LibraryState>) -> Result<Vec<String>, String> {
-    let idx = lib.index.lock().unwrap();
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let mut games: Vec<String> = idx.iter().map(|e| e.file.provenance.game.clone()).collect();
     games.sort();
     games.dedup();
@@ -1158,7 +1158,15 @@ pub fn library_games(lib: State<'_, LibraryState>) -> Result<Vec<String>, String
 #[specta::specta]
 pub fn library_rescan(app: tauri::AppHandle, lib: State<'_, LibraryState>) -> Result<u32, String> {
     state::rescan(&app, &lib);
-    Ok(lib.index.lock().unwrap().len() as u32)
+    Ok(lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?.len() as u32)
+}
+
+/// Scan/parse warnings from the last rescan (corrupt overrides/roots files,
+/// unreadable entries). The UI surfaces these so quarantine events are visible.
+#[tauri::command]
+#[specta::specta]
+pub fn library_warnings(lib: State<'_, LibraryState>) -> Result<Vec<String>, String> {
+    Ok(lib.warnings.lock().map_err(|e| format!("mutex poisoned: {e}"))?.clone())
 }
 
 #[tauri::command]
@@ -1169,7 +1177,7 @@ pub fn library_audition(
     hash: String,
     midi_note: u8,
 ) -> Result<(), String> {
-    let idx = lib.index.lock().unwrap();
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let e = idx.iter().find(|e| e.file.provenance.hash == hash)
         .ok_or("library entry not found")?;
     match &e.file.instrument {
@@ -1181,19 +1189,19 @@ pub fn library_audition(
 #[tauri::command]
 #[specta::specta]
 pub fn library_add_to_project(
-    state_proj: State<'_, ProjectState>,
+    project_state: State<'_, ProjectState>,
     lib: State<'_, LibraryState>,
     hash: String,
 ) -> Result<String, String> {
     let inst = {
-        let idx = lib.index.lock().unwrap();
+        let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
         idx.iter().find(|e| e.file.provenance.hash == hash)
             .map(|e| e.file.instrument.clone())
             .ok_or("library entry not found")?
     };
     // Reuse the existing add paths (they assign fresh UUIDs + mark dirty) —
     // same manager acquisition as add_fm_instrument / add_psg_instrument.
-    let mut mgr = state_proj.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     match inst {
         LibraryInstrument::Fm(i) => {
             let id = mgr.add_fm_instrument(i);
@@ -1210,7 +1218,7 @@ pub fn library_add_to_project(
 #[specta::specta]
 pub fn library_save_from_project(
     app: tauri::AppHandle,
-    state_proj: State<'_, ProjectState>,
+    project_state: State<'_, ProjectState>,
     lib: State<'_, LibraryState>,
     kind: String,
     id: String,
@@ -1221,7 +1229,7 @@ pub fn library_save_from_project(
     // shape as update_fm_instrument: parse UUID, lock manager, find by id).
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let instrument = {
-        let mgr = state_proj.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+        let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
         match kind.as_str() {
             "fm" => {
                 let mut i = mgr
@@ -1261,20 +1269,36 @@ pub fn library_save_from_project(
     Ok(hash)
 }
 
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryImportResult {
+    pub written: u32,
+    pub errors: Vec<String>,
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn library_import_files(
     app: tauri::AppHandle,
     lib: State<'_, LibraryState>,
     paths: Vec<String>,
-) -> Result<u32, String> {
+) -> Result<LibraryImportResult, String> {
     let root = state::user_root(&app)?;
     let mut written = 0u32;
+    // Per-file tolerance: one unreadable/unparseable file must not fail the
+    // whole batch — collect its error and keep going.
+    let mut errors = Vec::new();
     for p in &paths {
-        let data = std::fs::read(p).map_err(|e| format!("{p}: {e}"))?;
+        let data = match std::fs::read(p) {
+            Ok(d) => d,
+            Err(e) => { errors.push(format!("could not read {p}: {e}")); continue; }
+        };
         let fname = std::path::Path::new(p).file_name()
             .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-        let res = crate::import::fm_formats::import_fm_file(&data, &fname)?;
+        let res = match crate::import::fm_formats::import_fm_file(&data, &fname) {
+            Ok(r) => r,
+            Err(e) => { errors.push(format!("could not import {p}: {e}")); continue; }
+        };
         let game = format!("Imported: {}", res.format);
         for mut inst in res.instruments {
             inst.id = Uuid::nil(); // library files carry nil ids (determinism)
@@ -1286,12 +1310,15 @@ pub fn library_import_files(
                 provenance: Provenance { game: game.clone(), songs: vec![], slot: None, hash },
                 instrument: li,
             };
-            store::write_entry(&root, &file)?;
-            written += 1;
+            match store::write_entry(&root, &file) {
+                Ok(_) => written += 1,
+                Err(e) => errors.push(format!("could not write library entry for {p}: {e}")),
+            }
         }
     }
+    // Always rescan: partial batches still wrote entries.
     state::rescan(&app, &lib);
-    Ok(written)
+    Ok(LibraryImportResult { written, errors })
 }
 
 #[tauri::command]
@@ -1300,7 +1327,7 @@ pub fn library_set_tags(
     app: tauri::AppHandle, lib: State<'_, LibraryState>,
     hash: String, tags: Vec<String>,
 ) -> Result<(), String> {
-    let mut ov = lib.overrides.lock().unwrap();
+    let mut ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     ov.entry(hash).or_default().tags = Some(tags);
     store::save_overrides(&state::overrides_path(&app)?, &ov)
 }
@@ -1311,7 +1338,7 @@ pub fn library_set_favorite(
     app: tauri::AppHandle, lib: State<'_, LibraryState>,
     hash: String, favorite: bool,
 ) -> Result<(), String> {
-    let mut ov = lib.overrides.lock().unwrap();
+    let mut ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     ov.entry(hash).or_default().favorite = favorite;
     store::save_overrides(&state::overrides_path(&app)?, &ov)
 }
@@ -1319,7 +1346,7 @@ pub fn library_set_favorite(
 #[tauri::command]
 #[specta::specta]
 pub fn library_roots_get(lib: State<'_, LibraryState>) -> Result<Vec<RootInfo>, String> {
-    Ok(lib.roots.lock().unwrap().clone())
+    Ok(lib.roots.lock().map_err(|e| format!("mutex poisoned: {e}"))?.clone())
 }
 
 #[tauri::command]
@@ -1327,9 +1354,9 @@ pub fn library_roots_get(lib: State<'_, LibraryState>) -> Result<Vec<RootInfo>, 
 pub fn library_root_add(
     app: tauri::AppHandle, lib: State<'_, LibraryState>, path: String,
 ) -> Result<(), String> {
-    if !std::path::Path::new(&path).is_dir() { return Err("not a directory".into()); }
+    if !std::path::Path::new(&path).is_dir() { return Err(format!("{path} is not a directory")); }
     {
-        let mut roots = lib.roots.lock().unwrap();
+        let mut roots = lib.roots.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
         if roots.iter().any(|r| r.path == path) { return Ok(()); }
         roots.push(RootInfo { label: path.clone(), path, kind: "custom".into() });
         state::save_custom_roots(&app, &roots)?;
@@ -1344,7 +1371,7 @@ pub fn library_root_remove(
     app: tauri::AppHandle, lib: State<'_, LibraryState>, path: String,
 ) -> Result<(), String> {
     {
-        let mut roots = lib.roots.lock().unwrap();
+        let mut roots = lib.roots.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
         roots.retain(|r| !(r.kind == "custom" && r.path == path));
         state::save_custom_roots(&app, &roots)?;
     }

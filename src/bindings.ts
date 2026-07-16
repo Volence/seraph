@@ -478,6 +478,18 @@ async libraryRescan() : Promise<Result<number, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Scan/parse warnings from the last rescan (corrupt overrides/roots files,
+ * unreadable entries). The UI surfaces these so quarantine events are visible.
+ */
+async libraryWarnings() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_warnings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async libraryAudition(hash: string, midiNote: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("library_audition", { hash, midiNote }) };
@@ -502,7 +514,7 @@ async librarySaveFromProject(kind: string, id: string, name: string | null, tags
     else return { status: "error", error: e  as any };
 }
 },
-async libraryImportFiles(paths: string[]) : Promise<Result<number, string>> {
+async libraryImportFiles(paths: string[]) : Promise<Result<LibraryImportResult, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("library_import_files", { paths }) };
 } catch (e) {
@@ -581,6 +593,7 @@ export type ImportWarning = { channel: string; message: string }
 export type InstrumentBank = { fm: FmInstrument[]; psg: PsgInstrument[]; dac: DacInstrument[] }
 export type InstrumentMetadata = { category: string; author: string; tags: string[] }
 export type LibraryFilter = { text?: string | null; kind?: string | null; game?: string | null; tag?: string | null; favoritesOnly?: boolean }
+export type LibraryImportResult = { written: number; errors: string[] }
 export type LibraryListEntry = { hash: string; name: string; 
 /**
  * "fm" | "psg"

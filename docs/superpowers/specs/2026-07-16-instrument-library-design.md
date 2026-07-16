@@ -16,13 +16,20 @@ FM + PSG in v1; DAC deferred.
 ## Decisions (pinned during brainstorm)
 
 - **Sources:** Sonic 1/2/3&K SMPS (s2disasm/skdisasm in workspace), other SMPS
-  games (content sourced over time), Zyrinx games, community GYB/TFI packs.
-  **The Adventures of Batman & Robin is OUT of v1** — Kyd's post-Zyrinx driver
-  needs its own reverse-engineered parser; banked as a named follow-up.
+  games (content sourced over time), Zyrinx-driver games, community GYB/TFI
+  packs. **CORRECTED BY RESEARCH (2026-07-16): The Adventures of Batman & Robin
+  is IN v1** — Seraph's "Zyrinx" importer (`zyrinx_parser.rs`) is literally the
+  AoBR "Advanced Z80 Player" parser (20-song index for that ROM; the ROM is
+  present locally). It is Sub-Terrania/Red Zone that would need parser
+  extension — THEY are the named follow-up, not AoBR.
 - **Depth:** full browser — search, tag filters, favorites, audition. Backed by
   a folder-of-files + in-memory index, NOT a database (YAGNI; hundreds of
   instruments, not millions).
 - **Types:** FM instruments + PSG envelope presets. DAC samples deferred to v2.
+  Research note: SMPS PSG envelopes are NOT per-game data — they live in the
+  driver's bundled 52-entry table (`psg_envelopes.rs::FLAMEDRIVER_PSG_ENVELOPES`),
+  which songs reference by index. PSG library presets are therefore generated
+  once from that table, not extracted per game.
 - **Feeding:** repo-committed batch extraction CLI (reproducible, reviewed
   output) + in-app import-to-library.
 - **Default pack:** everything we extract is committed to the seraph repo and
@@ -56,7 +63,7 @@ Instrument file = thin metadata wrapper around the EXISTING serde types
   "name": "EHZ Lead",
   "type": "fm",
   "tags": ["lead", "bright"],
-  "provenance": { "game": "Sonic 2", "song": "EHZ", "slot": 3, "hash": "sha1:..." },
+  "provenance": { "game": "Sonic 2", "song": "EHZ", "slot": 3, "hash": "sha256:..." },
   "instrument": { }
 }
 ```
@@ -104,12 +111,13 @@ IPC (typed via the tauri-specta codegen landed 2026-07-15):
 - `library_audition(id, note, on|off)` — preview slot (below)
 - `library_roots_get` / `library_roots_set` — manage custom roots
 
-**Audition:** load the instrument into a reserved preview slot (FM or PSG
-channel matching type) WITHOUT touching the project; key on mouse-down,
-release on mouse-up. Prefer reusing the instrument editors' existing
-live-preview path; if that path only plays project-owned instruments, add a
-scratch-instrument holder on the engine side (small, bounded addition — the
-plan's research step must settle which).
+**Audition:** RESOLVED BY RESEARCH (2026-07-16): the existing preview path
+(`preview_fm_instrument` / `preview_psg_instrument`) is stateless register
+writes + key-on on channel 0 — only the *lookup* is project-scoped. Library
+audition adds command variants that accept the instrument data inline
+(from the library index) instead of a project UUID, reusing the same
+register-write/key-on code. No engine change, no scratch slot. Key on
+mouse-down, release on mouse-up.
 
 ## UI (`src/components/LibraryPanel.tsx` + CSS module)
 
@@ -132,21 +140,23 @@ extract_library gyb    --in pack.gyb --game "<pack>" --out library/community-<pa
 extract_library zyrinx --in <data> --game "<game>" --out library/<game>/
 ```
 
-Per run: parse every song, collect FM voices + PSG envelope tables, dedup by
-content hash (one file per unique voice; provenance lists every song using
-it), auto-name `"<song>-voice-<slot>"` (curation = humans renaming/tagging the
-JSON afterward — file-per-instrument exists for this). **Idempotent:** re-run
-over unchanged input → zero git diff.
+Per run: parse every song, collect FM voices, dedup by content hash (one file
+per unique voice; provenance lists every song using it), auto-name
+`"<song>-voice-<slot>"` (curation = humans renaming/tagging the JSON
+afterward — file-per-instrument exists for this). PSG presets: a `psg-table`
+subcommand emits the 52 bundled Flamedriver envelope presets once.
+**Idempotent:** re-run over unchanged input → zero git diff.
 
-### Source matrix
+### Source matrix (corrected 2026-07-16)
 
 | Source | Parser | Content availability | v1? |
 |---|---|---|---|
-| Sonic 1/2/3&K | SMPS-ASM (exists) | disassemblies in workspace | YES — seed of the pack |
-| Other SMPS games | same | ROM/disasm sourcing is ongoing manual work | pack grows over time |
-| Zyrinx (Sub-Terrania, Red Zone) | exists | user-provided data | YES |
+| Sonic 1/2/3&K | SMPS-ASM (exists, dialect verified vs OOZ.asm) | disassemblies in workspace | YES — seed of the pack |
+| Other SMPS games | same | ROM/disasm sourcing ongoing (Ristar disasm etc. already on disk) | pack grows over time |
+| Adventures of Batman & Robin | EXISTS (`zyrinx_parser.rs` IS the AoBR parser) | ROM on disk | YES |
 | Community GYB/TFI | exists | community packs | YES (import + curate) |
-| Adventures of Batman & Robin | DOES NOT EXIST | — | NO — named follow-up |
+| Sub-Terrania / Red Zone | needs parser extension (per-ROM song index) | user-provided ROMs | NO — named follow-up |
+| PSG presets | bundled table, no parsing | in-tree | YES (generated once) |
 
 ## Testing
 
@@ -165,8 +175,11 @@ in-app pack downloading (users add folders manually); automatic tag inference.
 
 ## Follow-ups banked
 
-1. **AoBR driver parser** (named follow-up — user explicitly wants these
-   instruments eventually).
+1. **Sub-Terrania / Red Zone parser extension** (the zyrinx importer is
+   AoBR-specific today; other Zyrinx-driver games need their own song-index
+   tables).
 2. DAC drum-kit extraction (v2 of the library).
 3. DAW polish/bugfix round — separate brainstorm; backlog to be captured from
    user experience + a smoke-test pass.
+4. More SMPS games as content sourcing permits (Ristar disassembly already on
+   disk).

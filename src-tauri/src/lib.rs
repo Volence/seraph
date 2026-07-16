@@ -53,6 +53,7 @@ use ipc::{
     import_vgm,
     // Instrument library
     library_list, library_games, library_rescan, library_warnings, library_audition,
+    library_stop_audition,
     library_add_to_project, library_save_from_project, library_import_files,
     library_set_tags, library_set_favorite,
     library_roots_get, library_root_add, library_root_remove,
@@ -141,6 +142,7 @@ fn build_specta() -> Builder<tauri::Wry> {
         library_rescan,
         library_warnings,
         library_audition,
+        library_stop_audition,
         library_add_to_project,
         library_save_from_project,
         library_import_files,

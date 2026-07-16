@@ -384,6 +384,38 @@ pub fn stop_fm_preview(
     Ok(())
 }
 
+/// Stop a library audition (FM or PSG) without resetting the whole mix.
+///
+/// - Forces release rate $F on ch0's four operators before keying off:
+///   imported patches (GYB/TFI) can carry RR=0 and would ring indefinitely on
+///   `FmKeyOff` alone. `do_preview_fm` reprograms the full patch on the next
+///   audition anyway, so clobbering SL/RR here is safe.
+/// - Sends `StopPreview`, which clears a looping PSG envelope preview (and
+///   any DAC preview) and invalidates the sequencer's ch0 FM patch cache so
+///   playback recovers on ch0's next note-on.
+///
+/// `stop_all_sound` (`AudioCommand::Panic`) stays reserved for the global
+/// panic button — it resets both chips but leaves the sequencer's patch cache
+/// intact, which kills FM output until the next stop/seek.
+#[tauri::command]
+#[specta::specta]
+pub fn library_stop_audition(
+    audio_state: State<'_, AudioState>,
+) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+
+    let ch: u8 = 0;
+    let port: u8 = 0;
+    for &off in &OP_REG_OFFSETS {
+        // SL/RR register ($80+slot): $FF = SL 15, RR 15 (fastest release).
+        ym_write_port(&mut thread, port, 0x80 + off + ch, 0xFF);
+    }
+    thread.send(AudioCommand::FmKeyOff { channel: ch });
+    thread.send(AudioCommand::StopPreview);
+
+    Ok(())
+}
+
 // --- PSG Instrument CRUD ---
 
 #[tauri::command]

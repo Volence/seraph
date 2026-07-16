@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LibraryListEntry } from "../bindings";
 import * as lib from "../api/library";
 import { formatTags } from "../lib/formatTags";
@@ -24,44 +24,108 @@ export function LibraryPanel({ refreshToken, onInstrumentAdded }: LibraryPanelPr
   const [editingTags, setEditingTags] = useState<string | null>(null); // hash
   const [tagDraft, setTagDraft] = useState("");
   const [rootsOpen, setRootsOpen] = useState(false);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  // Warnings strip: scan/quarantine warnings (re-fetched on every refresh) +
+  // locally-appended IPC/import errors. Dismissing remembers the scan set so
+  // it stays hidden until a rescan produces something new.
+  const [scanWarnings, setScanWarnings] = useState<string[]>([]);
+  const [localErrors, setLocalErrors] = useState<string[]>([]);
+  const [dismissedScanKey, setDismissedScanKey] = useState<string | null>(null);
+  // True between a successful audition mousedown and its stop — guards
+  // onMouseUp/onMouseLeave so hovering through the list never fires stop.
+  const auditioningRef = useRef(false);
+  // Guards the Enter-then-blur double-fire when committing a tag edit.
+  const savingTagsRef = useRef(false);
+
+  const pushError = useCallback((e: unknown) => {
+    setLocalErrors((errs) => [...errs, String(e)]);
+  }, []);
 
   const refresh = useCallback(async () => {
-    const filter = {
-      text: text || null,
-      kind: kind === "all" ? null : kind,
-      game: game === "all" ? null : game,
-      tag: null,
-      favoritesOnly: favOnly,
-    };
-    setEntries(await lib.libraryList(filter));
-    setGames(await lib.libraryGames());
-  }, [text, kind, game, favOnly]);
+    try {
+      const filter = {
+        text: text || null,
+        kind: kind === "all" ? null : kind,
+        game: game === "all" ? null : game,
+        tag: null,
+        favoritesOnly: favOnly,
+      };
+      setEntries(await lib.libraryList(filter));
+      setGames(await lib.libraryGames());
+      setScanWarnings(await lib.libraryWarnings());
+    } catch (e) {
+      pushError(e);
+    }
+  }, [text, kind, game, favOnly, pushError]);
 
   useEffect(() => { refresh(); }, [refresh, refreshToken]);
 
-  // Scan/quarantine warnings from the last rescan — fetch once on mount.
-  useEffect(() => {
-    lib.libraryWarnings().then(setWarnings).catch((e) => console.error("Library warnings:", e));
-  }, []);
-
   async function handleImport() {
-    const { open: openFileDialog } = await import("@tauri-apps/plugin-dialog");
-    const picked = await openFileDialog({
-      multiple: true,
-      filters: [{ name: "FM instruments", extensions: ["tfi", "vgi", "y12", "gyb"] }],
-    });
-    if (!picked) return;
-    const paths = Array.isArray(picked) ? picked : [picked];
-    const result = await lib.libraryImportFiles(paths as string[]);
-    if (result.errors.length > 0) setWarnings((w) => [...w, ...result.errors]);
-    await refresh();
+    try {
+      const { open: openFileDialog } = await import("@tauri-apps/plugin-dialog");
+      const picked = await openFileDialog({
+        multiple: true,
+        filters: [{ name: "FM instruments", extensions: ["tfi", "vgi", "y12", "gyb"] }],
+      });
+      if (!picked) return;
+      const paths = Array.isArray(picked) ? picked : [picked];
+      const result = await lib.libraryImportFiles(paths as string[]);
+      if (result.errors.length > 0) setLocalErrors((errs) => [...errs, ...result.errors]);
+      await refresh();
+    } catch (e) {
+      pushError(e);
+    }
   }
 
   async function saveTags(hash: string) {
-    await lib.librarySetTags(hash, tagDraft.split(",").map((t) => t.trim()).filter(Boolean));
-    setEditingTags(null);
-    await refresh();
+    if (savingTagsRef.current) return;
+    savingTagsRef.current = true;
+    try {
+      await lib.librarySetTags(hash, tagDraft.split(",").map((t) => t.trim()).filter(Boolean));
+      setEditingTags(null);
+      await refresh();
+    } catch (e) {
+      pushError(e);
+    } finally {
+      savingTagsRef.current = false;
+    }
+  }
+
+  async function startAudition(hash: string) {
+    auditioningRef.current = true;
+    try {
+      await lib.libraryAudition(hash, 60);
+    } catch (e) {
+      auditioningRef.current = false;
+      pushError(e);
+    }
+  }
+
+  async function stopAudition() {
+    if (!auditioningRef.current) return;
+    auditioningRef.current = false;
+    try {
+      await lib.libraryStopAudition();
+    } catch (e) {
+      pushError(e);
+    }
+  }
+
+  async function toggleFavorite(e: LibraryListEntry) {
+    try {
+      await lib.librarySetFavorite(e.hash, !e.favorite);
+      await refresh();
+    } catch (err) {
+      pushError(err);
+    }
+  }
+
+  async function addToProject(hash: string) {
+    try {
+      await lib.libraryAddToProject(hash);
+      onInstrumentAdded();
+    } catch (e) {
+      pushError(e);
+    }
   }
 
   if (!open) {
@@ -72,6 +136,8 @@ export function LibraryPanel({ refreshToken, onInstrumentAdded }: LibraryPanelPr
     );
   }
 
+  const shownScan = JSON.stringify(scanWarnings) !== dismissedScanKey ? scanWarnings : [];
+  const warnings = [...shownScan, ...localErrors];
   const shown = entries.slice(0, RENDER_CAP);
   return (
     <div className={styles.panel}>
@@ -85,7 +151,14 @@ export function LibraryPanel({ refreshToken, onInstrumentAdded }: LibraryPanelPr
         <div className={styles.warnings}>
           <div className={styles.warningsHeader}>
             <span>{warnings.length} library warning{warnings.length !== 1 ? "s" : ""}</span>
-            <button className={styles.warningsClose} onClick={() => setWarnings([])} title="Dismiss">x</button>
+            <button
+              className={styles.warningsClose}
+              onClick={() => {
+                setDismissedScanKey(JSON.stringify(scanWarnings));
+                setLocalErrors([]);
+              }}
+              title="Dismiss"
+            >x</button>
           </div>
           <ul>
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -123,9 +196,9 @@ export function LibraryPanel({ refreshToken, onInstrumentAdded }: LibraryPanelPr
             <span
               className={styles.itemName}
               title={`${e.game} — audition (hold)`}
-              onMouseDown={() => lib.libraryAudition(e.hash, 60)}
-              onMouseUp={() => lib.libraryStopAudition()}
-              onMouseLeave={() => lib.libraryStopAudition()}
+              onMouseDown={() => startAudition(e.hash)}
+              onMouseUp={stopAudition}
+              onMouseLeave={stopAudition}
             >
               {e.name}
             </span>
@@ -139,12 +212,12 @@ export function LibraryPanel({ refreshToken, onInstrumentAdded }: LibraryPanelPr
             <button
               className={e.favorite ? styles.starOn : styles.star}
               title={e.favorite ? "Unfavorite" : "Favorite"}
-              onClick={async () => { await lib.librarySetFavorite(e.hash, !e.favorite); refresh(); }}
+              onClick={() => toggleFavorite(e)}
             >★</button>
             <button
               className={styles.addBtn}
               title="Add to project"
-              onClick={async () => { await lib.libraryAddToProject(e.hash); onInstrumentAdded(); }}
+              onClick={() => addToProject(e.hash)}
             >+</button>
             {editingTags === e.hash && (
               <input

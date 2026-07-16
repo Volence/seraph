@@ -42,14 +42,16 @@ export async function libraryAudition(hash: string, midiNote: number): Promise<v
 /**
  * Stop a library audition, whatever the entry kind.
  *
- * `stop_fm_preview` only sends `FmKeyOff` (channel 0) — it does not touch a
- * looping PSG envelope preview, and no IPC command sends
- * `AudioCommand::StopPreview`. `stop_all_sound` sends `AudioCommand::Panic`,
- * which resets both the YM2612 and SN76489 and clears the PSG preview
- * envelope — the one command that verifiably silences BOTH preview kinds.
+ * Backed by the dedicated `library_stop_audition` command: it forces a fast
+ * release on FM ch0 (imported patches can carry RR=0 and would ring on
+ * KeyOff alone), keys off, and sends `StopPreview` — clearing a looping PSG
+ * envelope preview and invalidating the sequencer's ch0 FM patch cache so
+ * playback recovers on ch0's next note-on. Do NOT swap in `stop_all_sound`
+ * (Panic): it resets both chips without invalidating that cache, killing FM
+ * output until the next stop/seek; Panic remains the global panic button.
  */
 export async function libraryStopAudition(): Promise<void> {
-  unwrap(await commands.stopAllSound());
+  unwrap(await commands.libraryStopAudition());
 }
 
 export async function libraryAddToProject(hash: string): Promise<string> {

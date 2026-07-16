@@ -498,6 +498,29 @@ async libraryAudition(hash: string, midiNote: number) : Promise<Result<null, str
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Stop a library audition (FM or PSG) without resetting the whole mix.
+ * 
+ * - Forces release rate $F on ch0's four operators before keying off:
+ * imported patches (GYB/TFI) can carry RR=0 and would ring indefinitely on
+ * `FmKeyOff` alone. `do_preview_fm` reprograms the full patch on the next
+ * audition anyway, so clobbering SL/RR here is safe.
+ * - Sends `StopPreview`, which clears a looping PSG envelope preview (and
+ * any DAC preview) and invalidates the sequencer's ch0 FM patch cache so
+ * playback recovers on ch0's next note-on.
+ * 
+ * `stop_all_sound` (`AudioCommand::Panic`) stays reserved for the global
+ * panic button — it resets both chips but leaves the sequencer's patch cache
+ * intact, which kills FM output until the next stop/seek.
+ */
+async libraryStopAudition() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_stop_audition") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async libraryAddToProject(hash: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("library_add_to_project", { hash }) };

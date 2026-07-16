@@ -50,6 +50,21 @@ designs target the banked specs (normative); manifest flags carry the gates.
   ImportReport everywhere). S6 plan (SFX kind, sfx_transcode byte-parity, header
   form manifest-gated, audition-in-context). QUEUE FULLY BANKED — next: execution
   sessions in order S0->S6 (S0 gates all; engine packages 1-6 still to execute in aeon).
+- 2026-07-15: EXECUTION ORDER REVISITED. S0 DEFERRED (not started): the MEV
+  format is still moving upstream (aeon `MEV_PORTA $F5` landed ~07-08; an active
+  "sigil sound migration" (DSM series) is converting the sound pipeline toward
+  binary/.emp, and `sound_constants.asm` is on the .emp conversion path). Freezing
+  the manifest contract now would only buy repeated re-releases + a parser rework
+  when the asm→.emp move lands. Decision: park S0 (and every manifest-dependent
+  package) until aeon's sound format + sigil migration stabilize. Instead executed
+  the one fully-decoupled task: **S1 Task 1 (tauri-specta adoption)** — Rust is now
+  the single source of truth for IPC types; all 56 `#[tauri::command]`s
+  specta-annotated; generated `src/bindings.ts` retires the hand-mirrored TS
+  (`model.ts` 222→86). Caught+fixed a serde-vs-specta camelCase divergence
+  (`d1r`/`d2r`, would have broken FM edits) and added a mechanical parity guard
+  test. Two-stage review (spec ✅ + quality ✅). Merged to `main` (`437841e`),
+  cargo test 180 pass, `npm run build` green. S1 Tasks 2–8 remain DEFERRED
+  (blocked on the parked S0 manifest). Resume S0 when the sound format settles.
 
 ## EXECUTION HANDOFF (cold start — read this first)
 

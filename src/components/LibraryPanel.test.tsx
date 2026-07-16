@@ -127,4 +127,20 @@ describe("LibraryPanel", () => {
     fireEvent.mouseUp(window);
     await waitFor(() => expect(vi.mocked(lib.libraryStopAudition)).toHaveBeenCalledTimes(1));
   });
+
+  it("rows are draggable and set the library-entry drag payload", async () => {
+    render(<LibraryPanel onInstrumentAdded={() => {}} />);
+    const name = await screen.findByText("EHZ Lead");
+    const row = name.closest("[draggable]");
+    expect(row).not.toBeNull();
+
+    const setData = vi.fn();
+    fireEvent.dragStart(row!, { dataTransfer: { setData, effectAllowed: "" } });
+    expect(setData).toHaveBeenCalledWith(
+      "application/x-seraph-library-entry",
+      JSON.stringify({ hash: "EHZ Lead", kind: "fm" }),
+    );
+    // Kind-suffixed type for dragover compatibility cues.
+    expect(setData).toHaveBeenCalledWith("application/x-seraph-library-entry-fm", "fm");
+  });
 });

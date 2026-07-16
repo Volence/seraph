@@ -21,6 +21,14 @@ export type {
   RootInfo,
 } from "../bindings";
 
+/**
+ * DataTransfer MIME type for dragging a library entry (payload:
+ * `JSON.stringify({ hash, kind })`). A kind-suffixed variant
+ * (`${LIBRARY_DRAG_TYPE}-fm` / `-psg`) is also set so drop targets can show
+ * a compatibility cue during dragover, when only `types` is readable.
+ */
+export const LIBRARY_DRAG_TYPE = "application/x-seraph-library-entry";
+
 /** Unwrap a generated `Result<T, E>`: return `T` or throw the error payload. */
 function unwrap<T, E>(res: Result<T, E>): T {
   if (res.status === "ok") return res.data;
@@ -68,6 +76,15 @@ export async function libraryStopAudition(): Promise<void> {
 
 export async function libraryAddToProject(hash: string): Promise<string> {
   return unwrap(await commands.libraryAddToProject(hash));
+}
+
+/**
+ * Drag-to-track swap: bind a library voice to a track. Reuses a project
+ * instrument with the same content hash, otherwise adds the voice first.
+ * Returns the bound project instrument id. Kind-checked server-side.
+ */
+export async function libraryAssignToTrack(trackId: string, hash: string): Promise<string> {
+  return unwrap(await commands.libraryAssignToTrack(trackId, hash));
 }
 
 export async function librarySaveFromProject(

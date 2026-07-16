@@ -537,6 +537,20 @@ async libraryAddToProject(hash: string) : Promise<Result<string, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Drag-to-track swap: bind a library voice to a track, reusing a project
+ * instrument with the same content hash or adding the voice first. Returns
+ * the bound project instrument id. Kind-checked (FM voice ↔ FM track, PSG
+ * voice ↔ PSG/noise track) in the manager.
+ */
+async libraryAssignToTrack(trackId: string, hash: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_assign_to_track", { trackId, hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async librarySaveFromProject(kind: string, id: string, name: string | null, tags: string[]) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("library_save_from_project", { kind, id, name, tags }) };

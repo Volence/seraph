@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { Track } from "../types/model";
 import * as ipc from "../api/ipc";
+import * as library from "../api/library";
 import styles from "./TrackHeader.module.css";
 
 interface TrackHeaderProps {
@@ -31,6 +33,14 @@ function channelLabel(track: Track): string {
   return "?";
 }
 
+function trackKind(track: Track): "fm" | "psg" | "dac" {
+  const ch = track.channel;
+  if (ch === "PsgNoise") return "psg";
+  if (typeof ch === "object" && "Fm" in ch) return "fm";
+  if (typeof ch === "object" && "Psg" in ch) return "psg";
+  return "dac";
+}
+
 function levelColor(pct: number): string {
   if (pct > 0.95) return "#fa0";
   if (pct > 0.8) return "#ff0";
@@ -47,6 +57,37 @@ export function channelLevelIndex(track: Track): number {
 }
 
 export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroupHead, groupCollapsed, groupSize, onToggleCollapse }: TrackHeaderProps) {
+  const [dragOver, setDragOver] = useState(false);
+
+  function handleDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(library.LIBRARY_DRAG_TYPE)) return;
+    e.preventDefault();
+    // Only the kind-suffixed type is readable during dragover; cue
+    // compatible drops (FM voice → FM track, PSG voice → PSG/noise track).
+    const compatible = e.dataTransfer.types.includes(
+      `${library.LIBRARY_DRAG_TYPE}-${trackKind(track)}`,
+    );
+    e.dataTransfer.dropEffect = compatible ? "copy" : "none";
+    setDragOver(compatible);
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    setDragOver(false);
+    const raw = e.dataTransfer.getData(library.LIBRARY_DRAG_TYPE);
+    if (!raw) return;
+    e.preventDefault();
+    try {
+      const { hash } = JSON.parse(raw) as { hash: string };
+      await library.libraryAssignToTrack(track.id, hash);
+      onUpdate();
+      ipc.reloadSequence();
+    } catch (err) {
+      // Kind mismatch or backend failure — the server-side check is the
+      // source of truth; the dragover cue is advisory only.
+      console.error("Library voice assign failed:", err);
+    }
+  }
+
   async function toggleMute(e: React.MouseEvent) {
     e.stopPropagation();
     await ipc.updateTrack(
@@ -93,8 +134,11 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
 
   return (
     <div
-      className={`${styles.header} ${selected ? styles.selected : ""}`}
+      className={`${styles.header} ${selected ? styles.selected : ""} ${dragOver ? styles.dropTarget : ""}`}
       onClick={onClick}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
     >
       <div className={styles.top}>
         {isGroupHead && (

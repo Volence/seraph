@@ -1333,6 +1333,30 @@ pub fn library_save_from_project(
     Ok(hash)
 }
 
+/// Drag-to-track swap: bind a library voice to a track, reusing a project
+/// instrument with the same content hash or adding the voice first. Returns
+/// the bound project instrument id. Kind-checked (FM voice ↔ FM track, PSG
+/// voice ↔ PSG/noise track) in the manager.
+#[tauri::command]
+#[specta::specta]
+pub fn library_assign_to_track(
+    project_state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    track_id: String,
+    hash: String,
+) -> Result<String, String> {
+    let track_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let inst = {
+        let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+        idx.iter().find(|e| e.file.provenance.hash == hash)
+            .map(|e| e.file.instrument.clone())
+            .ok_or("library entry not found")?
+    };
+    let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let id = mgr.assign_library_instrument_to_track(track_uuid, &inst, &hash)?;
+    Ok(id.to_string())
+}
+
 #[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryImportResult {

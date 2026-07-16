@@ -279,6 +279,17 @@ export function LibraryPanel({ refreshToken, onInstrumentAdded }: LibraryPanelPr
             key={e.hash}
             className={e.hash === selectedHash ? `${styles.item} ${styles.itemSelected}` : styles.item}
             onClick={() => selectEntry(e.hash)}
+            draggable
+            onDragStart={(ev) => {
+              ev.dataTransfer.setData(
+                lib.LIBRARY_DRAG_TYPE,
+                JSON.stringify({ hash: e.hash, kind: e.kind }),
+              );
+              // Kind-suffixed type: readable during dragover for a
+              // compatibility cue (data itself is not).
+              ev.dataTransfer.setData(`${lib.LIBRARY_DRAG_TYPE}-${e.kind}`, e.kind);
+              ev.dataTransfer.effectAllowed = "copy";
+            }}
           >
             <span
               className={`${styles.dot} ${e.kind === "fm" ? styles.fmDot : styles.psgDot}`}

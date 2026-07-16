@@ -345,6 +345,82 @@ impl ProjectManager {
         self.instruments.psg.iter().find(|i| &i.id == id)
     }
 
+    // --- Library assignment ---
+
+    /// Bind a library voice to an existing track (drag-to-track swap).
+    ///
+    /// If a project instrument of the same kind already has `hash` as its
+    /// content hash it is REUSED; otherwise the library instrument is added
+    /// to the bank (with a fresh id, WITHOUT creating a new track — unlike
+    /// `add_fm_instrument`/`add_psg_instrument`). The track is then pointed
+    /// at the instrument and renamed to it, matching the update-path
+    /// convention that a track's name follows its bound instrument.
+    ///
+    /// Content hashes cover only sound fields (`fm_canonical_bytes` /
+    /// `psg_canonical_bytes` exclude id/name/metadata), so project
+    /// instruments can be hashed via a straight clone.
+    pub fn assign_library_instrument_to_track(
+        &mut self,
+        track_id: Uuid,
+        inst: &crate::library::entry::LibraryInstrument,
+        hash: &str,
+    ) -> Result<Uuid, String> {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
+        let track = self.tracks.iter().find(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        match (inst, &track.channel) {
+            (LibraryInstrument::Fm(_), ChannelAssignment::Fm(_)) => {}
+            (LibraryInstrument::Psg(_), ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise) => {}
+            (LibraryInstrument::Fm(_), _) => {
+                return Err("cannot assign an FM voice to a non-FM track".into());
+            }
+            (LibraryInstrument::Psg(_), _) => {
+                return Err("cannot assign a PSG voice to a non-PSG track".into());
+            }
+        }
+
+        let existing = match inst {
+            LibraryInstrument::Fm(_) => self.instruments.fm.iter()
+                .find(|i| content_hash(&LibraryInstrument::Fm((*i).clone())) == hash)
+                .map(|i| (i.id, i.name.clone())),
+            LibraryInstrument::Psg(_) => self.instruments.psg.iter()
+                .find(|i| content_hash(&LibraryInstrument::Psg((*i).clone())) == hash)
+                .map(|i| (i.id, i.name.clone())),
+        };
+
+        let (id, name) = match existing {
+            Some(found) => found,
+            None => {
+                let id = Uuid::new_v4();
+                let name = match inst {
+                    LibraryInstrument::Fm(i) => {
+                        let mut i = i.clone();
+                        i.id = id;
+                        let name = i.name.clone();
+                        self.instruments.fm.push(i);
+                        name
+                    }
+                    LibraryInstrument::Psg(i) => {
+                        let mut i = i.clone();
+                        i.id = id;
+                        let name = i.name.clone();
+                        self.instruments.psg.push(i);
+                        name
+                    }
+                };
+                self.dirty_instruments.insert(id);
+                (id, name)
+            }
+        };
+
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .expect("track existence checked above");
+        track.instrument_id = Some(id);
+        track.name = name;
+        Ok(id)
+    }
+
     // --- DAC CRUD ---
 
     pub fn add_dac_instrument(&mut self, inst: DacInstrument, pcm_data: Vec<u8>) -> Uuid {
@@ -1343,6 +1419,85 @@ mod tests {
         let snap = mgr.build_snapshot();
         let ticks: Vec<u64> = snap.channels[0].events.iter().map(|e| e.tick()).collect();
         assert!(ticks.windows(2).all(|w| w[0] <= w[1]), "events should be sorted by tick");
+
+        cleanup(&path);
+    }
+
+    fn assign_test_fm() -> FmInstrument {
+        FmInstrument {
+            id: Uuid::nil(),
+            name: "Library Lead".into(),
+            algorithm: 4,
+            feedback: 5,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        }
+    }
+
+    #[test]
+    fn test_assign_library_voice_reuses_matching_hash() {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
+        let path = temp_project_path("assign_reuse");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Assign", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let inst = assign_test_fm();
+        let existing_id = mgr.add_fm_instrument(inst.clone());
+        let track_id = mgr.add_track("Empty".into(), ChannelAssignment::Fm(1), None);
+
+        let voice = LibraryInstrument::Fm(inst);
+        let hash = content_hash(&voice);
+        let bound = mgr.assign_library_instrument_to_track(track_id, &voice, &hash).unwrap();
+
+        assert_eq!(bound, existing_id, "same-hash project instrument must be reused");
+        assert_eq!(mgr.list_fm_instruments().len(), 1, "no duplicate instrument added");
+        let track = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert_eq!(track.instrument_id, Some(existing_id));
+        assert_eq!(track.name, "Library Lead");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_assign_library_voice_adds_when_no_hash_match() {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
+        let path = temp_project_path("assign_add");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Assign", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.add_track("Empty".into(), ChannelAssignment::Fm(0), None);
+        let track_count = mgr.list_tracks().len();
+
+        let voice = LibraryInstrument::Fm(assign_test_fm());
+        let hash = content_hash(&voice);
+        let bound = mgr.assign_library_instrument_to_track(track_id, &voice, &hash).unwrap();
+
+        assert_eq!(mgr.list_fm_instruments().len(), 1, "voice added to the bank");
+        assert_eq!(mgr.list_fm_instruments()[0].id, bound);
+        assert_eq!(mgr.list_tracks().len(), track_count, "no extra track created");
+        let track = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert_eq!(track.instrument_id, Some(bound));
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_assign_library_voice_kind_mismatch_errors() {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
+        let path = temp_project_path("assign_mismatch");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Assign", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let psg_track = mgr.add_track("PSG".into(), ChannelAssignment::Psg(0), None);
+        let voice = LibraryInstrument::Fm(assign_test_fm());
+        let hash = content_hash(&voice);
+
+        let err = mgr.assign_library_instrument_to_track(psg_track, &voice, &hash).unwrap_err();
+        assert!(err.contains("FM voice"), "error should name the mismatch: {err}");
+        assert!(mgr.list_fm_instruments().is_empty(), "nothing added on error");
 
         cleanup(&path);
     }

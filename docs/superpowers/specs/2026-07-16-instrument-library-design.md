@@ -132,6 +132,26 @@ audition default note, double-click/button = add to project; inline tag editor
 shows a compact detail card (FM: algorithm/feedback/op summary; PSG: envelope
 sparkline). Project-side: a "Save to library" action on instruments.
 
+## Session-added features (user, 2026-07-16, during Task 7 by-ear pass)
+
+**Drag-to-track instrument swap.** Library rows are draggable onto tracks in
+the arrangement view. Drop semantics: the track's `instrument_id` switches to
+the dropped voice — adding it to the project first if needed, and REUSING an
+existing project instrument when one with the same content hash already
+exists (no duplicates).
+
+**Import recognition (hash payoff).** During song import (SMPS/VGM/Zyrinx),
+each mapped instrument's content hash is looked up against the library
+index. On a hit, the generic imported name ("Voice 3") is REPLACED by the
+library name ("EHZ Lead"), with the original slot recorded in the
+instrument's metadata (e.g. category "Imported · Voice 3"). Misses keep
+their generic names.
+
+**Detail card + per-note audition** (restored from this spec's UI section
+after the plan dropped it): selecting an entry shows the FM op grid / PSG
+envelope sparkline and a PianoKeys strip auditioning the entry at any pitch
+(`library_get_entry(hash)` IPC).
+
 ## Extraction pipeline
 
 Rust CLI in the existing crate — `src-tauri/src/bin/extract_library.rs` —

@@ -190,4 +190,102 @@ mod tests {
         assert!(bank.psg.is_empty());
         assert!(bank.dac.is_empty());
     }
+
+    // --- serde <-> specta field-name parity guard ---
+    //
+    // specta's camelCase and serde's camelCase disagree on digit-boundary
+    // identifiers (serde: `d1r` -> `d1r`, specta: `d1r` -> `d1R`), which is why
+    // `FmOperator` pins those two fields with `#[specta(rename = ...)]`. That pin
+    // is a second representation kept in sync by hand — exactly the failure mode
+    // this task exists to kill. These tests mechanically assert that the keys
+    // serde puts on the wire equal the keys specta emitted into the committed
+    // `src/bindings.ts`, so any future divergence (a renamed field, a new
+    // digit-boundary field) fails CI instead of silently shipping `undefined`.
+
+    /// Extract the object-literal field keys for `export type <name> = { ... }`
+    /// from the generated bindings, stripping the optional `?` marker.
+    fn bindings_type_keys(name: &str) -> std::collections::BTreeSet<String> {
+        let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings.ts"))
+            .expect("src/bindings.ts must be generated (run `cargo test`)");
+        let needle = format!("export type {name} = {{");
+        let start = src
+            .find(&needle)
+            .unwrap_or_else(|| panic!("type `{name}` not found in bindings.ts"))
+            + needle.len();
+        let body = &src[start..];
+        let end = body.find('}').expect("unterminated type body in bindings.ts");
+        body[..end]
+            .split(';')
+            .filter_map(|field| {
+                let field = field.trim();
+                if field.is_empty() {
+                    return None;
+                }
+                // "detune: number" or "ssgEg?: number" -> key
+                let key = field.split(':').next()?.trim();
+                Some(key.trim_end_matches('?').to_string())
+            })
+            .collect()
+    }
+
+    /// Assert that the JSON keys serde produces for `value` match the field names
+    /// specta wrote into `bindings.ts` for `type_name`.
+    fn assert_field_parity<T: serde::Serialize>(type_name: &str, value: &T) {
+        let json = serde_json::to_value(value).expect("serialize sample");
+        let serde_keys: std::collections::BTreeSet<String> = json
+            .as_object()
+            .expect("sample must serialize to a JSON object")
+            .keys()
+            .cloned()
+            .collect();
+        let specta_keys = bindings_type_keys(type_name);
+        assert_eq!(
+            serde_keys, specta_keys,
+            "serde/specta field-name mismatch for `{type_name}`: \
+             serde emits {serde_keys:?} but bindings.ts has {specta_keys:?}. \
+             Reconcile with `#[specta(rename = ...)]` and regenerate bindings.",
+        );
+    }
+
+    #[test]
+    fn fm_operator_serde_specta_field_parity() {
+        // Guards the `d1r`/`d2r` digit-boundary rename specifically.
+        let op = FmOperator::default();
+        assert_field_parity("FmOperator", &op);
+        // Explicit belt-and-braces: the wire uses `d1r`/`d2r`, never `d1R`/`d2R`.
+        let json = serde_json::to_value(op).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("d1r") && obj.contains_key("d2r"));
+        assert!(!obj.contains_key("d1R") && !obj.contains_key("d2R"));
+    }
+
+    #[test]
+    fn instrument_types_serde_specta_field_parity() {
+        assert_field_parity("InstrumentMetadata", &InstrumentMetadata::default());
+        assert_field_parity(
+            "FmInstrument",
+            &FmInstrument {
+                id: Uuid::new_v4(),
+                name: "sample".into(),
+                algorithm: 0,
+                feedback: 0,
+                operators: [FmOperator::default(); 4],
+                metadata: InstrumentMetadata::default(),
+            },
+        );
+        assert_field_parity(
+            "DacInstrument",
+            &DacInstrument {
+                id: Uuid::new_v4(),
+                name: "sample".into(),
+                target_sample_rate: 16000,
+                loop_start: None,
+                loop_length: None,
+                original_file: "s.wav".into(),
+                pcm_file: "s.pcm".into(),
+                source_is_raw: false,
+                metadata: InstrumentMetadata::default(),
+            },
+        );
+    }
 }

@@ -20,6 +20,9 @@ import type {
   PlaybackState,
   OverlapWarning,
   Result,
+  ExportResult,
+  ImportResult,
+  FmFileImportResponse,
 } from "../bindings";
 
 // Re-export the generated response types that call sites reference via `ipc.*`.
@@ -300,21 +303,21 @@ export async function getChannelOverlaps(): Promise<OverlapWarning[]> {
 
 // --- Export ---
 
-export async function exportSong(outputDir: string): Promise<import("../bindings").ExportResult> {
+export async function exportSong(outputDir: string): Promise<ExportResult> {
   return unwrap(await commands.exportSong(outputDir));
 }
 
 // --- Import ---
 
-export async function importSong(sourcePath: string, parentDir: string, dacDir?: string): Promise<import("../bindings").ImportResult> {
+export async function importSong(sourcePath: string, parentDir: string, dacDir?: string): Promise<ImportResult> {
   return unwrap(await commands.importSong(sourcePath, parentDir, dacDir ?? null));
 }
 
-export async function importZyrinxSong(romPath: string, parentDir: string, gameId: number): Promise<import("../bindings").ImportResult> {
+export async function importZyrinxSong(romPath: string, parentDir: string, gameId: number): Promise<ImportResult> {
   return unwrap(await commands.importZyrinxSong(romPath, parentDir, gameId));
 }
 
-export async function importVgm(vgmPath: string, parentDir: string): Promise<import("../bindings").ImportResult> {
+export async function importVgm(vgmPath: string, parentDir: string): Promise<ImportResult> {
   return unwrap(await commands.importVgm(vgmPath, parentDir));
 }
 
@@ -332,6 +335,6 @@ export async function exportVgm(outputPath: string, durationSeconds: number): Pr
 
 // --- FM File Import ---
 
-export async function importFmFile(filePath: string): Promise<import("../bindings").FmFileImportResponse> {
+export async function importFmFile(filePath: string): Promise<FmFileImportResponse> {
   return unwrap(await commands.importFmFile(filePath));
 }

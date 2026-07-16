@@ -152,6 +152,14 @@ after the plan dropped it): selecting an entry shows the FM op grid / PSG
 envelope sparkline and a PianoKeys strip auditioning the entry at any pitch
 (`library_get_entry(hash)` IPC).
 
+**PSG shape tags** (user, 2026-07-16): `extract_psg_table` mechanically
+classifies each envelope's shape — `sustained` / `decay` / `staccato` /
+`tremolo` — from the envelope data (loop presence, length, monotonicity) and
+writes the class as a baseline tag, making the 42 presets filterable by what
+they do. This is a deliberate carve-out from the out-of-scope "automatic tag
+inference": shape classification is a pure function of the data, not
+heuristic inference.
+
 ## Extraction pipeline
 
 Rust CLI in the existing crate — `src-tauri/src/bin/extract_library.rs` —

@@ -80,7 +80,7 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
       const { hash } = JSON.parse(raw) as { hash: string };
       await library.libraryAssignToTrack(track.id, hash);
       onUpdate();
-      ipc.reloadSequence();
+      await ipc.reloadSequence();
     } catch (err) {
       // Kind mismatch or backend failure — the server-side check is the
       // source of truth; the dragover cue is advisory only.

@@ -356,6 +356,12 @@ impl ProjectManager {
     /// at the instrument and renamed to it, matching the update-path
     /// convention that a track's name follows its bound instrument.
     ///
+    /// All per-region and per-note `instrument_id` overrides on the track
+    /// are CLEARED: importers stamp an id on every note and `build_snapshot`
+    /// gives those precedence over the track binding, so without the clear a
+    /// swap would be inaudible. Chosen semantic: "swap this track's
+    /// instrument" flattens any mid-track voice changes to the dropped voice.
+    ///
     /// Content hashes cover only sound fields (`fm_canonical_bytes` /
     /// `psg_canonical_bytes` exclude id/name/metadata), so project
     /// instruments can be hashed via a straight clone.
@@ -418,6 +424,15 @@ impl ProjectManager {
             .expect("track existence checked above");
         track.instrument_id = Some(id);
         track.name = name;
+        // A track-level swap must win over stale per-note/per-region bindings
+        // (importers stamp instrument_id on every note; build_snapshot gives
+        // those precedence over the track binding).
+        for region in &mut track.regions {
+            region.instrument_id = None;
+            for note in &mut region.notes {
+                note.instrument_id = None;
+            }
+        }
         Ok(id)
     }
 
@@ -1498,6 +1513,81 @@ mod tests {
         let err = mgr.assign_library_instrument_to_track(psg_track, &voice, &hash).unwrap_err();
         assert!(err.contains("FM voice"), "error should name the mismatch: {err}");
         assert!(mgr.list_fm_instruments().is_empty(), "nothing added on error");
+
+        cleanup(&path);
+    }
+
+    fn first_fm_patch_bytes(snap: &SequencerSnapshot) -> [u8; 25] {
+        for ch in &snap.channels {
+            for ev in &ch.events {
+                if let SequencerEvent::NoteOn {
+                    instrument: InstrumentData::FmPatch { bytes, .. }, ..
+                } = ev
+                {
+                    return *bytes;
+                }
+            }
+        }
+        panic!("no FM NoteOn in snapshot");
+    }
+
+    /// Importers stamp `instrument_id` on every note/region and
+    /// `build_snapshot` gives those precedence over the track binding — a
+    /// drag-to-track swap must clear them or it is inaudible.
+    #[test]
+    fn test_assign_library_voice_clears_note_overrides_and_changes_sound() {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
+        let path = temp_project_path("assign_overrides");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Assign", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let old_id = mgr.add_fm_instrument(assign_test_fm());
+        let track_id = mgr.tracks.iter()
+            .find(|t| t.instrument_id == Some(old_id))
+            .unwrap().id;
+
+        // Imported-style data: region AND note carry the old instrument id.
+        let track = mgr.tracks.iter_mut().find(|t| t.id == track_id).unwrap();
+        track.regions.push(Region {
+            id: Uuid::new_v4(),
+            start_tick: 0,
+            duration_ticks: 960,
+            notes: vec![Note {
+                tick: 0,
+                pitch: 60,
+                velocity: 100,
+                duration_ticks: 480,
+                instrument_id: Some(old_id),
+                detune: 0,
+                pan_override: None,
+                modulation: None,
+            }],
+            instrument_id: Some(old_id),
+        });
+
+        let before = first_fm_patch_bytes(&mgr.build_snapshot());
+
+        // A library voice with a different sound (and thus different hash).
+        let mut new_fm = assign_test_fm();
+        new_fm.name = "Swapped Voice".into();
+        new_fm.algorithm = 2;
+        new_fm.feedback = 1;
+        new_fm.operators[0].total_level = 33;
+        let voice = LibraryInstrument::Fm(new_fm);
+        let hash = content_hash(&voice);
+        mgr.assign_library_instrument_to_track(track_id, &voice, &hash).unwrap();
+
+        let after = first_fm_patch_bytes(&mgr.build_snapshot());
+        assert_ne!(before, after, "the swap must reach the audible patch");
+
+        let track = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        for region in &track.regions {
+            assert_eq!(region.instrument_id, None, "region override must be cleared");
+            for note in &region.notes {
+                assert_eq!(note.instrument_id, None, "note override must be cleared");
+            }
+        }
 
         cleanup(&path);
     }

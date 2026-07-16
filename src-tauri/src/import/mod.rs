@@ -8,7 +8,7 @@ pub mod zyrinx_parser;
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportResult {
     pub project_dir: String,
@@ -18,7 +18,7 @@ pub struct ImportResult {
     pub warnings: Vec<ImportWarning>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportWarning {
     pub channel: String,

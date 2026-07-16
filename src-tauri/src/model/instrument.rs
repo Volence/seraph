@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
 pub struct InstrumentBank {
     pub fm: Vec<FmInstrument>,
     pub psg: Vec<PsgInstrument>,
     pub dac: Vec<DacInstrument>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FmInstrument {
     pub id: Uuid,
@@ -19,7 +19,7 @@ pub struct FmInstrument {
     pub metadata: InstrumentMetadata,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FmOperator {
     pub detune: u8,
@@ -27,7 +27,11 @@ pub struct FmOperator {
     pub rate_scale: u8,
     pub attack_rate: u8,
     pub amp_mod: bool,
+    // serde's camelCase leaves `d1r`/`d2r` unchanged, but specta's camelCase
+    // would emit `d1R`/`d2R`; pin the specta name to match the wire format.
+    #[specta(rename = "d1r")]
     pub d1r: u8,
+    #[specta(rename = "d2r")]
     pub d2r: u8,
     pub sustain_level: u8,
     pub release_rate: u8,
@@ -69,7 +73,7 @@ impl Default for FmOperator {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PsgInstrument {
     pub id: Uuid,
@@ -84,13 +88,13 @@ pub struct PsgInstrument {
     pub metadata: InstrumentMetadata,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub enum NoiseMode {
     Periodic(u16),
     White(u16),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DacInstrument {
     pub id: Uuid,
@@ -104,7 +108,7 @@ pub struct DacInstrument {
     pub metadata: InstrumentMetadata,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
 pub struct InstrumentMetadata {
     pub category: String,
     pub author: String,

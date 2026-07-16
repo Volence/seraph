@@ -1,4 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
+// Thin wrappers over the tauri-specta generated bindings (`src/bindings.ts`).
+//
+// The generated `commands.*` return a `Result<T, E>` discriminated union.
+// These wrappers unwrap that into the historical "resolve with T / reject with
+// the error payload" contract the rest of the app relies on, so call sites did
+// not have to change. Types come straight from the generated bindings — Rust is
+// the single source of truth.
+import { commands } from "../bindings";
 import type {
   FmInstrument,
   PsgInstrument,
@@ -12,18 +19,35 @@ import type {
   Pan,
   PlaybackState,
   OverlapWarning,
-} from "../types/model";
+  Result,
+} from "../bindings";
+
+// Re-export the generated response types that call sites reference via `ipc.*`.
+export type {
+  ExportResult,
+  ExportError,
+  ExportFailure,
+  ImportResult,
+  ImportWarning,
+  FmFileImportResponse,
+} from "../bindings";
+
+/** Unwrap a generated `Result<T, E>`: return `T` or throw the error payload. */
+function unwrap<T, E>(res: Result<T, E>): T {
+  if (res.status === "ok") return res.data;
+  throw res.error;
+}
 
 export async function playFmTestTone(): Promise<string> {
-  return invoke<string>("play_fm_test_tone");
+  return unwrap(await commands.playFmTestTone());
 }
 
 export async function playPsgTestTone(): Promise<string> {
-  return invoke<string>("play_psg_test_tone");
+  return unwrap(await commands.playPsgTestTone());
 }
 
 export async function stopAllSound(): Promise<string> {
-  return invoke<string>("stop_all_sound");
+  return unwrap(await commands.stopAllSound());
 }
 
 export async function createProject(
@@ -34,107 +58,107 @@ export async function createProject(
   timeSigNum: number,
   timeSigDen: number,
 ): Promise<void> {
-  return invoke("create_project", { path, name, driverId, tempo, timeSigNum, timeSigDen });
+  unwrap(await commands.createProject(path, name, driverId, tempo, timeSigNum, timeSigDen));
 }
 
 export async function openProject(path: string): Promise<Song> {
-  return invoke<Song>("open_project", { path });
+  return unwrap(await commands.openProject(path));
 }
 
 export async function saveProject(): Promise<void> {
-  return invoke("save_project");
+  unwrap(await commands.saveProject());
 }
 
 export async function closeProject(): Promise<void> {
-  return invoke("close_project");
+  unwrap(await commands.closeProject());
 }
 
 export async function getProjectInfo(): Promise<SongMetadata | null> {
-  return invoke<SongMetadata | null>("get_project_info");
+  return unwrap(await commands.getProjectInfo());
 }
 
 export async function listDrivers(): Promise<DriverInfo[]> {
-  return invoke<DriverInfo[]>("list_drivers");
+  return unwrap(await commands.listDrivers());
 }
 
 export async function getDriverInfo(driverId: string): Promise<DriverDetail> {
-  return invoke<DriverDetail>("get_driver_info", { driverId });
+  return unwrap(await commands.getDriverInfo(driverId));
 }
 
 export async function addFmInstrument(instrument: FmInstrument): Promise<string> {
-  return invoke<string>("add_fm_instrument", { instrument });
+  return unwrap(await commands.addFmInstrument(instrument));
 }
 
 export async function updateFmInstrument(id: string, instrument: FmInstrument): Promise<void> {
-  return invoke("update_fm_instrument", { id, instrument });
+  unwrap(await commands.updateFmInstrument(id, instrument));
 }
 
 export async function deleteFmInstrument(id: string): Promise<void> {
-  return invoke("delete_fm_instrument", { id });
+  unwrap(await commands.deleteFmInstrument(id));
 }
 
 export async function listFmInstruments(): Promise<FmInstrument[]> {
-  return invoke<FmInstrument[]>("list_fm_instruments");
+  return unwrap(await commands.listFmInstruments());
 }
 
 export async function previewFmInstrument(id: string, midiNote: number): Promise<void> {
-  return invoke("preview_fm_instrument", { id, midiNote });
+  unwrap(await commands.previewFmInstrument(id, midiNote));
 }
 
 export async function stopFmPreview(): Promise<void> {
-  return invoke("stop_fm_preview");
+  unwrap(await commands.stopFmPreview());
 }
 
 export async function addPsgInstrument(instrument: PsgInstrument): Promise<string> {
-  return invoke<string>("add_psg_instrument", { instrument });
+  return unwrap(await commands.addPsgInstrument(instrument));
 }
 
 export async function updatePsgInstrument(id: string, instrument: PsgInstrument): Promise<void> {
-  return invoke("update_psg_instrument", { id, instrument });
+  unwrap(await commands.updatePsgInstrument(id, instrument));
 }
 
 export async function deletePsgInstrument(id: string): Promise<void> {
-  return invoke("delete_psg_instrument", { id });
+  unwrap(await commands.deletePsgInstrument(id));
 }
 
 export async function listPsgInstruments(): Promise<PsgInstrument[]> {
-  return invoke<PsgInstrument[]>("list_psg_instruments");
+  return unwrap(await commands.listPsgInstruments());
 }
 
 export async function previewPsgInstrument(id: string, midiNote: number): Promise<void> {
-  return invoke("preview_psg_instrument", { id, midiNote });
+  unwrap(await commands.previewPsgInstrument(id, midiNote));
 }
 
 export async function importDacWav(wavPath: string, targetRate: number): Promise<string> {
-  return invoke<string>("import_dac_wav", { wavPath, targetRate });
+  return unwrap(await commands.importDacWav(wavPath, targetRate));
 }
 
 export async function importDacRaw(pcmPath: string, sampleRate: number): Promise<string> {
-  return invoke<string>("import_dac_raw", { pcmPath, sampleRate });
+  return unwrap(await commands.importDacRaw(pcmPath, sampleRate));
 }
 
 export async function updateDacInstrument(id: string, instrument: DacInstrument): Promise<void> {
-  return invoke("update_dac_instrument", { id, instrument });
+  unwrap(await commands.updateDacInstrument(id, instrument));
 }
 
 export async function reconvertDac(id: string, newRate: number): Promise<void> {
-  return invoke("reconvert_dac", { id, newRate });
+  unwrap(await commands.reconvertDac(id, newRate));
 }
 
 export async function deleteDacInstrument(id: string): Promise<void> {
-  return invoke("delete_dac_instrument", { id });
+  unwrap(await commands.deleteDacInstrument(id));
 }
 
 export async function listDacInstruments(): Promise<DacInstrument[]> {
-  return invoke<DacInstrument[]>("list_dac_instruments");
+  return unwrap(await commands.listDacInstruments());
 }
 
 export async function previewDac(id: string): Promise<void> {
-  return invoke("preview_dac", { id });
+  unwrap(await commands.previewDac(id));
 }
 
 export async function getDacPcmData(id: string): Promise<number[]> {
-  return invoke<number[]>("get_dac_pcm_data", { id });
+  return unwrap(await commands.getDacPcmData(id));
 }
 
 // --- Track CRUD ---
@@ -144,7 +168,7 @@ export async function addTrack(
   channel: ChannelAssignment,
   instrumentId: string | null,
 ): Promise<string> {
-  return invoke<string>("add_track", { name, channel, instrumentId });
+  return unwrap(await commands.addTrack(name, channel, instrumentId));
 }
 
 export async function updateTrack(
@@ -158,15 +182,15 @@ export async function updateTrack(
   pan: Pan,
   pitchOffset?: number,
 ): Promise<void> {
-  return invoke("update_track", { id, name, channel, instrumentId, muted, solo, volume, pan, pitchOffset: pitchOffset ?? 0 });
+  unwrap(await commands.updateTrack(id, name, channel, instrumentId, muted, solo, volume, pan, pitchOffset ?? 0));
 }
 
 export async function deleteTrack(id: string): Promise<void> {
-  return invoke("delete_track", { id });
+  unwrap(await commands.deleteTrack(id));
 }
 
 export async function listTracks(): Promise<Track[]> {
-  return invoke<Track[]>("list_tracks");
+  return unwrap(await commands.listTracks());
 }
 
 // --- Region CRUD ---
@@ -176,7 +200,7 @@ export async function addRegion(
   startTick: number,
   durationTicks: number,
 ): Promise<string> {
-  return invoke<string>("add_region", { trackId, startTick, durationTicks });
+  return unwrap(await commands.addRegion(trackId, startTick, durationTicks));
 }
 
 export async function updateRegion(
@@ -185,7 +209,7 @@ export async function updateRegion(
   startTick: number,
   durationTicks: number,
 ): Promise<void> {
-  return invoke("update_region", { trackId, regionId, startTick, durationTicks });
+  unwrap(await commands.updateRegion(trackId, regionId, startTick, durationTicks));
 }
 
 export async function moveRegion(
@@ -194,11 +218,11 @@ export async function moveRegion(
   dstTrackId: string,
   startTick: number,
 ): Promise<void> {
-  return invoke("move_region", { srcTrackId, regionId, dstTrackId, startTick });
+  unwrap(await commands.moveRegion(srcTrackId, regionId, dstTrackId, startTick));
 }
 
 export async function deleteRegion(trackId: string, regionId: string): Promise<void> {
-  return invoke("delete_region", { trackId, regionId });
+  unwrap(await commands.deleteRegion(trackId, regionId));
 }
 
 // --- Note CRUD ---
@@ -211,7 +235,7 @@ export async function addNote(
   velocity: number,
   durationTicks: number,
 ): Promise<number> {
-  return invoke<number>("add_note", { trackId, regionId, tick, pitch, velocity, durationTicks });
+  return unwrap(await commands.addNote(trackId, regionId, tick, pitch, velocity, durationTicks));
 }
 
 export async function updateNote(
@@ -223,7 +247,7 @@ export async function updateNote(
   velocity: number,
   durationTicks: number,
 ): Promise<void> {
-  return invoke("update_note", { trackId, regionId, noteIndex, tick, pitch, velocity, durationTicks });
+  unwrap(await commands.updateNote(trackId, regionId, noteIndex, tick, pitch, velocity, durationTicks));
 }
 
 export async function deleteNote(
@@ -231,113 +255,83 @@ export async function deleteNote(
   regionId: string,
   noteIndex: number,
 ): Promise<void> {
-  return invoke("delete_note", { trackId, regionId, noteIndex });
+  unwrap(await commands.deleteNote(trackId, regionId, noteIndex));
 }
 
 // --- Transport ---
 
 export async function transportPlay(): Promise<void> {
-  return invoke("transport_play");
+  unwrap(await commands.transportPlay());
 }
 
 export async function transportStop(): Promise<void> {
-  return invoke("transport_stop");
+  unwrap(await commands.transportStop());
 }
 
 export async function transportSeek(tick: number): Promise<void> {
-  return invoke("transport_seek", { tick });
+  unwrap(await commands.transportSeek(tick));
 }
 
 export async function transportSetLoop(startTick: number, endTick: number): Promise<void> {
-  return invoke("transport_set_loop", { startTick, endTick });
+  unwrap(await commands.transportSetLoop(startTick, endTick));
 }
 
 export async function transportClearLoop(): Promise<void> {
-  return invoke("transport_clear_loop");
+  unwrap(await commands.transportClearLoop());
 }
 
 export async function reloadSequence(): Promise<void> {
-  return invoke("reload_sequence");
+  unwrap(await commands.reloadSequence());
 }
 
 export async function setMasterVolume(volume: number): Promise<void> {
-  return invoke("set_master_volume", { volume });
+  unwrap(await commands.setMasterVolume(volume));
 }
 
 export async function getPlaybackState(): Promise<PlaybackState> {
-  return invoke<PlaybackState>("get_playback_state");
+  return unwrap(await commands.getPlaybackState());
 }
 
 // --- Validation ---
 
 export async function getChannelOverlaps(): Promise<OverlapWarning[]> {
-  return invoke<OverlapWarning[]>("get_channel_overlaps");
+  return unwrap(await commands.getChannelOverlaps());
 }
 
 // --- Export ---
 
-export interface ExportResult {
-  files: string[];
-}
-
-export interface ExportError {
-  trackName: string;
-  regionIndex: number | null;
-  noteIndex: number | null;
-  message: string;
-}
-
-export async function exportSong(outputDir: string): Promise<ExportResult> {
-  return invoke<ExportResult>("export_song", { outputDir });
+export async function exportSong(outputDir: string): Promise<import("../bindings").ExportResult> {
+  return unwrap(await commands.exportSong(outputDir));
 }
 
 // --- Import ---
 
-export interface ImportWarning {
-  channel: string;
-  message: string;
+export async function importSong(sourcePath: string, parentDir: string, dacDir?: string): Promise<import("../bindings").ImportResult> {
+  return unwrap(await commands.importSong(sourcePath, parentDir, dacDir ?? null));
 }
 
-export interface ImportResult {
-  projectDir: string;
-  metadata: SongMetadata;
-  trackCount: number;
-  instrumentCount: number;
-  warnings: ImportWarning[];
+export async function importZyrinxSong(romPath: string, parentDir: string, gameId: number): Promise<import("../bindings").ImportResult> {
+  return unwrap(await commands.importZyrinxSong(romPath, parentDir, gameId));
 }
 
-export async function importSong(sourcePath: string, parentDir: string, dacDir?: string): Promise<ImportResult> {
-  return invoke<ImportResult>("import_song", { sourcePath, parentDir, dacDir: dacDir ?? null });
-}
-
-export async function importZyrinxSong(romPath: string, parentDir: string, gameId: number): Promise<ImportResult> {
-  return invoke<ImportResult>("import_zyrinx_song", { romPath, parentDir, gameId });
-}
-
-export async function importVgm(vgmPath: string, parentDir: string): Promise<ImportResult> {
-  return invoke<ImportResult>("import_vgm", { vgmPath, parentDir });
+export async function importVgm(vgmPath: string, parentDir: string): Promise<import("../bindings").ImportResult> {
+  return unwrap(await commands.importVgm(vgmPath, parentDir));
 }
 
 // --- WAV Export ---
 
 export async function exportWav(outputPath: string, durationSeconds: number): Promise<string> {
-  return invoke<string>("export_wav", { outputPath, durationSeconds });
+  return unwrap(await commands.exportWav(outputPath, durationSeconds));
 }
 
 // --- VGM Export ---
 
 export async function exportVgm(outputPath: string, durationSeconds: number): Promise<string> {
-  return invoke<string>("export_vgm", { outputPath, durationSeconds });
+  return unwrap(await commands.exportVgm(outputPath, durationSeconds));
 }
 
 // --- FM File Import ---
 
-export interface FmFileImportResponse {
-  format: string;
-  count: number;
-  ids: string[];
-}
-
-export async function importFmFile(filePath: string): Promise<FmFileImportResponse> {
-  return invoke<FmFileImportResponse>("import_fm_file", { filePath });
+export async function importFmFile(filePath: string): Promise<import("../bindings").FmFileImportResponse> {
+  return unwrap(await commands.importFmFile(filePath));
 }

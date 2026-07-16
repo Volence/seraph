@@ -31,7 +31,7 @@ impl SequencerEvent {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct OverlapWarning {
     pub channel_name: String,

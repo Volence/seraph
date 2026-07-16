@@ -25,7 +25,7 @@ pub trait DriverProfile: Send + Sync {
     ) -> Result<ExportResult, Vec<ExportError>>;
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelLayout {
     pub fm_channels: Vec<FmChannelInfo>,
@@ -33,7 +33,7 @@ pub struct ChannelLayout {
     pub dac_channels: Vec<DacChannelInfo>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FmChannelInfo {
     pub index: u8,
@@ -41,7 +41,7 @@ pub struct FmChannelInfo {
     pub supports_special_mode: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PsgChannelInfo {
     pub index: u8,
@@ -49,13 +49,13 @@ pub struct PsgChannelInfo {
     pub is_noise: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct DacChannelInfo {
     pub index: u8,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 pub enum DriverFeature {
     SsgEg,
     Fm3SpecialMode,

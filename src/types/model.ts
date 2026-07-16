@@ -1,155 +1,34 @@
-export interface FmOperator {
-  detune: number;
-  multiple: number;
-  rateScale: number;
-  attackRate: number;
-  ampMod: boolean;
-  d1r: number;
-  d2r: number;
-  sustainLevel: number;
-  releaseRate: number;
-  totalLevel: number;
-}
+// The data types below are generated from Rust by tauri-specta (see
+// `src/bindings.ts`). Rust is the single source of truth; these re-exports keep
+// the historical `../types/model` import path working for the rest of the app.
+export type {
+  FmOperator,
+  InstrumentMetadata,
+  FmInstrument,
+  PsgInstrument,
+  NoiseMode,
+  DacInstrument,
+  InstrumentBank,
+  SongMetadata,
+  ChannelAssignment,
+  Pan,
+  Track,
+  Region,
+  NoteModulation,
+  Note,
+  Song,
+  FmChannelInfo,
+  PsgChannelInfo,
+  DacChannelInfo,
+  ChannelLayout,
+  DriverInfo,
+  DriverDetail,
+  PlaybackState,
+  OverlapWarning,
+} from "../bindings";
 
-export interface InstrumentMetadata {
-  category: string;
-  author: string;
-  tags: string[];
-}
-
-export interface FmInstrument {
-  id: string;
-  name: string;
-  algorithm: number;
-  feedback: number;
-  operators: [FmOperator, FmOperator, FmOperator, FmOperator];
-  metadata: InstrumentMetadata;
-}
-
-export interface PsgInstrument {
-  id: string;
-  name: string;
-  volumeSequence: number[];
-  loopPoint: number | null;
-  noiseMode: NoiseMode | null;
-  metadata: InstrumentMetadata;
-}
-
-export type NoiseMode = { Periodic: number } | { White: number };
-
-export interface DacInstrument {
-  id: string;
-  name: string;
-  targetSampleRate: number;
-  loopStart: number | null;
-  loopLength: number | null;
-  originalFile: string;
-  pcmFile: string;
-  sourceIsRaw: boolean;
-  metadata: InstrumentMetadata;
-}
-
-export interface InstrumentBank {
-  fm: FmInstrument[];
-  psg: PsgInstrument[];
-  dac: DacInstrument[];
-}
-
-export interface SongMetadata {
-  name: string;
-  tempo: number;
-  timeSignature: [number, number];
-  ticksPerBeat: number;
-  driverId: string;
-}
-
-export type ChannelAssignment =
-  | { Fm: number }
-  | { Psg: number }
-  | "PsgNoise"
-  | { Dac: number };
-
-export type Pan = "Left" | "Right" | "Center";
-
-export interface Track {
-  id: string;
-  name: string;
-  channel: ChannelAssignment;
-  instrumentId: string | null;
-  regions: Region[];
-  muted: boolean;
-  solo: boolean;
-  volume: number;
-  pan: Pan;
-  pitchOffset: number;
-}
-
-export interface Region {
-  id: string;
-  startTick: number;
-  durationTicks: number;
-  notes: Note[];
-  instrumentId?: string | null;
-}
-
-export interface NoteModulation {
-  wait: number;
-  speed: number;
-  delta: number;
-  steps: number;
-}
-
-export interface Note {
-  tick: number;
-  pitch: number;
-  velocity: number;
-  durationTicks: number;
-  instrumentId?: string | null;
-  detune?: number;
-  panOverride?: number | null;
-  modulation?: NoteModulation | null;
-}
-
-export interface Song {
-  metadata: SongMetadata;
-  tracks: Track[];
-  instruments: InstrumentBank;
-}
-
-export interface FmChannelInfo {
-  index: number;
-  name: string;
-  supportsSpecialMode: boolean;
-}
-
-export interface PsgChannelInfo {
-  index: number;
-  name: string;
-  isNoise: boolean;
-}
-
-export interface DacChannelInfo {
-  index: number;
-  name: string;
-}
-
-export interface ChannelLayout {
-  fmChannels: FmChannelInfo[];
-  psgChannels: PsgChannelInfo[];
-  dacChannels: DacChannelInfo[];
-}
-
-export interface DriverInfo {
-  id: string;
-  name: string;
-}
-
-export interface DriverDetail {
-  id: string;
-  name: string;
-  layout: ChannelLayout;
-  features: string[];
-}
+// The DEFAULT_* constants below still need to satisfy the generated types.
+import type { FmOperator, InstrumentMetadata } from "../bindings";
 
 export type SelectedInstrument =
   | { type: "fm"; id: string }
@@ -195,21 +74,6 @@ export const CARRIER_MASKS = [
 
 export function isCarrier(algorithm: number, opIndex: number): boolean {
   return (CARRIER_MASKS[algorithm] & (1 << opIndex)) !== 0;
-}
-
-export interface PlaybackState {
-  playing: boolean;
-  tick: number;
-  loopStart: number | null;
-  loopEnd: number | null;
-  channelLevels: number[];
-}
-
-export interface OverlapWarning {
-  channelName: string;
-  tickStart: number;
-  tickEnd: number;
-  trackIds: string[];
 }
 
 export interface SelectedRegion {

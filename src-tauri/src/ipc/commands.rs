@@ -35,6 +35,7 @@ fn ym_write(thread: &mut AudioThread, addr: u8, data: u8) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn play_fm_test_tone(state: State<'_, AudioState>) -> Result<String, String> {
     let mut thread = state
         .thread
@@ -114,6 +115,7 @@ pub fn play_fm_test_tone(state: State<'_, AudioState>) -> Result<String, String>
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn play_psg_test_tone(state: State<'_, AudioState>) -> Result<String, String> {
     let mut thread = state
         .thread
@@ -150,6 +152,7 @@ pub fn play_psg_test_tone(state: State<'_, AudioState>) -> Result<String, String
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn stop_all_sound(state: State<'_, AudioState>) -> Result<String, String> {
     let mut thread = state
         .thread
@@ -164,6 +167,7 @@ pub fn stop_all_sound(state: State<'_, AudioState>) -> Result<String, String> {
 // --- Project Management ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn create_project(
     state: State<'_, ProjectState>,
     path: String,
@@ -178,18 +182,21 @@ pub fn create_project(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn open_project(state: State<'_, ProjectState>, path: String) -> Result<Song, String> {
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     mgr.open(&PathBuf::from(path))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn save_project(state: State<'_, ProjectState>) -> Result<(), String> {
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     mgr.save()
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn close_project(state: State<'_, ProjectState>) -> Result<(), String> {
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     mgr.close();
@@ -197,6 +204,7 @@ pub fn close_project(state: State<'_, ProjectState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_project_info(state: State<'_, ProjectState>) -> Result<Option<SongMetadata>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.metadata().cloned())
@@ -204,13 +212,14 @@ pub fn get_project_info(state: State<'_, ProjectState>) -> Result<Option<SongMet
 
 // --- Driver Info ---
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct DriverInfo {
     pub id: String,
     pub name: String,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_drivers(state: State<'_, ProjectState>) -> Result<Vec<DriverInfo>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr
@@ -224,7 +233,7 @@ pub fn list_drivers(state: State<'_, ProjectState>) -> Result<Vec<DriverInfo>, S
         .collect())
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DriverDetail {
     pub id: String,
@@ -234,6 +243,7 @@ pub struct DriverDetail {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_driver_info(state: State<'_, ProjectState>, driver_id: String) -> Result<DriverDetail, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let driver = mgr
@@ -264,6 +274,7 @@ pub fn get_driver_info(state: State<'_, ProjectState>, driver_id: String) -> Res
 // --- FM Instrument CRUD ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn add_fm_instrument(
     state: State<'_, ProjectState>,
     instrument: FmInstrument,
@@ -274,6 +285,7 @@ pub fn add_fm_instrument(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_fm_instrument(
     state: State<'_, ProjectState>,
     id: String,
@@ -285,6 +297,7 @@ pub fn update_fm_instrument(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_fm_instrument(state: State<'_, ProjectState>, id: String) -> Result<(), String> {
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
@@ -292,6 +305,7 @@ pub fn delete_fm_instrument(state: State<'_, ProjectState>, id: String) -> Resul
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_fm_instruments(state: State<'_, ProjectState>) -> Result<Vec<FmInstrument>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.list_fm_instruments().to_vec())
@@ -305,6 +319,7 @@ fn ym_write_port(thread: &mut AudioThread, port: u8, addr: u8, data: u8) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn preview_fm_instrument(
     audio_state: State<'_, AudioState>,
     project_state: State<'_, ProjectState>,
@@ -351,6 +366,7 @@ pub fn preview_fm_instrument(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn stop_fm_preview(
     audio_state: State<'_, AudioState>,
 ) -> Result<(), String> {
@@ -362,6 +378,7 @@ pub fn stop_fm_preview(
 // --- PSG Instrument CRUD ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn add_psg_instrument(
     state: State<'_, ProjectState>,
     instrument: PsgInstrument,
@@ -372,6 +389,7 @@ pub fn add_psg_instrument(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_psg_instrument(
     state: State<'_, ProjectState>,
     id: String,
@@ -383,6 +401,7 @@ pub fn update_psg_instrument(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_psg_instrument(state: State<'_, ProjectState>, id: String) -> Result<(), String> {
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
@@ -390,12 +409,14 @@ pub fn delete_psg_instrument(state: State<'_, ProjectState>, id: String) -> Resu
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_psg_instruments(state: State<'_, ProjectState>) -> Result<Vec<PsgInstrument>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.list_psg_instruments().to_vec())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn preview_psg_instrument(
     audio_state: State<'_, AudioState>,
     project_state: State<'_, ProjectState>,
@@ -428,6 +449,7 @@ pub fn preview_psg_instrument(
 // --- DAC Instrument CRUD ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_dac_wav(
     state: State<'_, ProjectState>,
     wav_path: String,
@@ -472,6 +494,7 @@ pub fn import_dac_wav(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_dac_raw(
     state: State<'_, ProjectState>,
     pcm_path: String,
@@ -516,6 +539,7 @@ pub fn import_dac_raw(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_dac_instrument(
     state: State<'_, ProjectState>,
     id: String,
@@ -527,6 +551,7 @@ pub fn update_dac_instrument(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn reconvert_dac(state: State<'_, ProjectState>, id: String, new_rate: u32) -> Result<(), String> {
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
@@ -559,6 +584,7 @@ pub fn reconvert_dac(state: State<'_, ProjectState>, id: String, new_rate: u32) 
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_dac_instrument(state: State<'_, ProjectState>, id: String) -> Result<(), String> {
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
@@ -566,12 +592,14 @@ pub fn delete_dac_instrument(state: State<'_, ProjectState>, id: String) -> Resu
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_dac_instruments(state: State<'_, ProjectState>) -> Result<Vec<DacInstrument>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.list_dac_instruments().to_vec())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn preview_dac(
     audio_state: State<'_, AudioState>,
     project_state: State<'_, ProjectState>,
@@ -598,6 +626,7 @@ pub fn preview_dac(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_dac_pcm_data(
     state: State<'_, ProjectState>,
     id: String,
@@ -613,6 +642,7 @@ pub fn get_dac_pcm_data(
 // --- Track CRUD ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn add_track(
     state: State<'_, ProjectState>,
     name: String,
@@ -629,6 +659,7 @@ pub fn add_track(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_track(
     state: State<'_, ProjectState>,
     id: String,
@@ -651,6 +682,7 @@ pub fn update_track(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_track(state: State<'_, ProjectState>, id: String) -> Result<(), String> {
     let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
@@ -658,6 +690,7 @@ pub fn delete_track(state: State<'_, ProjectState>, id: String) -> Result<(), St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_tracks(state: State<'_, ProjectState>) -> Result<Vec<crate::model::song::Track>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.list_tracks().to_vec())
@@ -666,6 +699,7 @@ pub fn list_tracks(state: State<'_, ProjectState>) -> Result<Vec<crate::model::s
 // --- Region CRUD ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn add_region(
     state: State<'_, ProjectState>,
     track_id: String,
@@ -679,6 +713,7 @@ pub fn add_region(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_region(
     state: State<'_, ProjectState>,
     track_id: String,
@@ -693,6 +728,7 @@ pub fn update_region(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn move_region(
     state: State<'_, ProjectState>,
     src_track_id: String,
@@ -708,6 +744,7 @@ pub fn move_region(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_region(
     state: State<'_, ProjectState>,
     track_id: String,
@@ -722,6 +759,7 @@ pub fn delete_region(
 // --- Note CRUD ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn add_note(
     state: State<'_, ProjectState>,
     track_id: String,
@@ -738,6 +776,7 @@ pub fn add_note(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_note(
     state: State<'_, ProjectState>,
     track_id: String,
@@ -755,6 +794,7 @@ pub fn update_note(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_note(
     state: State<'_, ProjectState>,
     track_id: String,
@@ -770,6 +810,7 @@ pub fn delete_note(
 // --- Transport ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn transport_play(
     audio_state: State<'_, AudioState>,
     project_state: State<'_, ProjectState>,
@@ -785,6 +826,7 @@ pub fn transport_play(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn transport_stop(audio_state: State<'_, AudioState>) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::TransportStop);
@@ -792,6 +834,7 @@ pub fn transport_stop(audio_state: State<'_, AudioState>) -> Result<(), String> 
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn transport_seek(audio_state: State<'_, AudioState>, tick: u64) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::TransportSeek { tick });
@@ -799,6 +842,7 @@ pub fn transport_seek(audio_state: State<'_, AudioState>, tick: u64) -> Result<(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn reload_sequence(
     audio_state: State<'_, AudioState>,
     project_state: State<'_, ProjectState>,
@@ -812,6 +856,7 @@ pub fn reload_sequence(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn transport_set_loop(audio_state: State<'_, AudioState>, start_tick: u64, end_tick: u64) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::TransportSetLoop { start_tick, end_tick });
@@ -819,6 +864,7 @@ pub fn transport_set_loop(audio_state: State<'_, AudioState>, start_tick: u64, e
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn transport_clear_loop(audio_state: State<'_, AudioState>) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::TransportClearLoop);
@@ -826,13 +872,14 @@ pub fn transport_clear_loop(audio_state: State<'_, AudioState>) -> Result<(), St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_master_volume(audio_state: State<'_, AudioState>, volume: f32) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::SetMasterVolume { volume });
     Ok(())
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackState {
     pub playing: bool,
@@ -843,6 +890,7 @@ pub struct PlaybackState {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_playback_state(audio_state: State<'_, AudioState>) -> Result<PlaybackState, String> {
     let thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let tick = thread.position_tick().load(std::sync::atomic::Ordering::Relaxed);
@@ -859,6 +907,7 @@ pub fn get_playback_state(audio_state: State<'_, AudioState>) -> Result<Playback
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_channel_overlaps(state: State<'_, ProjectState>) -> Result<Vec<OverlapWarning>, String> {
     let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     Ok(mgr.get_all_overlaps())
@@ -866,13 +915,14 @@ pub fn get_channel_overlaps(state: State<'_, ProjectState>) -> Result<Vec<Overla
 
 // --- Export ---
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportFailure {
     pub errors: Vec<ExportError>,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn export_song(
     state: State<'_, ProjectState>,
     output_dir: String,
@@ -907,6 +957,7 @@ pub fn export_song(
 // --- WAV Export ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn export_wav(
     project_state: State<'_, ProjectState>,
     output_path: String,
@@ -962,6 +1013,7 @@ pub fn export_wav(
 // --- Import ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_song(
     state: State<'_, ProjectState>,
     source_path: String,
@@ -982,7 +1034,7 @@ pub fn import_song(
 
 // --- FM File Import ---
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FmFileImportResponse {
     pub format: String,
@@ -991,6 +1043,7 @@ pub struct FmFileImportResponse {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_fm_file(
     state: State<'_, ProjectState>,
     file_path: String,
@@ -1021,6 +1074,7 @@ pub fn import_fm_file(
 // --- VGM Export ---
 
 #[tauri::command]
+#[specta::specta]
 pub fn export_vgm(
     project_state: State<'_, ProjectState>,
     output_path: String,
@@ -1039,6 +1093,7 @@ pub fn export_vgm(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_zyrinx_song(
     rom_path: String,
     parent_dir: String,
@@ -1050,6 +1105,7 @@ pub fn import_zyrinx_song(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_vgm(
     vgm_path: String,
     parent_dir: String,

@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use super::instrument::InstrumentBank;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SongMetadata {
     pub name: String,
@@ -13,7 +13,7 @@ pub struct SongMetadata {
     pub driver_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
     pub id: Uuid,
@@ -31,7 +31,7 @@ pub struct Track {
     pub modulation: Option<TrackModulation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackModulation {
     pub wait: u8,
@@ -40,7 +40,7 @@ pub struct TrackModulation {
     pub steps: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub enum ChannelAssignment {
     Fm(u8),
     Psg(u8),
@@ -48,14 +48,14 @@ pub enum ChannelAssignment {
     Dac(u8),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub enum Pan {
     Left,
     Right,
     Center,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Region {
     pub id: Uuid,
@@ -66,7 +66,7 @@ pub struct Region {
     pub instrument_id: Option<Uuid>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     pub tick: u64,
@@ -83,7 +83,7 @@ pub struct Note {
     pub modulation: Option<NoteModulation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteModulation {
     pub wait: u8,
@@ -100,7 +100,7 @@ pub struct ProjectFile {
 }
 
 /// Full in-memory song representation including instruments.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct Song {
     pub metadata: SongMetadata,
     pub tracks: Vec<Track>,

@@ -1,22 +1,17 @@
 {
   "schema": 1,
-  "name": "Credits (Sonic & Knuckles) voice 10",
+  "name": "UVB voice 13",
   "tags": [],
   "provenance": {
     "game": "Sonic 3 & Knuckles",
-    "songs": [
-      "Credits (Sonic & Knuckles)",
-      "LRZ1",
-      "Menu (Sonic & Knuckles)",
-      "Menu (Sonic 3)"
-    ],
-    "slot": 10,
+    "songs": [],
+    "slot": 13,
     "hash": "sha256:901e17a987a185f8b014c9aa5b5f643e0e32cced47300927f1d49b3be958beba"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Credits (Sonic & Knuckles) voice 10",
+    "name": "UVB voice 13",
     "algorithm": 0,
     "feedback": 7,
     "operators": [

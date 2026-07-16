@@ -1,32 +1,29 @@
 {
   "schema": 1,
-  "name": "Credits (Sonic & Knuckles) voice 10",
+  "name": "UVB voice 25",
   "tags": [],
   "provenance": {
     "game": "Sonic 3 & Knuckles",
     "songs": [
-      "Credits (Sonic & Knuckles)",
-      "LRZ1",
-      "Menu (Sonic & Knuckles)",
-      "Menu (Sonic 3)"
+      "Desert Palace"
     ],
-    "slot": 10,
-    "hash": "sha256:901e17a987a185f8b014c9aa5b5f643e0e32cced47300927f1d49b3be958beba"
+    "slot": 25,
+    "hash": "sha256:f80c3f7dcd21740cb75f20b8d5756bffedf4316ac6db9363233c852429ecd2c7"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Credits (Sonic & Knuckles) voice 10",
-    "algorithm": 0,
+    "name": "UVB voice 25",
+    "algorithm": 2,
     "feedback": 7,
     "operators": [
       {
         "detune": 3,
         "multiple": 1,
-        "rateScale": 0,
-        "attackRate": 27,
+        "rateScale": 1,
+        "attackRate": 19,
         "ampMod": false,
-        "d1r": 0,
+        "d1r": 3,
         "d2r": 0,
         "sustainLevel": 0,
         "releaseRate": 15,
@@ -36,40 +33,40 @@
       {
         "detune": 3,
         "multiple": 1,
-        "rateScale": 0,
-        "attackRate": 26,
+        "rateScale": 2,
+        "attackRate": 14,
         "ampMod": false,
-        "d1r": 0,
+        "d1r": 14,
         "d2r": 0,
-        "sustainLevel": 0,
+        "sustainLevel": 1,
         "releaseRate": 15,
-        "totalLevel": 26,
+        "totalLevel": 38,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 7,
+        "rateScale": 2,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 40,
         "ssgEg": 0
       },
       {
         "detune": 3,
         "multiple": 1,
-        "rateScale": 0,
-        "attackRate": 19,
-        "ampMod": false,
-        "d1r": 0,
-        "d2r": 0,
-        "sustainLevel": 0,
-        "releaseRate": 15,
-        "totalLevel": 25,
-        "ssgEg": 0
-      },
-      {
-        "detune": 6,
-        "multiple": 3,
-        "rateScale": 0,
-        "attackRate": 16,
+        "rateScale": 2,
+        "attackRate": 13,
         "ampMod": false,
         "d1r": 14,
         "d2r": 0,
-        "sustainLevel": 3,
+        "sustainLevel": 1,
         "releaseRate": 15,
-        "totalLevel": 26,
+        "totalLevel": 23,
         "ssgEg": 0
       }
     ],

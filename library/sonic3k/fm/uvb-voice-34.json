@@ -1,21 +1,17 @@
 {
   "schema": 1,
-  "name": "Credits (Sonic & Knuckles) voice 07",
+  "name": "UVB voice 34",
   "tags": [],
   "provenance": {
     "game": "Sonic 3 & Knuckles",
-    "songs": [
-      "Credits (Sonic & Knuckles)",
-      "Gum Ball Machine",
-      "LRZ1"
-    ],
-    "slot": 7,
+    "songs": [],
+    "slot": 34,
     "hash": "sha256:9649ab64720aee87f7d04c5e3d47ffbb6cf22074e0292c2b9bfe0fe9cdd420bf"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Credits (Sonic & Knuckles) voice 07",
+    "name": "UVB voice 34",
     "algorithm": 0,
     "feedback": 4,
     "operators": [

@@ -25,8 +25,19 @@ pub struct ExtractStats {
 }
 
 /// Extract every FM voice from every .asm song in `in_dir` (sorted for
-/// determinism), dedup by hash, write to `out_dir`.
+/// determinism), dedup by hash, write to `out_dir`. Songs referencing the
+/// shared Universal Voice Bank (`smpsHeaderVoiceUVB`, S3K) contribute the
+/// bank voices they actually use.
 pub fn extract_smps_dir(in_dir: &Path, game: &str, out_dir: &Path) -> Result<ExtractStats, String> {
+    extract_smps_dir_with_bank(in_dir, game, out_dir, uvb_bank())
+}
+
+fn extract_smps_dir_with_bank(
+    in_dir: &Path,
+    game: &str,
+    out_dir: &Path,
+    uvb: &[[u8; 25]],
+) -> Result<ExtractStats, String> {
     let mut files: Vec<_> = fs::read_dir(in_dir).map_err(|e| e.to_string())?
         .flatten().map(|e| e.path())
         .filter(|p| p.extension().is_some_and(|x| x == "asm"))
@@ -51,41 +62,146 @@ pub fn extract_smps_dir(in_dir: &Path, game: &str, out_dir: &Path) -> Result<Ext
         // the track-number prefix stripped ("OOZ voice 00").
         let song = song_stem(&f);
         let display = display_song_name(&song).to_string();
-        for (i, voice) in smps.voices.iter().enumerate() {
-            stats.voices_seen += 1;
-            let mut inst = fm_voice_to_instrument(voice)?;
-            // CRITICAL for idempotency: importers assign fresh random UUIDs.
-            // Library files must be deterministic — nil the id (a real id is
-            // re-assigned by add_fm_instrument when added to a project).
-            inst.id = uuid::Uuid::nil();
-            let li_probe = LibraryInstrument::Fm(inst.clone());
-            let hash = content_hash(&li_probe);
-            match entries.get_mut(&hash) {
-                Some(e) => {
-                    if !e.provenance.songs.contains(&song) { e.provenance.songs.push(song.clone()); }
-                }
-                None => {
-                    inst.name = format!("{display} voice {i:02}");
-                    inst.metadata = InstrumentMetadata {
-                        category: game.to_string(), author: String::new(), tags: vec![],
-                    };
-                    let name = inst.name.clone();
-                    entries.insert(hash.clone(), LibraryEntryFile {
-                        schema: LIBRARY_SCHEMA, name, tags: vec![],
-                        provenance: Provenance {
-                            game: game.to_string(), songs: vec![song.clone()],
-                            slot: Some(i as u8), hash: hash.clone(),
-                        },
-                        instrument: LibraryInstrument::Fm(inst),
-                    });
-                    order.push(hash);
+        if smps.voices.is_empty() && matches!(smps.voice_ref, smps_parser::VoiceRef::Uvb) {
+            // Shared-bank song: harvest only the bank voices it actually
+            // uses (SetVoice events on FM channels — mirrors the used-index
+            // logic of the UVB round-trip test in import/mod.rs). Names are
+            // bank-based ("UVB voice NN"), NOT per-song: the same bank voice
+            // referenced by several songs must hash-dedup to ONE entry whose
+            // provenance lists them all; a per-song name would depend on
+            // which song happened to be seen first.
+            let mut used: Vec<u8> = Vec::new();
+            for ch in &smps.channels {
+                if ch.kind != smps_parser::SmpsChannelKind::Fm { continue; }
+                for ev in &ch.events {
+                    if let smps_parser::SmpsEvent::SetVoice(v) = ev {
+                        if !used.contains(v) { used.push(*v); }
+                    }
                 }
             }
+            used.sort();
+            for &idx in &used {
+                let Some(voice) = uvb.get(idx as usize) else {
+                    eprintln!("{song}: UVB voice index {idx} out of range (bank has {})", uvb.len());
+                    continue;
+                };
+                stats.voices_seen += 1;
+                let inst = fm_voice_to_instrument(voice)?;
+                accumulate_fm(
+                    &mut entries, &mut order, inst,
+                    format!("UVB voice {idx:02}"), game, &song, idx,
+                );
+            }
+            continue;
+        }
+        for (i, voice) in smps.voices.iter().enumerate() {
+            stats.voices_seen += 1;
+            let inst = fm_voice_to_instrument(voice)?;
+            accumulate_fm(
+                &mut entries, &mut order, inst,
+                format!("{display} voice {i:02}"), game, &song, i as u8,
+            );
         }
     }
     write_game_meta(out_dir, game, &in_dir.display().to_string())?;
     for h in order {
         write_entry(out_dir, &entries[&h])?;
+        stats.unique_written += 1;
+    }
+    Ok(stats)
+}
+
+/// Hash-dedup one FM voice into the accumulate-then-write maps: a repeat
+/// hash unions provenance songs; a new hash takes `name` and `slot`.
+fn accumulate_fm(
+    entries: &mut HashMap<String, LibraryEntryFile>,
+    order: &mut Vec<String>,
+    mut inst: FmInstrument,
+    name: String,
+    game: &str,
+    song: &str,
+    slot: u8,
+) {
+    // CRITICAL for idempotency: importers assign fresh random UUIDs.
+    // Library files must be deterministic — nil the id (a real id is
+    // re-assigned by add_fm_instrument when added to a project).
+    inst.id = uuid::Uuid::nil();
+    let hash = content_hash(&LibraryInstrument::Fm(inst.clone()));
+    match entries.get_mut(&hash) {
+        Some(e) => {
+            if !e.provenance.songs.iter().any(|s| s == song) {
+                e.provenance.songs.push(song.to_string());
+            }
+        }
+        None => {
+            inst.name = name.clone();
+            inst.metadata = InstrumentMetadata {
+                category: game.to_string(), author: String::new(), tags: vec![],
+            };
+            entries.insert(hash.clone(), LibraryEntryFile {
+                schema: LIBRARY_SCHEMA, name, tags: vec![],
+                provenance: Provenance {
+                    game: game.to_string(), songs: vec![song.to_string()],
+                    slot: Some(slot), hash: hash.clone(),
+                },
+                instrument: LibraryInstrument::Fm(inst),
+            });
+            order.push(hash);
+        }
+    }
+}
+
+/// The bundled S3K Universal Voice Bank, parsed once lazily — the same
+/// source the production importer resolves against (see `smps_mapper`).
+fn uvb_bank() -> &'static [[u8; 25]] {
+    static UVB: std::sync::OnceLock<Vec<[u8; 25]>> = std::sync::OnceLock::new();
+    UVB.get_or_init(|| {
+        static UVB_SOURCE: &str = include_str!("../../test_data/UniBank.asm");
+        match smps_parser::parse_voice_bank(UVB_SOURCE) {
+            Ok(v) => v,
+            Err(e) => { eprintln!("UVB parse error: {e}"); vec![] }
+        }
+    })
+}
+
+/// Extract the ENTIRE bundled Universal Voice Bank (S3K shared voices),
+/// so bank voices no parsed song references are still in the library.
+///
+/// ORDER MATTERS when combining with the S3K smps pass into the same out
+/// dir: run `uvb` FIRST, then `smps`. Both passes produce identical hashes
+/// and names for shared voices, so `write_entry`'s same-hash branch
+/// overwrites in place — the later smps pass replaces this pass's
+/// empty-provenance files with the songs-bearing versions, and this pass
+/// contributes only the voices nothing references. (The reverse order
+/// would clobber song provenance with empty lists.)
+pub fn extract_uvb(out_dir: &Path) -> Result<ExtractStats, String> {
+    extract_uvb_bank(uvb_bank(), out_dir)
+}
+
+fn extract_uvb_bank(bank: &[[u8; 25]], out_dir: &Path) -> Result<ExtractStats, String> {
+    write_game_meta(out_dir, "Sonic 3 & Knuckles", "unibank-asm")?;
+    let mut stats = ExtractStats::default();
+    let mut seen = std::collections::HashSet::new();
+    for (idx, voice) in bank.iter().enumerate() {
+        stats.voices_seen += 1;
+        let mut inst = fm_voice_to_instrument(voice)?;
+        inst.id = uuid::Uuid::nil(); // determinism — see accumulate_fm note
+        inst.name = format!("UVB voice {idx:02}");
+        inst.metadata = InstrumentMetadata {
+            category: "Sonic 3 & Knuckles".into(), author: String::new(), tags: vec![],
+        };
+        let name = inst.name.clone();
+        let li = LibraryInstrument::Fm(inst);
+        let hash = content_hash(&li);
+        if !seen.insert(hash.clone()) { continue; }
+        write_entry(out_dir, &LibraryEntryFile {
+            schema: LIBRARY_SCHEMA, name, tags: vec![],
+            provenance: Provenance {
+                game: "Sonic 3 & Knuckles".into(), songs: vec![],
+                slot: Some(idx as u8), hash,
+            },
+            instrument: li,
+        })?;
         stats.unique_written += 1;
     }
     Ok(stats)
@@ -321,6 +437,54 @@ mod tests {
         )
     }
 
+    /// Minimal UVB-referencing song: no inline voices, `smpsHeaderVoiceUVB`,
+    /// one FM channel selecting bank voice $01 only.
+    fn fixture_uvb_song(p: &str) -> String {
+        format!(
+            r"{p}_Header:
+	smpsHeaderStartSong 3
+	smpsHeaderVoiceUVB
+	smpsHeaderChan      $01, $00
+	smpsHeaderTempo     $01, $00
+
+	smpsHeaderFM        {p}_FM1, $00, $00
+
+{p}_FM1:
+	smpsSetvoice        $01
+	smpsStop
+"
+        )
+    }
+
+    /// Two-voice fixture bank (voice $00 = the OOZ block, voice $01 distinct),
+    /// in the exact dialect `parse_voice_bank` accepts.
+    fn fixture_bank() -> Vec<[u8; 25]> {
+        smps_parser::parse_voice_bank(
+            r"Fixture_UVB:
+;	Voice $00
+	smpsVcAlgorithm     $01
+	smpsVcFeedback      $07
+	smpsVcDetune        $00, $03, $06, $00
+	smpsVcCoarseFreq    $01, $00, $00, $06
+	smpsVcRateScale     $01, $01, $00, $00
+	smpsVcAttackRate    $1F, $1F, $3F, $3F
+	smpsVcAmpMod        $00, $00, $00, $00
+	smpsVcDecayRate1    $09, $13, $0F, $11
+	smpsVcDecayRate2    $03, $04, $04, $05
+	smpsVcDecayLevel    $02, $02, $02, $02
+	smpsVcReleaseRate   $0F, $0F, $0F, $0F
+	smpsVcTotalLevel    $80, $97, $2C, $23
+
+;	Voice $01
+	smpsVcAlgorithm     $03
+	smpsVcFeedback      $05
+	smpsVcAttackRate    $1F, $1F, $1F, $1F
+	smpsVcTotalLevel    $80, $20, $10, $00
+",
+        )
+        .unwrap()
+    }
+
     /// Relative path -> file contents, for byte-identical idempotency checks.
     fn dir_snapshot(dir: &Path) -> BTreeMap<String, String> {
         let mut m = BTreeMap::new();
@@ -379,6 +543,66 @@ mod tests {
             }
             _ => panic!("expected fm entry"),
         }
+    }
+
+    #[test]
+    fn uvb_song_extracts_only_used_bank_voices() {
+        let bank = fixture_bank();
+        assert_eq!(bank.len(), 2);
+        let t = tempfile::tempdir().unwrap();
+        let in_dir = t.path().join("in");
+        std::fs::create_dir_all(&in_dir).unwrap();
+        std::fs::write(in_dir.join("20 - UVB Song.asm"), fixture_uvb_song("Uvb_Song")).unwrap();
+        let out = t.path().join("out");
+        let stats = extract_smps_dir_with_bank(&in_dir, "Sonic 3 & Knuckles", &out, &bank).unwrap();
+        assert_eq!(stats.songs, 1);
+        assert_eq!(stats.voices_seen, 1); // only the USED bank voice, not all of them
+        assert_eq!(stats.unique_written, 1);
+        let e: crate::library::entry::LibraryEntryFile = serde_json::from_str(
+            &fs::read_to_string(out.join("fm/uvb-voice-01.json")).unwrap(),
+        ).unwrap();
+        assert_eq!(e.name, "UVB voice 01"); // bank-based, not per-song
+        assert_eq!(e.provenance.songs, vec!["20 - UVB Song"]); // raw stem
+        assert_eq!(e.provenance.slot, Some(1)); // the UVB index
+        match e.instrument {
+            LibraryInstrument::Fm(inst) => {
+                assert_eq!(inst.id, uuid::Uuid::nil());
+                assert_eq!(inst.algorithm, 3); // bank voice $01, not voice $00
+                assert_eq!(inst.feedback, 5);
+            }
+            _ => panic!("expected fm entry"),
+        }
+    }
+
+    #[test]
+    fn uvb_pass_then_smps_pass_merges_provenance() {
+        let bank = fixture_bank();
+        let t = tempfile::tempdir().unwrap();
+        let in_dir = t.path().join("in");
+        std::fs::create_dir_all(&in_dir).unwrap();
+        std::fs::write(in_dir.join("20 - UVB Song.asm"), fixture_uvb_song("Uvb_Song")).unwrap();
+        let out = t.path().join("out");
+        // Documented order: uvb FIRST (whole bank, empty provenance), then
+        // the smps pass overwrites shared voices with songs-bearing versions.
+        let uvb_stats = extract_uvb_bank(&bank, &out).unwrap();
+        assert_eq!(uvb_stats.unique_written, 2);
+        extract_smps_dir_with_bank(&in_dir, "Sonic 3 & Knuckles", &out, &bank).unwrap();
+        // shared voice: song provenance survived the pair
+        let used: crate::library::entry::LibraryEntryFile = serde_json::from_str(
+            &fs::read_to_string(out.join("fm/uvb-voice-01.json")).unwrap(),
+        ).unwrap();
+        assert_eq!(used.provenance.songs, vec!["20 - UVB Song"]);
+        // unused bank voice: still present, empty songs
+        let unused: crate::library::entry::LibraryEntryFile = serde_json::from_str(
+            &fs::read_to_string(out.join("fm/uvb-voice-00.json")).unwrap(),
+        ).unwrap();
+        assert_eq!(unused.name, "UVB voice 00");
+        assert!(unused.provenance.songs.is_empty());
+        // the ordered pair is idempotent as a unit
+        let before = dir_snapshot(&out);
+        extract_uvb_bank(&bank, &out).unwrap();
+        extract_smps_dir_with_bank(&in_dir, "Sonic 3 & Knuckles", &out, &bank).unwrap();
+        assert_eq!(before, dir_snapshot(&out));
     }
 
     #[test]

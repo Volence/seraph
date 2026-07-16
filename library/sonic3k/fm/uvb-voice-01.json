@@ -1,24 +1,17 @@
 {
   "schema": 1,
-  "name": "1UP (Sonic & Knuckles) voice 03",
+  "name": "UVB voice 01",
   "tags": [],
   "provenance": {
     "game": "Sonic 3 & Knuckles",
-    "songs": [
-      "1UP (Sonic & Knuckles)",
-      "1UP (Sonic 3)",
-      "Invincible (Sonic 3)",
-      "Level Outro",
-      "Special Stage",
-      "Title (Sonic 3)"
-    ],
-    "slot": 3,
+    "songs": [],
+    "slot": 1,
     "hash": "sha256:87a786f03f287b8cddda1f0b042e74deed27ffb2b1db0c317c879c4b24332818"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "1UP (Sonic & Knuckles) voice 03",
+    "name": "UVB voice 01",
     "algorithm": 5,
     "feedback": 7,
     "operators": [

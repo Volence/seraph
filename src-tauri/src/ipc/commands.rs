@@ -1260,6 +1260,16 @@ pub fn library_warnings(lib: State<'_, LibraryState>) -> Result<Vec<String>, Str
     Ok(lib.warnings.lock().map_err(|e| format!("mutex poisoned: {e}"))?.clone())
 }
 
+/// Look up a library entry by content hash and clone its instrument.
+/// Shared by audition / add-to-project / assign-to-track.
+fn find_library_instrument(lib: &LibraryState, hash: &str) -> Result<LibraryInstrument, String> {
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    idx.iter()
+        .find(|e| e.file.provenance.hash == hash)
+        .map(|e| e.file.instrument.clone())
+        .ok_or_else(|| format!("library entry not found: {hash}"))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn library_audition(
@@ -1268,12 +1278,9 @@ pub fn library_audition(
     hash: String,
     midi_note: u8,
 ) -> Result<(), String> {
-    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-    let e = idx.iter().find(|e| e.file.provenance.hash == hash)
-        .ok_or("library entry not found")?;
-    match &e.file.instrument {
-        LibraryInstrument::Fm(i) => do_preview_fm(&audio_state, i, midi_note),
-        LibraryInstrument::Psg(i) => do_preview_psg(&audio_state, i, midi_note),
+    match find_library_instrument(&lib, &hash)? {
+        LibraryInstrument::Fm(i) => do_preview_fm(&audio_state, &i, midi_note),
+        LibraryInstrument::Psg(i) => do_preview_psg(&audio_state, &i, midi_note),
     }
 }
 
@@ -1284,12 +1291,7 @@ pub fn library_add_to_project(
     lib: State<'_, LibraryState>,
     hash: String,
 ) -> Result<String, String> {
-    let inst = {
-        let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-        idx.iter().find(|e| e.file.provenance.hash == hash)
-            .map(|e| e.file.instrument.clone())
-            .ok_or("library entry not found")?
-    };
+    let inst = find_library_instrument(&lib, &hash)?;
     // Reuse the existing add paths (they assign fresh UUIDs + mark dirty) —
     // same manager acquisition as add_fm_instrument / add_psg_instrument.
     let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
@@ -1373,12 +1375,7 @@ pub fn library_assign_to_track(
     hash: String,
 ) -> Result<String, String> {
     let track_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
-    let inst = {
-        let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-        idx.iter().find(|e| e.file.provenance.hash == hash)
-            .map(|e| e.file.instrument.clone())
-            .ok_or("library entry not found")?
-    };
+    let inst = find_library_instrument(&lib, &hash)?;
     let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let id = mgr.assign_library_instrument_to_track(track_uuid, &inst, &hash)?;
     Ok(id.to_string())

@@ -8,8 +8,8 @@ import type { FmInstrument, FmOperator } from "../bindings";
 vi.mock("../api/library");
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
-const entry = (name: string, kind: LibraryListEntry["kind"]): LibraryListEntry => ({
-  hash: name,
+const entry = (hash: string, name: string, kind: LibraryListEntry["kind"]): LibraryListEntry => ({
+  hash,
   name,
   kind,
   game: "Sonic 2",
@@ -41,7 +41,7 @@ describe("LibraryPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks(); // call counts must not leak across tests
     vi.mocked(lib.libraryGames).mockResolvedValue(["Sonic 2"]);
-    vi.mocked(lib.libraryList).mockResolvedValue([entry("EHZ Lead", "fm"), entry("Env 3", "psg")]);
+    vi.mocked(lib.libraryList).mockResolvedValue([entry("sha256:aaaa", "EHZ Lead", "fm"), entry("sha256:bbbb", "Env 3", "psg")]);
     vi.mocked(lib.libraryWarnings).mockResolvedValue([]);
     vi.mocked(lib.libraryAudition).mockResolvedValue(undefined);
     vi.mocked(lib.libraryStopAudition).mockResolvedValue(undefined);
@@ -95,7 +95,7 @@ describe("LibraryPanel", () => {
     // Real hold-to-audition: down starts, up stops once; a following
     // mouseLeave does not stop again.
     fireEvent.mouseDown(name);
-    expect(vi.mocked(lib.libraryAudition)).toHaveBeenCalledWith("EHZ Lead", 60);
+    expect(vi.mocked(lib.libraryAudition)).toHaveBeenCalledWith("sha256:aaaa", 60);
     fireEvent.mouseUp(name);
     await waitFor(() =>
       expect(vi.mocked(lib.libraryStopAudition)).toHaveBeenCalledTimes(1)
@@ -111,7 +111,7 @@ describe("LibraryPanel", () => {
 
     fireEvent.click(name);
     await waitFor(() =>
-      expect(vi.mocked(lib.libraryGetEntry)).toHaveBeenCalledWith("EHZ Lead")
+      expect(vi.mocked(lib.libraryGetEntry)).toHaveBeenCalledWith("sha256:aaaa")
     );
     await screen.findByText("ALG 4 · FB 3");
     expect(screen.getByText("MUL")).toBeTruthy();
@@ -123,7 +123,7 @@ describe("LibraryPanel", () => {
     const keys = document.querySelectorAll('[class*="whiteKey"]');
     expect(keys.length).toBe(7);
     fireEvent.mouseDown(keys[1]);
-    expect(vi.mocked(lib.libraryAudition)).toHaveBeenCalledWith("EHZ Lead", 62);
+    expect(vi.mocked(lib.libraryAudition)).toHaveBeenCalledWith("sha256:aaaa", 62);
     fireEvent.mouseUp(window);
     await waitFor(() => expect(vi.mocked(lib.libraryStopAudition)).toHaveBeenCalledTimes(1));
   });
@@ -138,7 +138,7 @@ describe("LibraryPanel", () => {
     fireEvent.dragStart(row!, { dataTransfer: { setData, effectAllowed: "" } });
     expect(setData).toHaveBeenCalledWith(
       "application/x-seraph-library-entry",
-      JSON.stringify({ hash: "EHZ Lead", kind: "fm" }),
+      JSON.stringify({ hash: "sha256:aaaa", kind: "fm" }),
     );
     // Kind-suffixed type for dragover compatibility cues.
     expect(setData).toHaveBeenCalledWith("application/x-seraph-library-entry-fm", "fm");

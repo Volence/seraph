@@ -32,7 +32,10 @@ fn main() {
         _ => usage(),
     };
     match res {
-        Ok(s) => println!("songs={} voices_seen={} unique_written={}", s.songs, s.voices_seen, s.unique_written),
+        Ok(s) => println!(
+            "songs={} voices_seen={} unique_written={} failed={}",
+            s.songs, s.voices_seen, s.unique_written, s.failed
+        ),
         Err(e) => { eprintln!("error: {e}"); exit(1) }
     }
 }

@@ -1,7 +1,9 @@
 {
   "schema": 1,
   "name": "smps env 18",
-  "tags": [],
+  "tags": [
+    "tremolo"
+  ],
   "provenance": {
     "game": "SMPS PSG",
     "songs": [],

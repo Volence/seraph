@@ -1,7 +1,9 @@
 {
   "schema": 1,
   "name": "smps env 29",
-  "tags": [],
+  "tags": [
+    "staccato"
+  ],
   "provenance": {
     "game": "SMPS PSG",
     "songs": [],

@@ -2,6 +2,7 @@
   "schema": 1,
   "name": "smps env 0C/19/1B",
   "tags": [
+    "sustained",
     "env-19",
     "env-1b"
   ],

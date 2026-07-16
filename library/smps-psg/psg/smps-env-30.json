@@ -1,7 +1,9 @@
 {
   "schema": 1,
   "name": "smps env 30",
-  "tags": [],
+  "tags": [
+    "decay"
+  ],
   "provenance": {
     "game": "SMPS PSG",
     "songs": [],

@@ -2,6 +2,7 @@
   "schema": 1,
   "name": "smps env 08/15",
   "tags": [
+    "decay",
     "env-15"
   ],
   "provenance": {

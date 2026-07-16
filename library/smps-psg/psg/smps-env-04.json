@@ -1,7 +1,9 @@
 {
   "schema": 1,
   "name": "smps env 04",
-  "tags": [],
+  "tags": [
+    "sustained"
+  ],
   "provenance": {
     "game": "SMPS PSG",
     "songs": [],

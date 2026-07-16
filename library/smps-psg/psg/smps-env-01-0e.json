@@ -2,6 +2,7 @@
   "schema": 1,
   "name": "smps env 01/0E",
   "tags": [
+    "sustained",
     "env-0e"
   ],
   "provenance": {

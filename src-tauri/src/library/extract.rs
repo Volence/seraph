@@ -309,6 +309,39 @@ pub fn extract_zyrinx(rom_path: &Path, game: &str, out_dir: &Path) -> Result<Ext
 /// ones. Duplicates are folded into ONE entry whose name lists every song
 /// index ("smps env 02/0F") and whose tags alias the folded indices
 /// ("env-0f") so text search finds any of them.
+/// Mechanical envelope-shape classification (spec: "PSG shape tags").
+///
+/// `volumes` is the STORED volume sequence (15 = loudest, 0 = silent — the
+/// inverted form `extract_psg_table` writes, not raw SMPS attenuations).
+/// Categories and precedence are pinned by the spec:
+/// tremolo > sustained > staccato > decay.
+pub fn classify_psg_shape(
+    volumes: &[u8],
+    loop_point: Option<usize>,
+    silence_on_end: bool,
+) -> &'static str {
+    if let Some(lp) = loop_point {
+        let seg = &volumes[lp.min(volumes.len())..];
+        let first = seg.first();
+        if seg.iter().any(|v| Some(v) != first) {
+            return "tremolo"; // looped segment oscillates
+        }
+        return "sustained"; // constant looped segment
+    }
+    let last = volumes.last().copied().unwrap_or(0);
+    if last > 0 {
+        return "sustained"; // no loop but holds under the finger
+    }
+    // Ends silent from here on (last == 0 always satisfies the rule's
+    // `silence_on_end OR last == 0`; the flag is kept for rule fidelity).
+    let _ = silence_on_end;
+    if volumes.len() <= 6 {
+        "staccato"
+    } else {
+        "decay"
+    }
+}
+
 pub fn extract_psg_table(out_dir: &Path) -> Result<ExtractStats, String> {
     write_game_meta(out_dir, "SMPS PSG", "flamedriver-psg-table")?;
     let mut stats = ExtractStats::default();
@@ -348,7 +381,10 @@ pub fn extract_psg_table(out_dir: &Path) -> Result<ExtractStats, String> {
         let joined = nums.iter().map(|n| format!("{n:02X}")).collect::<Vec<_>>().join("/");
         inst.name = format!("smps env {joined}");
         let name = inst.name.clone();
-        let tags: Vec<String> = nums[1..].iter().map(|n| format!("env-{n:02x}")).collect();
+        // Baseline shape tag first, then the folded alias tags (env-XX).
+        let shape = classify_psg_shape(&inst.volume_sequence, inst.loop_point, inst.silence_on_end);
+        let mut tags: Vec<String> = vec![shape.to_string()];
+        tags.extend(nums[1..].iter().map(|n| format!("env-{n:02x}")));
         // slot = the primary (first) 1-based song index, same numbering as
         // the name and smps_envelope_index.
         let slot = nums[0];
@@ -641,7 +677,8 @@ mod tests {
             &fs::read_to_string(out.join("psg/smps-env-01-0e.json")).unwrap(),
         ).unwrap();
         assert_eq!(e.name, "smps env 01/0E");
-        assert_eq!(e.tags, vec!["env-0e"]);
+        // baseline shape tag first ([13] holds under the finger), then aliases
+        assert_eq!(e.tags, vec!["sustained", "env-0e"]);
         assert_eq!(e.provenance.slot, Some(1));
         match e.instrument {
             LibraryInstrument::Psg(inst) => {
@@ -658,6 +695,43 @@ mod tests {
             &fs::read_to_string(out.join("psg/smps-env-0c-19-1b.json")).unwrap(),
         ).unwrap();
         assert_eq!(e3.name, "smps env 0C/19/1B");
-        assert_eq!(e3.tags, vec!["env-19", "env-1b"]);
+        assert_eq!(e3.tags, vec!["sustained", "env-19", "env-1b"]);
+    }
+
+    /// Convert a raw table envelope exactly as `extract_psg_table` does.
+    fn stored_envelope(table_idx: u8) -> (Vec<u8>, Option<usize>, bool) {
+        let env = psg_envelopes::get_envelope(table_idx).unwrap();
+        let volumes = env.volumes.iter().map(|&v| 15 - (v as u8).min(15)).collect();
+        (volumes, env.loop_point, env.silence_on_end)
+    }
+
+    #[test]
+    fn classify_psg_shape_hand_built_envelopes() {
+        // looped segment oscillates
+        assert_eq!(classify_psg_shape(&[15, 3, 15, 3], Some(0), false), "tremolo");
+        // looped segment constant
+        assert_eq!(classify_psg_shape(&[15, 10, 8, 8], Some(2), false), "sustained");
+        // no loop, holds under the finger
+        assert_eq!(classify_psg_shape(&[15, 12, 10], None, false), "sustained");
+        // no loop, ends silent, short
+        assert_eq!(classify_psg_shape(&[15, 10, 5, 0], None, true), "staccato");
+        // no loop, ends silent, gradual
+        assert_eq!(classify_psg_shape(&[15, 13, 11, 9, 7, 5, 3, 0], None, true), "decay");
+    }
+
+    #[test]
+    fn classify_psg_shape_real_table_entries() {
+        // $06: loop over an oscillating segment
+        let (v, lp, s) = stored_envelope(0x06);
+        assert_eq!(classify_psg_shape(&v, lp, s), "tremolo");
+        // $0C: raw [0] -> stored [15], no loop, holds
+        let (v, lp, s) = stored_envelope(0x0C);
+        assert_eq!(classify_psg_shape(&v, lp, s), "sustained");
+        // $01: 6 steps ending at full attenuation -> short and silent
+        let (v, lp, s) = stored_envelope(0x01);
+        assert_eq!(classify_psg_shape(&v, lp, s), "staccato");
+        // $07: 16-step fade to silence
+        let (v, lp, s) = stored_envelope(0x07);
+        assert_eq!(classify_psg_shape(&v, lp, s), "decay");
     }
 }

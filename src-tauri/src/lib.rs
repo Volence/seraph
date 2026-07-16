@@ -1,10 +1,11 @@
 mod audio;
 mod dac;
-mod driver;
+pub mod driver;
 mod export;
-mod import;
+pub mod import;
 mod ipc;
-mod model;
+pub mod library;
+pub mod model;
 mod project;
 mod sequencer;
 mod sn76489;

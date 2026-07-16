@@ -32,6 +32,7 @@ flate2 = "1"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "uuid"] }
 specta-typescript = "0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -68,10 +68,14 @@ Instrument file = thin metadata wrapper around the EXISTING serde types
 }
 ```
 
-`provenance.hash` = content hash of the raw patch bytes (canonical: the packed
-register block for FM; the envelope byte string for PSG). It is the entry's
-identity: dedup key for extraction, idempotency key for re-runs, and the key
-user overrides attach to.
+`provenance.hash` = content hash of the raw patch bytes (canonical:
+fixed-order per-field byte string — FM: algorithm, feedback, 4×11 operator
+fields incl. ssg_eg; PSG: length-prefixed volume sequence, tag-encoded loop
+point, silence flag, tag-encoded noise mode; ids/names/metadata/
+smps_envelope_index excluded). The packed-register block was deliberately NOT
+used: it drops ssg_eg and ORs carrier bits into TL, making it lossy. The hash
+is the entry's identity: dedup key for extraction, idempotency key for
+re-runs, and the key user overrides attach to.
 
 ### Roots (portability model)
 
@@ -127,6 +131,34 @@ audition default note, double-click/button = add to project; inline tag editor
 + favorite toggle; Import button; roots management affordance. Selected entry
 shows a compact detail card (FM: algorithm/feedback/op summary; PSG: envelope
 sparkline). Project-side: a "Save to library" action on instruments.
+
+## Session-added features (user, 2026-07-16, during Task 7 by-ear pass)
+
+**Drag-to-track instrument swap.** Library rows are draggable onto tracks in
+the arrangement view. Drop semantics: the track's `instrument_id` switches to
+the dropped voice — adding it to the project first if needed, and REUSING an
+existing project instrument when one with the same content hash already
+exists (no duplicates).
+
+**Import recognition (hash payoff).** During song import (SMPS/VGM/Zyrinx),
+each mapped instrument's content hash is looked up against the library
+index. On a hit, the generic imported name ("Voice 3") is REPLACED by the
+library name ("EHZ Lead"), with the original slot recorded in the
+instrument's metadata (e.g. category "Imported · Voice 3"). Misses keep
+their generic names.
+
+**Detail card + per-note audition** (restored from this spec's UI section
+after the plan dropped it): selecting an entry shows the FM op grid / PSG
+envelope sparkline and a PianoKeys strip auditioning the entry at any pitch
+(`library_get_entry(hash)` IPC).
+
+**PSG shape tags** (user, 2026-07-16): `extract_psg_table` mechanically
+classifies each envelope's shape — `sustained` / `decay` / `staccato` /
+`tremolo` — from the envelope data (loop presence, length, monotonicity) and
+writes the class as a baseline tag, making the 42 presets filterable by what
+they do. This is a deliberate carve-out from the out-of-scope "automatic tag
+inference": shape classification is a pure function of the data, not
+heuristic inference.
 
 ## Extraction pipeline
 

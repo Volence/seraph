@@ -7,6 +7,9 @@ use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
 use crate::audio::{AudioCommand, AudioThread};
 use crate::dac;
 use crate::export::{ExportResult, ExportError};
+use crate::library::entry::{content_hash, LibraryEntryFile, LibraryInstrument, Provenance, LIBRARY_SCHEMA};
+use crate::library::state::{self, LibraryState, RootInfo};
+use crate::library::store::{self, LibraryFilter, LibraryListEntry};
 use crate::model::driver::{ChannelLayout, DriverFeature};
 use crate::model::instrument::*;
 use crate::model::song::{Song, SongMetadata};
@@ -311,11 +314,56 @@ pub fn list_fm_instruments(state: State<'_, ProjectState>) -> Result<Vec<FmInstr
     Ok(mgr.list_fm_instruments().to_vec())
 }
 
-const OP_REG_OFFSETS: [u8; 4] = [0x00, 0x08, 0x04, 0x0C];
-
 fn ym_write_port(thread: &mut AudioThread, port: u8, addr: u8, data: u8) {
     thread.send(AudioCommand::Ym2612Write { port: port as u32, data: addr });
     thread.send(AudioCommand::Ym2612Write { port: (port + 1) as u32, data });
+}
+
+/// Pure register-write generation for the FM preview: `(addr, data)` pairs
+/// programming `inst` onto the given part-I channel (feedback/algorithm,
+/// pan, then per-operator params). Operator slots come from the shared
+/// `PACKED_OP_SLOTS` (operators[0] = Yamaha Op4 carrier → slot +$0C) — the
+/// same table the sequencer programs patches with; a private reversed copy
+/// here once put the carrier on the feedback slot (audition static bug).
+fn fm_preview_writes(inst: &FmInstrument, channel: u8) -> Vec<(u8, u8)> {
+    let mut writes = Vec::with_capacity(26);
+    writes.push((0xB0 + channel, (inst.feedback << 3) | inst.algorithm));
+    writes.push((0xB4 + channel, 0xC0));
+    for (i, op) in inst.operators.iter().enumerate() {
+        let slot = PACKED_OP_SLOTS[i] + channel;
+        writes.push((0x30 + slot, (op.detune << 4) | op.multiple));
+        writes.push((0x40 + slot, op.total_level));
+        writes.push((0x50 + slot, (op.rate_scale << 6) | op.attack_rate));
+        writes.push((0x60 + slot, ((op.amp_mod as u8) << 7) | op.d1r));
+        writes.push((0x70 + slot, op.d2r));
+        writes.push((0x80 + slot, (op.sustain_level << 4) | op.release_rate));
+    }
+    writes
+}
+
+/// Stateless FM preview: program the patch onto channel 0 and key on.
+/// Shared by the project preview command and the library audition command.
+fn do_preview_fm(audio_state: &AudioState, inst: &FmInstrument, midi_note: u8) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+
+    let ch: u8 = 0;
+    let port: u8 = 0;
+
+    thread.send(AudioCommand::FmKeyOff { channel: ch });
+
+    for (addr, data) in fm_preview_writes(inst, ch) {
+        ym_write_port(&mut thread, port, addr, data);
+    }
+
+    let (block, fnum) = midi_to_fm_freq(midi_note);
+    let freq_msb = (block << 3) | ((fnum >> 8) as u8 & 0x07);
+    let freq_lsb = (fnum & 0xFF) as u8;
+    ym_write_port(&mut thread, port, 0xA4 + ch, freq_msb);
+    ym_write_port(&mut thread, port, 0xA0 + ch, freq_lsb);
+
+    thread.send(AudioCommand::FmKeyOn { channel: ch, operators: 0xF0 });
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -334,35 +382,7 @@ pub fn preview_fm_instrument(
         .clone();
     drop(mgr);
 
-    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-
-    let ch: u8 = 0;
-    let port: u8 = 0;
-
-    thread.send(AudioCommand::FmKeyOff { channel: ch });
-
-    ym_write_port(&mut thread, port, 0xB0 + ch, (inst.feedback << 3) | inst.algorithm);
-    ym_write_port(&mut thread, port, 0xB4 + ch, 0xC0);
-
-    for (i, op) in inst.operators.iter().enumerate() {
-        let slot = OP_REG_OFFSETS[i] + ch;
-        ym_write_port(&mut thread, port, 0x30 + slot, (op.detune << 4) | op.multiple);
-        ym_write_port(&mut thread, port, 0x40 + slot, op.total_level);
-        ym_write_port(&mut thread, port, 0x50 + slot, (op.rate_scale << 6) | op.attack_rate);
-        ym_write_port(&mut thread, port, 0x60 + slot, ((op.amp_mod as u8) << 7) | op.d1r);
-        ym_write_port(&mut thread, port, 0x70 + slot, op.d2r);
-        ym_write_port(&mut thread, port, 0x80 + slot, (op.sustain_level << 4) | op.release_rate);
-    }
-
-    let (block, fnum) = midi_to_fm_freq(midi_note);
-    let freq_msb = (block << 3) | ((fnum >> 8) as u8 & 0x07);
-    let freq_lsb = (fnum & 0xFF) as u8;
-    ym_write_port(&mut thread, port, 0xA4 + ch, freq_msb);
-    ym_write_port(&mut thread, port, 0xA0 + ch, freq_lsb);
-
-    thread.send(AudioCommand::FmKeyOn { channel: ch, operators: 0xF0 });
-
-    Ok(())
+    do_preview_fm(&audio_state, &inst, midi_note)
 }
 
 #[tauri::command]
@@ -372,6 +392,38 @@ pub fn stop_fm_preview(
 ) -> Result<(), String> {
     let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     thread.send(AudioCommand::FmKeyOff { channel: 0 });
+    Ok(())
+}
+
+/// Stop a library audition (FM or PSG) without resetting the whole mix.
+///
+/// - Forces release rate $F on ch0's four operators before keying off:
+///   imported patches (GYB/TFI) can carry RR=0 and would ring indefinitely on
+///   `FmKeyOff` alone. `do_preview_fm` reprograms the full patch on the next
+///   audition anyway, so clobbering SL/RR here is safe.
+/// - Sends `StopPreview`, which clears a looping PSG envelope preview (and
+///   any DAC preview) and invalidates the sequencer's ch0 FM patch cache so
+///   playback recovers on ch0's next note-on.
+///
+/// `stop_all_sound` (`AudioCommand::Panic`) stays reserved for the global
+/// panic button — it resets both chips but leaves the sequencer's patch cache
+/// intact, which kills FM output until the next stop/seek.
+#[tauri::command]
+#[specta::specta]
+pub fn library_stop_audition(
+    audio_state: State<'_, AudioState>,
+) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+
+    let ch: u8 = 0;
+    let port: u8 = 0;
+    for &off in &PACKED_OP_SLOTS {
+        // SL/RR register ($80+slot): $FF = SL 15, RR 15 (fastest release).
+        ym_write_port(&mut thread, port, 0x80 + off + ch, 0xFF);
+    }
+    thread.send(AudioCommand::FmKeyOff { channel: ch });
+    thread.send(AudioCommand::StopPreview);
+
     Ok(())
 }
 
@@ -415,6 +467,24 @@ pub fn list_psg_instruments(state: State<'_, ProjectState>) -> Result<Vec<PsgIns
     Ok(mgr.list_psg_instruments().to_vec())
 }
 
+/// Stateless PSG preview: envelope playback on channel 0.
+/// Shared by the project preview command and the library audition command.
+fn do_preview_psg(audio_state: &AudioState, inst: &PsgInstrument, midi_note: u8) -> Result<(), String> {
+    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+
+    let period = midi_to_psg_period(midi_note);
+    let channel: u8 = 0;
+
+    thread.send(AudioCommand::PsgEnvelopePreview {
+        channel,
+        period,
+        envelope: Arc::new(inst.volume_sequence.clone()),
+        loop_point: inst.loop_point,
+    });
+
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn preview_psg_instrument(
@@ -431,19 +501,7 @@ pub fn preview_psg_instrument(
         .clone();
     drop(mgr);
 
-    let mut thread = audio_state.thread.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-
-    let period = midi_to_psg_period(midi_note);
-    let channel: u8 = 0;
-
-    thread.send(AudioCommand::PsgEnvelopePreview {
-        channel,
-        period,
-        envelope: Arc::new(inst.volume_sequence),
-        loop_point: inst.loop_point,
-    });
-
-    Ok(())
+    do_preview_psg(&audio_state, &inst, midi_note)
 }
 
 // --- DAC Instrument CRUD ---
@@ -1012,10 +1070,21 @@ pub fn export_wav(
 
 // --- Import ---
 
+/// Hash → name lookup from the library index, for import-time recognition
+/// (imported voices matching a library entry take the entry's name).
+fn library_recognition_table(lib: &State<'_, LibraryState>) -> crate::import::RecognitionTable {
+    lib.index.lock()
+        .map(|idx| idx.iter()
+            .map(|e| (e.file.provenance.hash.clone(), e.file.name.clone()))
+            .collect())
+        .unwrap_or_default()
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn import_song(
     state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
     source_path: String,
     parent_dir: String,
     dac_dir: Option<String>,
@@ -1028,8 +1097,9 @@ pub fn import_song(
     let source = std::path::PathBuf::from(&source_path);
     let parent = std::path::PathBuf::from(&parent_dir);
     let dac_path = dac_dir.as_ref().map(std::path::PathBuf::from);
+    let recognition = library_recognition_table(&lib);
 
-    crate::import::import_smps_file_with_dac(&source, &parent, driver, dac_path.as_deref())
+    crate::import::import_smps_file_with_dac(&source, &parent, driver, dac_path.as_deref(), &recognition)
 }
 
 // --- FM File Import ---
@@ -1095,22 +1165,453 @@ pub fn export_vgm(
 #[tauri::command]
 #[specta::specta]
 pub fn import_zyrinx_song(
+    lib: State<'_, LibraryState>,
     rom_path: String,
     parent_dir: String,
     game_id: u8,
 ) -> Result<crate::import::ImportResult, String> {
     let rom = std::path::PathBuf::from(&rom_path);
     let parent = std::path::PathBuf::from(&parent_dir);
-    crate::import::import_zyrinx_rom(&rom, &parent, game_id)
+    let recognition = library_recognition_table(&lib);
+    crate::import::import_zyrinx_rom(&rom, &parent, game_id, &recognition)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn import_vgm(
+    lib: State<'_, LibraryState>,
     vgm_path: String,
     parent_dir: String,
 ) -> Result<crate::import::ImportResult, String> {
     let path = std::path::PathBuf::from(&vgm_path);
     let parent = std::path::PathBuf::from(&parent_dir);
-    crate::import::vgm_import::import_vgm_file(&path, &parent)
+    let recognition = library_recognition_table(&lib);
+    crate::import::vgm_import::import_vgm_file(&path, &parent, &recognition)
+}
+
+// --- Instrument Library ---
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_list(
+    lib: State<'_, LibraryState>,
+    filter: LibraryFilter,
+) -> Result<Vec<LibraryListEntry>, String> {
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let all: Vec<LibraryListEntry> = idx.iter().map(|e| store::to_list_entry(e, &ov)).collect();
+    Ok(store::apply_filter(&all, &filter))
+}
+
+/// Full instrument payload for the selected entry's detail card. A separate
+/// command (rather than fields on `LibraryListEntry`) keeps `library_list`
+/// lean — the list carries hundreds of entries, the card needs exactly one.
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryEntryDetail {
+    pub name: String,
+    pub game: String,
+    pub tags: Vec<String>,
+    pub instrument: LibraryInstrument,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_get_entry(
+    lib: State<'_, LibraryState>,
+    hash: String,
+) -> Result<LibraryEntryDetail, String> {
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let e = idx.iter().find(|e| e.file.provenance.hash == hash)
+        .ok_or("library entry not found")?;
+    // Same override precedence as `store::to_list_entry`.
+    let o = ov.get(&hash);
+    Ok(LibraryEntryDetail {
+        name: e.file.name.clone(),
+        game: e.file.provenance.game.clone(),
+        tags: o.and_then(|o| o.tags.clone()).unwrap_or_else(|| e.file.tags.clone()),
+        instrument: e.file.instrument.clone(),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_games(lib: State<'_, LibraryState>) -> Result<Vec<String>, String> {
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let mut games: Vec<String> = idx.iter().map(|e| e.file.provenance.game.clone()).collect();
+    games.sort();
+    games.dedup();
+    Ok(games)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_rescan(app: tauri::AppHandle, lib: State<'_, LibraryState>) -> Result<u32, String> {
+    state::rescan(&app, &lib);
+    Ok(lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?.len() as u32)
+}
+
+/// Scan/parse warnings from the last rescan (corrupt overrides/roots files,
+/// unreadable entries). The UI surfaces these so quarantine events are visible.
+#[tauri::command]
+#[specta::specta]
+pub fn library_warnings(lib: State<'_, LibraryState>) -> Result<Vec<String>, String> {
+    Ok(lib.warnings.lock().map_err(|e| format!("mutex poisoned: {e}"))?.clone())
+}
+
+/// Look up a library entry by content hash and clone its instrument.
+/// Shared by audition / add-to-project / assign-to-track.
+fn find_library_instrument(lib: &LibraryState, hash: &str) -> Result<LibraryInstrument, String> {
+    let idx = lib.index.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    idx.iter()
+        .find(|e| e.file.provenance.hash == hash)
+        .map(|e| e.file.instrument.clone())
+        .ok_or_else(|| format!("library entry not found: {hash}"))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_audition(
+    audio_state: State<'_, AudioState>,
+    lib: State<'_, LibraryState>,
+    hash: String,
+    midi_note: u8,
+) -> Result<(), String> {
+    match find_library_instrument(&lib, &hash)? {
+        LibraryInstrument::Fm(i) => do_preview_fm(&audio_state, &i, midi_note),
+        LibraryInstrument::Psg(i) => do_preview_psg(&audio_state, &i, midi_note),
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_add_to_project(
+    project_state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    hash: String,
+) -> Result<String, String> {
+    let inst = find_library_instrument(&lib, &hash)?;
+    // Reuse the existing add paths (they assign fresh UUIDs + mark dirty) —
+    // same manager acquisition as add_fm_instrument / add_psg_instrument.
+    let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    match inst {
+        LibraryInstrument::Fm(i) => {
+            let id = mgr.add_fm_instrument(i);
+            Ok(id.to_string())
+        }
+        LibraryInstrument::Psg(i) => {
+            let id = mgr.add_psg_instrument(i);
+            Ok(id.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_save_from_project(
+    app: tauri::AppHandle,
+    project_state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    kind: String,
+    id: String,
+    name: Option<String>,
+    tags: Vec<String>,
+) -> Result<String, String> {
+    // Fetch the instrument from the ProjectManager by kind+id (same lookup
+    // shape as update_fm_instrument: parse UUID, lock manager, find by id).
+    let uuid = Uuid::parse_str(&id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let instrument = {
+        let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+        match kind.as_str() {
+            "fm" => {
+                let mut i = mgr
+                    .get_fm_instrument(&uuid)
+                    .ok_or("FM instrument not found")?
+                    .clone();
+                // Library files carry nil ids — determinism, and hash-dedup in
+                // write_entry needs identical bytes.
+                i.id = Uuid::nil();
+                LibraryInstrument::Fm(i)
+            }
+            "psg" => {
+                let mut i = mgr
+                    .get_psg_instrument(&uuid)
+                    .ok_or("PSG instrument not found")?
+                    .clone();
+                i.id = Uuid::nil();
+                LibraryInstrument::Psg(i)
+            }
+            other => return Err(format!("unknown instrument kind: {other}")),
+        }
+    };
+    let inst_name = match &instrument {
+        LibraryInstrument::Fm(i) => i.name.clone(),
+        LibraryInstrument::Psg(i) => i.name.clone(),
+    };
+    let hash = content_hash(&instrument);
+    let file = LibraryEntryFile {
+        schema: LIBRARY_SCHEMA,
+        name: name.unwrap_or(inst_name),
+        tags,
+        provenance: Provenance { game: "User".into(), songs: vec![], slot: None, hash: hash.clone() },
+        instrument,
+    };
+    store::write_entry(&state::user_root(&app)?, &file)?;
+    state::rescan(&app, &lib);
+    Ok(hash)
+}
+
+/// Drag-to-track swap: bind a library voice to a track, reusing a project
+/// instrument with the same content hash or adding the voice first. Returns
+/// the bound project instrument id. Kind-checked (FM voice ↔ FM track, PSG
+/// voice ↔ PSG/noise track) in the manager.
+#[tauri::command]
+#[specta::specta]
+pub fn library_assign_to_track(
+    project_state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    track_id: String,
+    hash: String,
+) -> Result<String, String> {
+    let track_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let inst = find_library_instrument(&lib, &hash)?;
+    let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let id = mgr.assign_library_instrument_to_track(track_uuid, &inst, &hash)?;
+    Ok(id.to_string())
+}
+
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryImportResult {
+    pub written: u32,
+    pub errors: Vec<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_import_files(
+    app: tauri::AppHandle,
+    lib: State<'_, LibraryState>,
+    paths: Vec<String>,
+) -> Result<LibraryImportResult, String> {
+    let root = state::user_root(&app)?;
+    let mut written = 0u32;
+    // Per-file tolerance: one unreadable/unparseable file must not fail the
+    // whole batch — collect its error and keep going.
+    let mut errors = Vec::new();
+    for p in &paths {
+        let data = match std::fs::read(p) {
+            Ok(d) => d,
+            Err(e) => { errors.push(format!("could not read {p}: {e}")); continue; }
+        };
+        let fname = std::path::Path::new(p).file_name()
+            .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let res = match crate::import::fm_formats::import_fm_file(&data, &fname) {
+            Ok(r) => r,
+            Err(e) => { errors.push(format!("could not import {p}: {e}")); continue; }
+        };
+        let game = format!("Imported: {}", res.format);
+        for mut inst in res.instruments {
+            inst.id = Uuid::nil(); // library files carry nil ids (determinism)
+            let name = inst.name.clone();
+            let li = LibraryInstrument::Fm(inst);
+            let hash = content_hash(&li);
+            let file = LibraryEntryFile {
+                schema: LIBRARY_SCHEMA, name, tags: vec![],
+                provenance: Provenance { game: game.clone(), songs: vec![], slot: None, hash },
+                instrument: li,
+            };
+            match store::write_entry(&root, &file) {
+                Ok(_) => written += 1,
+                Err(e) => errors.push(format!("could not write library entry for {p}: {e}")),
+            }
+        }
+    }
+    // Always rescan: partial batches still wrote entries.
+    state::rescan(&app, &lib);
+    Ok(LibraryImportResult { written, errors })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_set_tags(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>,
+    hash: String, tags: Vec<String>,
+) -> Result<(), String> {
+    let mut ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    ov.entry(hash).or_default().tags = Some(tags);
+    store::save_overrides(&state::overrides_path(&app)?, &ov)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_set_favorite(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>,
+    hash: String, favorite: bool,
+) -> Result<(), String> {
+    let mut ov = lib.overrides.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    ov.entry(hash).or_default().favorite = favorite;
+    store::save_overrides(&state::overrides_path(&app)?, &ov)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_roots_get(lib: State<'_, LibraryState>) -> Result<Vec<RootInfo>, String> {
+    Ok(lib.roots.lock().map_err(|e| format!("mutex poisoned: {e}"))?.clone())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_root_add(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>, path: String,
+) -> Result<(), String> {
+    if !std::path::Path::new(&path).is_dir() { return Err(format!("{path} is not a directory")); }
+    {
+        let mut roots = lib.roots.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+        if roots.iter().any(|r| r.path == path) { return Ok(()); }
+        roots.push(RootInfo { label: path.clone(), path, kind: "custom".into() });
+        state::save_custom_roots(&app, &roots)?;
+    }
+    state::rescan(&app, &lib);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn library_root_remove(
+    app: tauri::AppHandle, lib: State<'_, LibraryState>, path: String,
+) -> Result<(), String> {
+    {
+        let mut roots = lib.roots.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+        roots.retain(|r| !(r.kind == "custom" && r.path == path));
+        state::save_custom_roots(&app, &roots)?;
+    }
+    state::rescan(&app, &lib);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Asymmetric voice in the shape of S3K LBZ2 voice 00 (alg 3, fb 0,
+    /// carrier TL 0, Op1 TL $2A): per-op values all differ so any slot
+    /// mix-up is detectable.
+    fn lbz2_like() -> FmInstrument {
+        let mut inst = FmInstrument {
+            id: Uuid::nil(),
+            name: "LBZ2 v00".into(),
+            algorithm: 3,
+            feedback: 0,
+            operators: [FmOperator::default(); 4],
+            metadata: InstrumentMetadata::default(),
+        };
+        inst.operators[0].total_level = 0x00; // Yamaha Op4 — the carrier
+        inst.operators[1].total_level = 0x2B;
+        inst.operators[2].total_level = 0x1A;
+        inst.operators[3].total_level = 0x2A; // Yamaha Op1 — feedback op
+        for (i, op) in inst.operators.iter_mut().enumerate() {
+            op.multiple = 1 + i as u8;
+            op.attack_rate = 31 - (i as u8 * 5);
+            op.d1r = 4 + i as u8;
+            op.sustain_level = i as u8;
+            op.release_rate = 7 + i as u8;
+        }
+        inst
+    }
+
+    #[test]
+    fn test_fm_preview_carrier_lands_on_slot_0c() {
+        let writes = fm_preview_writes(&lbz2_like(), 0);
+        // operators[0] (the carrier, Yamaha Op4) → TL register $40 + $0C.
+        assert!(
+            writes.contains(&(0x40 + 0x0C, 0x00)),
+            "carrier TL must be written to slot +$0C, got: {writes:02x?}"
+        );
+        // operators[3] (Yamaha Op1, the feedback operator) → TL $40 + $00.
+        assert!(
+            writes.contains(&(0x40 + 0x00, 0x2A)),
+            "Op1 TL must be written to slot +$00, got: {writes:02x?}"
+        );
+    }
+
+    /// Drift guard: the preview's register map must equal what the SEQUENCER
+    /// programs for the same instrument (full volume/velocity so carrier TL
+    /// scaling is a no-op). Reconstructs the sequencer's map from its real
+    /// port-0 (address latch) / port-1 (data) write stream, last write wins.
+    #[test]
+    fn test_fm_preview_matches_sequencer_patch_programming() {
+        use crate::sequencer::{
+            ChannelSequence, ChannelType, InstrumentData, Sequencer, SequencerEvent,
+            SequencerOutput, SequencerSnapshot,
+        };
+        use std::collections::HashMap;
+
+        let inst = lbz2_like();
+        let preview: HashMap<u8, u8> = fm_preview_writes(&inst, 0).into_iter().collect();
+
+        let snapshot = SequencerSnapshot {
+            tempo_bpm: 120.0,
+            ticks_per_beat: 480,
+            loop_start: None,
+            loop_end: None,
+            channels: vec![ChannelSequence {
+                channel_type: ChannelType::Fm(0),
+                volume: 127,
+                pan: 0xC0,
+                modulation: None,
+                noise_reg: 0xE4,
+                events: vec![
+                    SequencerEvent::NoteOn {
+                        tick: 0,
+                        pitch: 60,
+                        velocity: 127,
+                        detune: 0,
+                        duration_ticks: 480,
+                        instrument: InstrumentData::FmPatch {
+                            bytes: inst.pack_patch(),
+                            ssg_eg: [0; 4],
+                        },
+                        modulation: None,
+                        pan_override: None,
+                    },
+                    SequencerEvent::NoteOff { tick: 480, pitch: 60 },
+                ],
+                overlaps: vec![],
+            }],
+        };
+        let mut seq = Sequencer::new(44100);
+        seq.load_snapshot(snapshot);
+        seq.play();
+        let mut out = Vec::new();
+        for _ in 0..100 {
+            seq.advance(&mut out);
+        }
+
+        let mut seq_map: HashMap<u8, u8> = HashMap::new();
+        let mut latched_addr: Option<u8> = None;
+        for o in &out {
+            if let SequencerOutput::FmWrite(w) = o {
+                match w.port {
+                    0 => latched_addr = Some(w.data),
+                    1 => {
+                        if let Some(a) = latched_addr.take() {
+                            seq_map.insert(a, w.data);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for (addr, data) in &preview {
+            assert_eq!(
+                seq_map.get(addr),
+                Some(data),
+                "register {addr:#04x}: preview wrote {data:#04x}, sequencer wrote {:?} — op-slot mapping drifted",
+                seq_map.get(addr),
+            );
+        }
+    }
 }

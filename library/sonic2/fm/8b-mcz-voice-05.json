@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "8B - MCZ voice 05",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "8B - MCZ",
+      "9E - Credits"
+    ],
+    "slot": 5,
+    "hash": "sha256:a0620581c2527acb273b1745a5b260999e39855a2101aaabe726304265ca19a6"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "8B - MCZ voice 05",
+    "algorithm": 1,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 8,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 12,
+        "d2r": 7,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 20,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 5,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 7,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 50,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 12,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 23,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

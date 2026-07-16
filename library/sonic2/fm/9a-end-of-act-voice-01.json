@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "9A - End of Act voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "9A - End of Act"
+    ],
+    "slot": 1,
+    "hash": "sha256:c6334c047d82771dacccdbeb2936bf777f735bd195a9823bef8ab93c4fb2ac65"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "9A - End of Act voice 01",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 3,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 3,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 49,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 12,
+        "rateScale": 3,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 1,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 71,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 3,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 33,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

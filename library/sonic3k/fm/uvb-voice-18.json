@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "name": "UVB voice 18",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "AIZ2",
+      "Menu (Sonic & Knuckles)",
+      "Menu (Sonic 3)"
+    ],
+    "slot": 18,
+    "hash": "sha256:a4729c5c43dbd2c7c05ccac4a0ee3b1bf74c36843fb6386a4c12561c5ddfe0f8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "UVB voice 18",
+    "algorithm": 4,
+    "feedback": 3,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 5,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 3,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 25,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 5,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 3,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 30,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

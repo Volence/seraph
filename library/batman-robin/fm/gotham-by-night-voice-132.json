@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "name": "Gotham by Night voice 132",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Gotham by Night",
+      "Big Boss",
+      "Flying Over The City",
+      "Animal Boss"
+    ],
+    "slot": 132,
+    "hash": "sha256:d338faecd0258a7719fd41488fd2dc656478c7be06f4338f4a791e1f622c6851"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Gotham by Night voice 132",
+    "algorithm": 1,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 5,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 27,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 57,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 24,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 0,
+        "sustainLevel": 6,
+        "releaseRate": 6,
+        "totalLevel": 5,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

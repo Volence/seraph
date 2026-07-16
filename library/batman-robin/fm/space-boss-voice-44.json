@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Space Boss voice 44",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Space Boss"
+    ],
+    "slot": 44,
+    "hash": "sha256:8f616a29823eceb3c1029474731112e5881faf6773d588186ccd6555f1988990"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Space Boss voice 44",
+    "algorithm": 0,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 5,
+        "multiple": 6,
+        "rateScale": 3,
+        "attackRate": 26,
+        "ampMod": true,
+        "d1r": 15,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 23,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 10,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 6,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": true,
+        "d1r": 16,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 10,
+        "totalLevel": 15,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 8,
+        "ampMod": true,
+        "d1r": 11,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 10,
+        "totalLevel": 23,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

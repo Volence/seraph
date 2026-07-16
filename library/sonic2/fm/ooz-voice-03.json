@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "OOZ voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "84 - OOZ"
+    ],
+    "slot": 3,
+    "hash": "sha256:4af421fa7c5589788f56b90383060219b178097fadad4d19f2eeae313752a6ab"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "OOZ voice 03",
+    "algorithm": 6,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 10,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 10,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 20,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "name": "Silence voice 41",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Silence",
+      "Main Title",
+      "Flying Over The City",
+      "Ending"
+    ],
+    "slot": 41,
+    "hash": "sha256:160f5307d7601ca3b967bedf60c883d45322076173f45b40c440f67af90354cd"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Silence voice 41",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 4,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 7,
+        "sustainLevel": 3,
+        "releaseRate": 4,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 4,
+        "sustainLevel": 0,
+        "releaseRate": 3,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 2,
+        "totalLevel": 17,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

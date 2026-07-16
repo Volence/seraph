@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Competition Menu voice 05",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Competition Menu"
+    ],
+    "slot": 5,
+    "hash": "sha256:1b95b29b2c6348ae09dfe74a3a7171fa7a69684ad8e049a9ab698f9962077fb8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Competition Menu voice 05",
+    "algorithm": 4,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 8,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 32,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 11,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 16,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 24,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 32,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

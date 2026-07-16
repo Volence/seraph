@@ -12,12 +12,14 @@ interface BottomPanelProps {
   onCloseRegion: () => void;
   playing: boolean;
   projectMeta: SongMetadata;
+  /** Forwarded to the editors' "Save to library" buttons. */
+  onSavedToLibrary?: () => void;
 }
 
 const MIN_HEIGHT = 120;
 const MAX_HEIGHT_RATIO = 0.8;
 
-export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion, playing, projectMeta }: BottomPanelProps) {
+export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion, playing, projectMeta, onSavedToLibrary }: BottomPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [height, setHeight] = useState(300);
   const dragging = useRef(false);
@@ -77,10 +79,10 @@ export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion,
                 <div className={styles.empty}>Select an instrument to edit</div>
               )}
               {selectedInstrument?.type === "fm" && (
-                <FmEditor instrumentId={selectedInstrument.id} />
+                <FmEditor instrumentId={selectedInstrument.id} onSavedToLibrary={onSavedToLibrary} />
               )}
               {selectedInstrument?.type === "psg" && (
-                <PsgEditor instrumentId={selectedInstrument.id} />
+                <PsgEditor instrumentId={selectedInstrument.id} onSavedToLibrary={onSavedToLibrary} />
               )}
               {selectedInstrument?.type === "dac" && (
                 <DacEditor instrumentId={selectedInstrument.id} />

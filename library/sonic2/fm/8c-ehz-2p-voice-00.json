@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "8C - EHZ 2P voice 00",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "8C - EHZ 2P",
+      "9E - Credits"
+    ],
+    "slot": 0,
+    "hash": "sha256:ef9a1adbda219e0c3990c23ee441b1147dfed5f5cdbdff6cda3ce997e14f223f"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "8C - EHZ 2P voice 00",
+    "algorithm": 0,
+    "feedback": 4,
+    "operators": [
+      {
+        "detune": 6,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 12,
+        "d2r": 8,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 22,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 5,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 58,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 6,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 28,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

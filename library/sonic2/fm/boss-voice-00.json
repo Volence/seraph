@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Boss voice 00",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "93 - Boss"
+    ],
+    "slot": 0,
+    "hash": "sha256:c307fcc32116df9b65a9457ccb91419dac7b11eed0443b3a91e2d2d43d0e9d64"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Boss voice 00",
+    "algorithm": 0,
+    "feedback": 4,
+    "operators": [
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 8,
+        "sustainLevel": 15,
+        "releaseRate": 9,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 9,
+        "totalLevel": 22,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 5,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 9,
+        "totalLevel": 58,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 6,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 9,
+        "totalLevel": 28,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

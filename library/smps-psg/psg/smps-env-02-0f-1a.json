@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "name": "smps env 02/0F/1A",
+  "tags": [
+    "staccato",
+    "env-0f",
+    "env-1a"
+  ],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 2,
+    "hash": "sha256:74217ac52e636708a4903a1827a1d92afa7f5513666d1baecdf67246ae1c0a21"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 02/0F/1A",
+    "volumeSequence": [
+      15,
+      13,
+      11,
+      9,
+      7,
+      0
+    ],
+    "loopPoint": null,
+    "silenceOnEnd": true,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 2,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

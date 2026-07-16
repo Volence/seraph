@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Title (Sonic & Knuckles) voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Title (Sonic & Knuckles)"
+    ],
+    "slot": 2,
+    "hash": "sha256:d45cbd350f3738003cf821448c809e02b3a1d9071b8ebd70c7c172f05012a987"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Title (Sonic & Knuckles) voice 02",
+    "algorithm": 2,
+    "feedback": 1,
+    "operators": [
+      {
+        "detune": 1,
+        "multiple": 9,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 0,
+        "sustainLevel": 7,
+        "releaseRate": 15,
+        "totalLevel": 12,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 50,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 6,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 1,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 16,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 2,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

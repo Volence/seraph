@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "name": "smps env 08/15",
+  "tags": [
+    "decay",
+    "env-15"
+  ],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 8,
+    "hash": "sha256:2f2dcac4fe062ccc5c008b1fe5a3ca9127a3a704a8393d137ef21cea352cfcda"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 08/15",
+    "volumeSequence": [
+      15,
+      15,
+      15,
+      13,
+      12,
+      12,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      1,
+      0
+    ],
+    "loopPoint": null,
+    "silenceOnEnd": true,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 8,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

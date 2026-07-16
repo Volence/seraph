@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+# The extract_library bin (instrument-pack extraction CLI) makes `cargo run`
+# ambiguous; the app is the default.
+default-run = "seraph"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -32,6 +35,7 @@ flate2 = "1"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "uuid"] }
 specta-typescript = "0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3.27.0"

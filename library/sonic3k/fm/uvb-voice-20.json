@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "name": "UVB voice 20",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "AIZ1",
+      "AIZ2",
+      "Chrome Gadget",
+      "Continue (Sonic & Knuckles)",
+      "Continue (Sonic 3)",
+      "Desert Palace",
+      "HCZ1",
+      "LRZ2"
+    ],
+    "slot": 20,
+    "hash": "sha256:c2d017cd5bbaa3c94c9f57b925656d15a32b492e057e47f31cd788470333c402"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "UVB voice 20",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 12,
+        "d2r": 7,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 40,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 6,
+        "rateScale": 2,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 6,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 18,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 33,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

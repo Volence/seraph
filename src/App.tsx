@@ -8,6 +8,7 @@ import { BottomPanel } from "./components/BottomPanel";
 import { StatusBar } from "./components/StatusBar";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
+import { LibraryPanel } from "./components/LibraryPanel";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -25,6 +26,8 @@ export default function App() {
   >(null);
   const [importWarnings, setImportWarnings] = useState<ipc.ImportWarning[] | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  // Bumped after save-from-project so the LibraryPanel re-queries.
+  const [libraryRefresh, setLibraryRefresh] = useState(0);
 
   const projectOpen = projectMeta !== null;
 
@@ -177,6 +180,14 @@ export default function App() {
         </div>
       )}
       <div className={styles.body}>
+        {projectOpen && (
+          <LibraryPanel
+            refreshToken={libraryRefresh}
+            // No global instrument-refresh callback exists — the BottomPanel
+            // editors refetch on selection.
+            onInstrumentAdded={() => {}}
+          />
+        )}
         <MainArea
           projectOpen={projectOpen}
           projectMeta={projectMeta}
@@ -202,6 +213,7 @@ export default function App() {
           onCloseRegion={() => setSelectedRegions([])}
           playing={playing}
           projectMeta={projectMeta!}
+          onSavedToLibrary={() => setLibraryRefresh((n) => n + 1)}
         />
       )}
       <StatusBar />

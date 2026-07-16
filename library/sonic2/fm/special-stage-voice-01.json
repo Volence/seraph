@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Special Stage voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "92 - Special Stage"
+    ],
+    "slot": 1,
+    "hash": "sha256:75623e9a192ed1b2d89dcbc2283ba6d0578361c5b872b77ed79663c1257f6aa1"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Special Stage voice 01",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 6,
+        "sustainLevel": 11,
+        "releaseRate": 5,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 3,
+        "sustainLevel": 10,
+        "releaseRate": 2,
+        "totalLevel": 35,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 6,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 3,
+        "sustainLevel": 7,
+        "releaseRate": 2,
+        "totalLevel": 28,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 7,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 2,
+        "sustainLevel": 5,
+        "releaseRate": 2,
+        "totalLevel": 26,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

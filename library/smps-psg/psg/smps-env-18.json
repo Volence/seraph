@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "name": "smps env 18",
+  "tags": [
+    "tremolo"
+  ],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 24,
+    "hash": "sha256:1ded63ee5a63d0fdceecd0653552d779df21889e1e2872c13696c71d6df6ef79"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 18",
+    "volumeSequence": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      15
+    ],
+    "loopPoint": 0,
+    "silenceOnEnd": false,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 24,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

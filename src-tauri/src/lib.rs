@@ -1,10 +1,11 @@
 mod audio;
 mod dac;
-mod driver;
+pub mod driver;
 mod export;
-mod import;
+pub mod import;
 mod ipc;
-mod model;
+pub mod library;
+pub mod model;
 mod project;
 mod sequencer;
 mod sn76489;
@@ -50,10 +51,17 @@ use ipc::{
     import_zyrinx_song,
     import_fm_file,
     import_vgm,
+    // Instrument library
+    library_list, library_games, library_get_entry, library_rescan, library_warnings,
+    library_audition, library_stop_audition,
+    library_add_to_project, library_assign_to_track, library_save_from_project, library_import_files,
+    library_set_tags, library_set_favorite,
+    library_roots_get, library_root_add, library_root_remove,
 };
+use library::state::LibraryState;
 use model::driver::DriverRegistry;
 use project::ProjectManager;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
 
 /// Construct the tauri-specta `Builder` with every IPC command registered.
@@ -128,6 +136,23 @@ fn build_specta() -> Builder<tauri::Wry> {
         export_vgm,
         // VGM Import
         import_vgm,
+        // Instrument library
+        library_list,
+        library_games,
+        library_get_entry,
+        library_rescan,
+        library_warnings,
+        library_audition,
+        library_stop_audition,
+        library_add_to_project,
+        library_assign_to_track,
+        library_save_from_project,
+        library_import_files,
+        library_set_tags,
+        library_set_favorite,
+        library_roots_get,
+        library_root_add,
+        library_root_remove,
     ])
 }
 
@@ -151,7 +176,11 @@ pub fn run() {
         .manage(ProjectState {
             manager: Mutex::new(project_manager),
         })
+        .manage(LibraryState::default())
         .setup(move |app| {
+            // Populate the instrument library index on startup.
+            library::state::rescan(app.handle(), &app.state::<LibraryState>());
+
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 const DISPLAY_BINS: usize = 128;

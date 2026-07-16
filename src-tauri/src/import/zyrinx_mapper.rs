@@ -26,6 +26,54 @@ pub struct MappedZyrinxSong {
     pub warnings: Vec<ImportWarning>,
 }
 
+/// Convert one Zyrinx ROM voice into a Seraph FM instrument (operator
+/// reorder, TL inversion, carrier TL zeroing). Shared by the song importer
+/// and the library extractor.
+pub fn zyrinx_voice_to_fm(voice: &ZyrinxVoice) -> FmInstrument {
+    let algo = voice.fb_alg & 0x07;
+    let fb = (voice.fb_alg >> 3) & 0x07;
+
+    let mut operators = [
+        FmOperator::default(),
+        FmOperator::default(),
+        FmOperator::default(),
+        FmOperator::default(),
+    ];
+
+    for i in 0..4 {
+        let dst = ZY_TO_SMPS[i];
+        operators[dst].detune = voice.dt_mul[i] >> 4;
+        operators[dst].multiple = voice.dt_mul[i] & 0x0F;
+        operators[dst].total_level = (voice.tl[i] ^ 0x7F) & 0x7F;
+        operators[dst].rate_scale = voice.ks_ar[i] >> 6;
+        operators[dst].attack_rate = voice.ks_ar[i] & 0x1F;
+        operators[dst].amp_mod = voice.am_d1r[i] & 0x80 != 0;
+        operators[dst].d1r = voice.am_d1r[i] & 0x1F;
+        operators[dst].d2r = voice.d2r[i] & 0x1F;
+        operators[dst].sustain_level = voice.sl_rr[i] >> 4;
+        operators[dst].release_rate = voice.sl_rr[i] & 0x0F;
+    }
+
+    let cm = CARRIER_MASKS[algo as usize];
+    for i in 0..4 {
+        if (cm >> i) & 1 == 1 {
+            operators[i].total_level = 0;
+        }
+    }
+
+    FmInstrument {
+        id: Uuid::new_v4(),
+        name: format!("Zyrinx Voice {}", voice.index),
+        algorithm: algo,
+        feedback: fb,
+        operators,
+        metadata: InstrumentMetadata {
+            category: "Zyrinx Import".into(),
+            ..InstrumentMetadata::default()
+        },
+    }
+}
+
 pub fn map_zyrinx_to_song(zy: &ZyrinxSong) -> MappedZyrinxSong {
     let mut warnings = Vec::new();
 
@@ -38,48 +86,7 @@ pub fn map_zyrinx_to_song(zy: &ZyrinxSong) -> MappedZyrinxSong {
     let mut voice_to_fm_id: HashMap<u8, Uuid> = HashMap::new();
 
     for voice in &zy.voices {
-        let algo = voice.fb_alg & 0x07;
-        let fb = (voice.fb_alg >> 3) & 0x07;
-
-        let mut operators = [
-            FmOperator::default(),
-            FmOperator::default(),
-            FmOperator::default(),
-            FmOperator::default(),
-        ];
-
-        for i in 0..4 {
-            let dst = ZY_TO_SMPS[i];
-            operators[dst].detune = voice.dt_mul[i] >> 4;
-            operators[dst].multiple = voice.dt_mul[i] & 0x0F;
-            operators[dst].total_level = (voice.tl[i] ^ 0x7F) & 0x7F;
-            operators[dst].rate_scale = voice.ks_ar[i] >> 6;
-            operators[dst].attack_rate = voice.ks_ar[i] & 0x1F;
-            operators[dst].amp_mod = voice.am_d1r[i] & 0x80 != 0;
-            operators[dst].d1r = voice.am_d1r[i] & 0x1F;
-            operators[dst].d2r = voice.d2r[i] & 0x1F;
-            operators[dst].sustain_level = voice.sl_rr[i] >> 4;
-            operators[dst].release_rate = voice.sl_rr[i] & 0x0F;
-        }
-
-        let cm = CARRIER_MASKS[algo as usize];
-        for i in 0..4 {
-            if (cm >> i) & 1 == 1 {
-                operators[i].total_level = 0;
-            }
-        }
-
-        let inst = FmInstrument {
-            id: Uuid::new_v4(),
-            name: format!("Zyrinx Voice {}", voice.index),
-            algorithm: algo,
-            feedback: fb,
-            operators,
-            metadata: InstrumentMetadata {
-                category: "Zyrinx Import".into(),
-                ..InstrumentMetadata::default()
-            },
-        };
+        let inst = zyrinx_voice_to_fm(voice);
         voice_to_fm_id.insert(voice.index, inst.id);
         instruments.fm.push(inst);
     }

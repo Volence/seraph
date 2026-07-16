@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "name": "Extreme Boss voice 121",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Extreme Boss",
+      "Animal Boss",
+      "Psycho Section"
+    ],
+    "slot": 121,
+    "hash": "sha256:79c5fe1fb82077e912b80d14dabda758adf1b1a3303364d6f222be482da5414a"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Extreme Boss voice 121",
+    "algorithm": 3,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 8,
+        "sustainLevel": 0,
+        "releaseRate": 3,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 5,
+        "sustainLevel": 5,
+        "releaseRate": 3,
+        "totalLevel": 26,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 3,
+        "sustainLevel": 4,
+        "releaseRate": 3,
+        "totalLevel": 12,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 21,
+        "d2r": 9,
+        "sustainLevel": 0,
+        "releaseRate": 2,
+        "totalLevel": 27,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

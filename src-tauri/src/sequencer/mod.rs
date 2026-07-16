@@ -3,12 +3,8 @@ pub mod snapshot;
 pub use snapshot::*;
 
 use crate::audio::frequency::{midi_to_fm_freq, midi_to_psg_period};
+use crate::model::instrument::PACKED_OP_SLOTS;
 use std::sync::Arc;
-
-// operators[0..3] = SMPS op1..op4 (macro arg order, NOT binary byte order).
-// S3K binary is [op4,op3,op2,op1]; Z80 register table [$30,$38,$34,$3C] maps:
-//   op1→$3C(+$0C), op2→$34(+$04), op3→$38(+$08), op4→$30(+$00).
-const PACKED_OP_SLOTS: [u8; 4] = [0x0C, 0x04, 0x08, 0x00];
 
 pub struct Sequencer {
     snapshot: SequencerSnapshot,
@@ -101,6 +97,17 @@ impl Sequencer {
         self.last_fm_patch = [[0xFF; 25]; 6];
         self.last_fm_pan = [0xFF; 6];
         self.seek_cursors();
+    }
+
+    /// Forget the cached FM patch/pan for one hardware channel so the next
+    /// note-on reprograms it in full. Used when something outside the
+    /// sequencer (e.g. a library audition on ch0) has clobbered that
+    /// channel's registers; mirrors the full-cache resets in `stop`/`seek`.
+    pub fn invalidate_fm_cache(&mut self, channel: usize) {
+        if channel < 6 {
+            self.last_fm_patch[channel] = [0xFF; 25];
+            self.last_fm_pan[channel] = 0xFF;
+        }
     }
 
     pub fn set_loop(&mut self, start: u64, end: u64) {
@@ -485,6 +492,28 @@ mod tests {
         }
         let has_fm_write = output.iter().any(|o| matches!(o, SequencerOutput::FmWrite(_)));
         assert!(has_fm_write, "should emit FM register writes for NoteOn");
+    }
+
+    #[test]
+    fn test_invalidate_fm_cache_forces_reprogram() {
+        let mut seq = Sequencer::new(44100);
+        seq.load_snapshot(make_fm_snapshot());
+        seq.play();
+
+        let mut output = Vec::new();
+        for _ in 0..100 {
+            seq.advance(&mut output);
+        }
+        // The tick-0 NoteOn programmed and cached ch0's patch ([0; 25] in the
+        // test snapshot, distinct from the [0xFF; 25] "empty" sentinel).
+        assert_eq!(seq.last_fm_patch[0], [0u8; 25]);
+
+        seq.invalidate_fm_cache(0);
+        assert_eq!(seq.last_fm_patch[0], [0xFF; 25]);
+        assert_eq!(seq.last_fm_pan[0], 0xFF);
+
+        // Out-of-range channel is a no-op, not a panic.
+        seq.invalidate_fm_cache(6);
     }
 
     #[test]

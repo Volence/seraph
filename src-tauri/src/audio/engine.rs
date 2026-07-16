@@ -251,6 +251,11 @@ impl AudioEngine {
                 if self.psg_preview_envelope.take().is_some() {
                     self.sn76489.write(0x90 | (self.psg_preview_channel << 5) | 0x0F);
                 }
+                // FM previews/auditions clobber ch0's registers (patch + the
+                // forced-release writes from `library_stop_audition`). Drop the
+                // sequencer's ch0 patch/pan cache so playback reprograms the
+                // channel on its next note-on instead of trusting stale state.
+                self.sequencer.invalidate_fm_cache(0);
             }
             AudioCommand::Panic => {
                 self.ym2612.reset();

@@ -453,6 +453,159 @@ async importVgm(vgmPath: string, parentDir: string) : Promise<Result<ImportResul
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async libraryList(filter: LibraryFilter) : Promise<Result<LibraryListEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_list", { filter }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryGames() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_games") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryGetEntry(hash: string) : Promise<Result<LibraryEntryDetail, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_get_entry", { hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRescan() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_rescan") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Scan/parse warnings from the last rescan (corrupt overrides/roots files,
+ * unreadable entries). The UI surfaces these so quarantine events are visible.
+ */
+async libraryWarnings() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_warnings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryAudition(hash: string, midiNote: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_audition", { hash, midiNote }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop a library audition (FM or PSG) without resetting the whole mix.
+ * 
+ * - Forces release rate $F on ch0's four operators before keying off:
+ * imported patches (GYB/TFI) can carry RR=0 and would ring indefinitely on
+ * `FmKeyOff` alone. `do_preview_fm` reprograms the full patch on the next
+ * audition anyway, so clobbering SL/RR here is safe.
+ * - Sends `StopPreview`, which clears a looping PSG envelope preview (and
+ * any DAC preview) and invalidates the sequencer's ch0 FM patch cache so
+ * playback recovers on ch0's next note-on.
+ * 
+ * `stop_all_sound` (`AudioCommand::Panic`) stays reserved for the global
+ * panic button — it resets both chips but leaves the sequencer's patch cache
+ * intact, which kills FM output until the next stop/seek.
+ */
+async libraryStopAudition() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_stop_audition") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryAddToProject(hash: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_add_to_project", { hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Drag-to-track swap: bind a library voice to a track, reusing a project
+ * instrument with the same content hash or adding the voice first. Returns
+ * the bound project instrument id. Kind-checked (FM voice ↔ FM track, PSG
+ * voice ↔ PSG/noise track) in the manager.
+ */
+async libraryAssignToTrack(trackId: string, hash: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_assign_to_track", { trackId, hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async librarySaveFromProject(kind: string, id: string, name: string | null, tags: string[]) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_save_from_project", { kind, id, name, tags }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryImportFiles(paths: string[]) : Promise<Result<LibraryImportResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_import_files", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async librarySetTags(hash: string, tags: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_set_tags", { hash, tags }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async librarySetFavorite(hash: string, favorite: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_set_favorite", { hash, favorite }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRootsGet() : Promise<Result<RootInfo[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_roots_get") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRootAdd(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_root_add", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async libraryRootRemove(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_root_remove", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -484,6 +637,23 @@ export type ImportResult = { projectDir: string; metadata: SongMetadata; trackCo
 export type ImportWarning = { channel: string; message: string }
 export type InstrumentBank = { fm: FmInstrument[]; psg: PsgInstrument[]; dac: DacInstrument[] }
 export type InstrumentMetadata = { category: string; author: string; tags: string[] }
+/**
+ * Full instrument payload for the selected entry's detail card. A separate
+ * command (rather than fields on `LibraryListEntry`) keeps `library_list`
+ * lean — the list carries hundreds of entries, the card needs exactly one.
+ */
+export type LibraryEntryDetail = { name: string; game: string; tags: string[]; instrument: LibraryInstrument }
+export type LibraryFilter = { text?: string | null; kind?: string | null; game?: string | null; tag?: string | null; favoritesOnly?: boolean }
+export type LibraryImportResult = { written: number; errors: string[] }
+/**
+ * `{"type":"fm","instrument":{...}}` shape per the spec.
+ */
+export type LibraryInstrument = { type: "fm"; instrument: FmInstrument } | { type: "psg"; instrument: PsgInstrument }
+export type LibraryListEntry = { hash: string; name: string; 
+/**
+ * "fm" | "psg"
+ */
+kind: string; game: string; tags: string[]; favorite: boolean; rootLabel: string }
 export type NoiseMode = { Periodic: number } | { White: number }
 export type Note = { tick: number; pitch: number; velocity: number; durationTicks: number; instrumentId?: string | null; detune?: number; panOverride?: number | null; modulation?: NoteModulation | null }
 export type NoteModulation = { wait: number; speed: number; delta: number; steps: number }
@@ -493,6 +663,11 @@ export type PlaybackState = { playing: boolean; tick: number; loopStart: number 
 export type PsgChannelInfo = { index: number; name: string; isNoise: boolean }
 export type PsgInstrument = { id: string; name: string; volumeSequence: number[]; loopPoint: number | null; silenceOnEnd?: boolean; noiseMode: NoiseMode | null; smpsEnvelopeIndex?: number | null; metadata: InstrumentMetadata }
 export type Region = { id: string; startTick: number; durationTicks: number; notes: Note[]; instrumentId?: string | null }
+export type RootInfo = { label: string; path: string; 
+/**
+ * "bundled" | "user" | "custom"
+ */
+kind: string }
 /**
  * Full in-memory song representation including instruments.
  */

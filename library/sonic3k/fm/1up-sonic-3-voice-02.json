@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "name": "1UP (Sonic 3) voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "1UP (Sonic 3)",
+      "Game Over",
+      "Gum Ball Machine",
+      "Slots"
+    ],
+    "slot": 2,
+    "hash": "sha256:ba5038084147b7d5cf833ffd3db26dff27a7a74f62b27a08b776666ffd813e3b"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "1UP (Sonic 3) voice 02",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 7,
+        "totalLevel": 7,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 15,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 2,
+        "totalLevel": 29,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 0,
+        "sustainLevel": 2,
+        "releaseRate": 3,
+        "totalLevel": 21,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

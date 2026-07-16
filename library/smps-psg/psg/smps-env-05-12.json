@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "name": "smps env 05/12",
+  "tags": [
+    "sustained",
+    "env-12"
+  ],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 5,
+    "hash": "sha256:27610ee5d0a7634b7678789af4c47e370d627efe48f05c71bb5f322075b3a508"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 05/12",
+    "volumeSequence": [
+      12,
+      15,
+      14,
+      14,
+      14,
+      13,
+      12,
+      11,
+      11,
+      10
+    ],
+    "loopPoint": null,
+    "silenceOnEnd": false,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 5,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

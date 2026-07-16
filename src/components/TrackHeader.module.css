@@ -163,3 +163,8 @@
   transition: width 60ms linear;
 }
 
+
+.dropTarget {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}

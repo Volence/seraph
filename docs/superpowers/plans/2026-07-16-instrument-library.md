@@ -1189,8 +1189,13 @@ pub fn extract_psg_table(out_dir: &Path) -> Result<ExtractStats, String> {
         // Convert with the SAME attenuation->volume rule as
         // smps_mapper::resolve_psg_env (READ smps_mapper.rs:319-382; volume =
         // 15 - atten, clamped). Build PsgInstrument { volume_sequence, loop_point,
-        // silence_on_end, noise_mode: None, smps_envelope_index: Some(idx as u8), .. }
-        // name: format!("smps env {idx:02X}")
+        // silence_on_end, noise_mode: None, smps_envelope_index: Some(idx as u8 + 1), .. }
+        // name: format!("smps env {:02X}", idx + 1)
+        // NOTE (review correction): the song-facing envelope index is 1-BASED —
+        // verified against the importer (resolve_psg_env does `env_idx.saturating_sub(1)`
+        // for the table lookup, mirroring the Z80 `dec a`, and stores Some(env_idx)
+        // un-decremented) and the exporter (export/smps.rs emits the field verbatim
+        // as `sTone_{:02X}`). Table position idx = song index idx + 1.
         unimplemented!("transcribe conversion from resolve_psg_env")
     }
     Ok(stats)

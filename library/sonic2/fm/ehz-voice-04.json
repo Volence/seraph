@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "EHZ voice 04",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "82 - EHZ"
+    ],
+    "slot": 4,
+    "hash": "sha256:a0c9a5a2f3a65c5e89c084490173f0cb95e9ea9d1a90528ec6daa5f64397295c"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "EHZ voice 04",
+    "algorithm": 3,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 3,
+        "sustainLevel": 1,
+        "releaseRate": 7,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 3,
+        "totalLevel": 40,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 1,
+        "sustainLevel": 1,
+        "releaseRate": 3,
+        "totalLevel": 40,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 7,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 1,
+        "sustainLevel": 1,
+        "releaseRate": 3,
+        "totalLevel": 30,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

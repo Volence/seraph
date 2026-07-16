@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Endless Mine voice 06",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Endless Mine"
+    ],
+    "slot": 6,
+    "hash": "sha256:c89944b1d435e2960d837c7a30a55292e21b94d00d84e8ac61715f01867ec42c"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Endless Mine voice 06",
+    "algorithm": 0,
+    "feedback": 2,
+    "operators": [
+      {
+        "detune": 4,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 8,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 8,
+        "totalLevel": 28,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 3,
+        "releaseRate": 8,
+        "totalLevel": 37,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 5,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 8,
+        "totalLevel": 32,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

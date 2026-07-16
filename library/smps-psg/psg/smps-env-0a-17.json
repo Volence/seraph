@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "name": "smps env 0A/17",
+  "tags": [
+    "sustained",
+    "env-17"
+  ],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 10,
+    "hash": "sha256:c24dbce5000ba1b8839c8167df412e541b0782b560e8a794dbc0bbb9d000fe30"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 0A/17",
+    "volumeSequence": [
+      14,
+      15,
+      15,
+      15,
+      15,
+      14,
+      14,
+      14,
+      13,
+      13,
+      13,
+      12,
+      12,
+      12,
+      12,
+      11,
+      11,
+      11,
+      10,
+      10
+    ],
+    "loopPoint": null,
+    "silenceOnEnd": false,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 10,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

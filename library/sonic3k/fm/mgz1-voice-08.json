@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "MGZ1 voice 08",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "MGZ1"
+    ],
+    "slot": 8,
+    "hash": "sha256:ef216b8eed0a0553fc3d7ca288f4733fa38ebb43339ca50520e80507d28eab09"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "MGZ1 voice 08",
+    "algorithm": 3,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 4,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 1,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 11,
+        "d2r": 8,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 7,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 8,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 23,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 5,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 24,
+        "d2r": 5,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 15,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

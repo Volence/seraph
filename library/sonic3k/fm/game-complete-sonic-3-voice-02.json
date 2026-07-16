@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Game Complete (Sonic 3) voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Game Complete (Sonic 3)",
+      "Title (Sonic 3)"
+    ],
+    "slot": 2,
+    "hash": "sha256:6fad91749bab2bfad8ca187914c2b4149e40fe56ff342dec8eebdb64d3b90e73"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Game Complete (Sonic 3) voice 02",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 15,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 8,
+        "totalLevel": 4,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 7,
+        "totalLevel": 25,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 8,
+        "totalLevel": 4,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 7,
+        "totalLevel": 29,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

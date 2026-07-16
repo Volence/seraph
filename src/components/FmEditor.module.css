@@ -106,3 +106,17 @@
   align-items: center;
   flex-shrink: 0;
 }
+
+.saveToLibrary {
+  margin-top: 6px;
+  padding: 4px 12px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: var(--fs-sm);
+}
+
+.saveToLibrary:hover {
+  background: var(--border);
+}

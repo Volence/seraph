@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { FmInstrument, FmOperator } from "../types/model";
 import { isCarrier } from "../types/model";
 import * as ipc from "../api/ipc";
+import { librarySaveFromProject } from "../api/library";
 import { Knob } from "../widgets/Knob";
 import { AlgorithmDiagram } from "../widgets/AlgorithmDiagram";
 import { EnvelopeDisplay } from "../widgets/EnvelopeDisplay";
@@ -10,9 +11,11 @@ import styles from "./FmEditor.module.css";
 
 interface FmEditorProps {
   instrumentId: string;
+  /** Called after a successful save-to-library (refreshes the panel). */
+  onSavedToLibrary?: () => void;
 }
 
-export function FmEditor({ instrumentId }: FmEditorProps) {
+export function FmEditor({ instrumentId, onSavedToLibrary }: FmEditorProps) {
   const [instrument, setInstrument] = useState<FmInstrument | null>(null);
 
   const load = useCallback(async () => {
@@ -99,6 +102,20 @@ export function FmEditor({ instrumentId }: FmEditorProps) {
           onNoteOn={(note) => ipc.previewFmInstrument(instrumentId, note)}
           onNoteOff={() => ipc.stopFmPreview()}
         />
+        <button
+          className={styles.saveToLibrary}
+          title="Save this instrument to My Library"
+          onClick={async () => {
+            try {
+              await librarySaveFromProject("fm", instrumentId, null, []);
+              onSavedToLibrary?.();
+            } catch (e) {
+              console.error("Save to library failed:", e);
+            }
+          }}
+        >
+          Save to library
+        </button>
       </div>
     </div>
   );

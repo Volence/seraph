@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "CNZ voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "89 - CNZ"
+    ],
+    "slot": 2,
+    "hash": "sha256:74ca2589b16c28acc4c57d83d1dae7a912238c5306d910331bedfeb55e577aff"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "CNZ voice 02",
+    "algorithm": 4,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 3,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 2,
+        "sustainLevel": 10,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 30,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 3,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 2,
+        "sustainLevel": 6,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 30,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,121 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+}
+
+.title {
+  margin: 0 0 20px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.rootList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.rootRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: var(--fs-sm);
+}
+
+.rootLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.kindBadge {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.removeBtn {
+  padding: 2px 8px;
+  background: none;
+  color: var(--error);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: var(--fs-xs);
+  flex-shrink: 0;
+}
+
+.removeBtn:hover {
+  border-color: var(--error);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--error);
+  font-size: var(--fs-sm);
+  margin: 12px 0 0;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.addBtn {
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.addBtn:hover {
+  background: var(--border);
+}
+
+.closeBtn {
+  padding: 8px 20px;
+  background: var(--accent);
+  color: var(--surface-void);
+  border: none;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.closeBtn:hover {
+  opacity: 0.9;
+}

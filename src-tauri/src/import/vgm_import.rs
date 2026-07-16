@@ -1210,12 +1210,17 @@ fn sample_to_note(
 
 // --- Disk I/O ---
 
-pub fn import_vgm_file(vgm_path: &Path, parent_dir: &Path) -> Result<ImportResult, String> {
+pub fn import_vgm_file(
+    vgm_path: &Path,
+    parent_dir: &Path,
+    recognition: &crate::import::RecognitionTable,
+) -> Result<ImportResult, String> {
     let data = std::fs::read(vgm_path)
         .map_err(|e| format!("failed to read {}: {e}", vgm_path.display()))?;
 
     let import = import_vgm_data(&data)?;
-    let song = import.song;
+    let mut song = import.song;
+    crate::import::recognize_instruments(&mut song.instruments, recognition);
 
     let dir_name = vgm_path
         .file_stem()
@@ -1490,7 +1495,7 @@ mod tests {
         let vgm_path = tmp.path().join("test_song.vgm");
         std::fs::write(&vgm_path, &data).unwrap();
 
-        let result = import_vgm_file(&vgm_path, tmp.path()).unwrap();
+        let result = import_vgm_file(&vgm_path, tmp.path(), &Default::default()).unwrap();
         let project_dir = std::path::PathBuf::from(&result.project_dir);
 
         assert!(project_dir.join("project.json").exists());

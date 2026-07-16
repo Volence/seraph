@@ -30,6 +30,9 @@ pub enum LibraryInstrument {
     Psg(PsgInstrument),
 }
 
+/// Unknown fields are silently ignored on read (serde `flatten` is
+/// incompatible with `deny_unknown_fields`, which must never be added here) —
+/// the deliberate forward-compat tradeoff.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryEntryFile {
@@ -58,13 +61,21 @@ pub fn fm_canonical_bytes(inst: &FmInstrument) -> Vec<u8> {
 
 /// Canonical bytes for a PSG preset. `smps_envelope_index` is EXCLUDED
 /// (provenance, not sound); `noise_mode` is included (it is sound).
+///
+/// The encoding is injective by structure: the volume sequence is length-
+/// prefixed (u64 LE count, then the bytes) and every `Option` field is
+/// tag-encoded (a tag byte, then the payload only when present), so distinct
+/// field values can never produce the same byte string.
 pub fn psg_canonical_bytes(inst: &PsgInstrument) -> Vec<u8> {
     let mut b = Vec::new();
+    b.extend_from_slice(&(inst.volume_sequence.len() as u64).to_le_bytes());
     b.extend_from_slice(&inst.volume_sequence);
-    b.push(0xFE); // field separator (volumes are 0..15, never 0xFE)
     match inst.loop_point {
-        Some(lp) => b.extend_from_slice(&(lp as u64).to_le_bytes()),
-        None => b.extend_from_slice(&u64::MAX.to_le_bytes()),
+        None => b.push(0),
+        Some(lp) => {
+            b.push(1);
+            b.extend_from_slice(&(lp as u64).to_le_bytes());
+        }
     }
     b.push(inst.silence_on_end as u8);
     match &inst.noise_mode {
@@ -156,6 +167,45 @@ mod tests {
         assert_eq!(
             content_hash(&LibraryInstrument::Psg(mk(Some(3)))),
             content_hash(&LibraryInstrument::Psg(mk(None)))
+        );
+    }
+
+    #[test]
+    fn fm_golden_hash() {
+        // Fixed patch with distinct per-operator values so operator ORDER is
+        // part of the pinned identity.
+        let mut inst = sample_fm();
+        for (i, op) in inst.operators.iter_mut().enumerate() {
+            op.total_level = 10 + i as u8;
+            op.d1r = i as u8;
+        }
+        // GOLDEN: changing this breaks every existing library entry's
+        // identity — never update casually.
+        assert_eq!(
+            content_hash(&LibraryInstrument::Fm(inst)),
+            "sha256:3016163608974f68a0d46ce682fbc8551e4896d3435345cae6b06935ca5f3eae"
+        );
+    }
+
+    #[test]
+    fn psg_golden_hash() {
+        // Fixed preset exercising every encoded branch: non-empty sequence,
+        // Some loop_point, silence flag, Some noise mode.
+        let inst = PsgInstrument {
+            id: Uuid::nil(),
+            name: "golden".into(),
+            volume_sequence: vec![15, 12, 8, 4, 0],
+            loop_point: Some(2),
+            silence_on_end: true,
+            noise_mode: Some(NoiseMode::White(3)),
+            smps_envelope_index: None,
+            metadata: InstrumentMetadata::default(),
+        };
+        // GOLDEN: changing this breaks every existing library entry's
+        // identity — never update casually.
+        assert_eq!(
+            content_hash(&LibraryInstrument::Psg(inst)),
+            "sha256:5c6ad3d846f4dae7efae4d9b80aae1af74fd2656ed00159e2caed5d5640bdb1a"
         );
     }
 }

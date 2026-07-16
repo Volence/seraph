@@ -68,10 +68,14 @@ Instrument file = thin metadata wrapper around the EXISTING serde types
 }
 ```
 
-`provenance.hash` = content hash of the raw patch bytes (canonical: the packed
-register block for FM; the envelope byte string for PSG). It is the entry's
-identity: dedup key for extraction, idempotency key for re-runs, and the key
-user overrides attach to.
+`provenance.hash` = content hash of the raw patch bytes (canonical:
+fixed-order per-field byte string — FM: algorithm, feedback, 4×11 operator
+fields incl. ssg_eg; PSG: length-prefixed volume sequence, tag-encoded loop
+point, silence flag, tag-encoded noise mode; ids/names/metadata/
+smps_envelope_index excluded). The packed-register block was deliberately NOT
+used: it drops ssg_eg and ORs carrier bits into TL, making it lossy. The hash
+is the entry's identity: dedup key for extraction, idempotency key for
+re-runs, and the key user overrides attach to.
 
 ### Roots (portability model)
 

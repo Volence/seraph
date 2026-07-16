@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Balloon Park voice 04",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Balloon Park"
+    ],
+    "slot": 4,
+    "hash": "sha256:2bd2944221ff933f6f7b07d39de08ba051921ce15b3d73370a8b4bf1d4d57142"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Balloon Park voice 04",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 5,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 4,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 30,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 5,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 12,
+        "d2r": 4,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 26,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

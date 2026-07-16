@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "ARZ voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "87 - ARZ",
+      "9E - Credits"
+    ],
+    "slot": 3,
+    "hash": "sha256:f94f81f7296fe7b359866af3aba22f3df0d3176dfcdc5552c6ff383a7e421840"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "ARZ voice 03",
+    "algorithm": 2,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 2,
+        "sustainLevel": 7,
+        "releaseRate": 2,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 3,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 1,
+        "totalLevel": 38,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 13,
+        "rateScale": 2,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 1,
+        "totalLevel": 45,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 1,
+        "totalLevel": 35,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

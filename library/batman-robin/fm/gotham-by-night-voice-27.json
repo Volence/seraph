@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "name": "Gotham by Night voice 27",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Gotham by Night",
+      "Moving Trucks",
+      "Flying Over The City",
+      "Space Boss",
+      "The Lab",
+      "Final Boss",
+      "Ending"
+    ],
+    "slot": 27,
+    "hash": "sha256:7793ba5615f2013b85b390fead86035817b4cf51366f0f84db7cde90d10fedb1"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Gotham by Night voice 27",
+    "algorithm": 7,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 6,
+        "multiple": 12,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 8,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

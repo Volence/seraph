@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Gotham by Night voice 128",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Gotham by Night"
+    ],
+    "slot": 128,
+    "hash": "sha256:3fb45b9587858847723e3b51505868bbcb4e3e12d6c5956b9a3c1cbf9d2f7d86"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Gotham by Night voice 128",
+    "algorithm": 6,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 4,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 13,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 6,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

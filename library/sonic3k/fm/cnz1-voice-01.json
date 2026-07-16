@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "CNZ1 voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "CNZ1",
+      "CNZ2"
+    ],
+    "slot": 1,
+    "hash": "sha256:88909a51ce782f7646478be1bf0f86c3847f56302a7cd45284a3d9e8c79ccbc4"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "CNZ1 voice 01",
+    "algorithm": 5,
+    "feedback": 4,
+    "operators": [
+      {
+        "detune": 2,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 10,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 11,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 16,
+        "sustainLevel": 14,
+        "releaseRate": 7,
+        "totalLevel": 11,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

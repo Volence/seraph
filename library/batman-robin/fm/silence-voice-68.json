@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "name": "Silence voice 68",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Silence",
+      "Main Title",
+      "Not Much Time",
+      "Dark Studio"
+    ],
+    "slot": 68,
+    "hash": "sha256:6ef4e2bfcb6f7347575e593a9d81bcece736610b7a44866747f338aec26e1003"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Silence voice 68",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 5,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 25,
+        "d2r": 16,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 24,
+        "d2r": 0,
+        "sustainLevel": 11,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 17,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 14,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

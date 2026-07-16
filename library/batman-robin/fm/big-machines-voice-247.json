@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Big Machines voice 247",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Big Machines"
+    ],
+    "slot": 247,
+    "hash": "sha256:62207f247b4f12c56cb81c43db9054b5e97180e032e6519dee20d2a802265ae8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Big Machines voice 247",
+    "algorithm": 1,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 25,
+        "d2r": 16,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 24,
+        "d2r": 0,
+        "sustainLevel": 11,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 17,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 19,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

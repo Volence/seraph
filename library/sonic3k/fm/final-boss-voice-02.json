@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Final Boss voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Final Boss"
+    ],
+    "slot": 2,
+    "hash": "sha256:31fdb696f039b443ca6e8d356ea609b0332d6f7cb90d1a64a2eb6b453d76a570"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Final Boss voice 02",
+    "algorithm": 5,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 6,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 10,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 30,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 16,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

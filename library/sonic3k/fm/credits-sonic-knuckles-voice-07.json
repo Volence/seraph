@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Credits (Sonic & Knuckles) voice 07",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Credits (Sonic & Knuckles)",
+      "Gum Ball Machine"
+    ],
+    "slot": 7,
+    "hash": "sha256:9649ab64720aee87f7d04c5e3d47ffbb6cf22074e0292c2b9bfe0fe9cdd420bf"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Credits (Sonic & Knuckles) voice 07",
+    "algorithm": 0,
+    "feedback": 4,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 8,
+        "sustainLevel": 15,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 0,
+        "totalLevel": 19,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 5,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 0,
+        "totalLevel": 55,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 6,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 0,
+        "totalLevel": 25,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

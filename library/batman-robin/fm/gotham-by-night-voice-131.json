@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "name": "Gotham by Night voice 131",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Gotham by Night",
+      "Two-Face's Theme",
+      "Flying Over The City"
+    ],
+    "slot": 131,
+    "hash": "sha256:7691819a5f3518c981567b4dce1123b9546572f6d11ad05b74d8ea711b1cbdad"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Gotham by Night voice 131",
+    "algorithm": 2,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 4,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 11,
+        "d2r": 6,
+        "sustainLevel": 6,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 7,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 11,
+        "d2r": 10,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 3,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 12,
+        "d2r": 9,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 13,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 8,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 127,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

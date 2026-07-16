@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "DEZ1 voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "DEZ1"
+    ],
+    "slot": 3,
+    "hash": "sha256:469fd571e28815214caa3f797d59d12248cd38fece06b147d076ad14a9706497"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "DEZ1 voice 03",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 6,
+        "multiple": 0,
+        "rateScale": 3,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 8,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 9,
+        "sustainLevel": 15,
+        "releaseRate": 9,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 8,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 6,
+        "rateScale": 0,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 8,
+        "sustainLevel": 8,
+        "releaseRate": 9,
+        "totalLevel": 2,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

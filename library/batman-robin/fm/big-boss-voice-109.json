@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "name": "Big Boss voice 109",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Big Boss",
+      "Not Much Time",
+      "Dark Studio"
+    ],
+    "slot": 109,
+    "hash": "sha256:b8009c8452fd95ad84e1f57cd920f1cc303d80fa1bfee1fed45b16b6a716e3d7"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Big Boss voice 109",
+    "algorithm": 2,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 11,
+        "sustainLevel": 0,
+        "releaseRate": 12,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 26,
+        "d2r": 11,
+        "sustainLevel": 0,
+        "releaseRate": 11,
+        "totalLevel": 9,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 22,
+        "d2r": 31,
+        "sustainLevel": 0,
+        "releaseRate": 7,
+        "totalLevel": 127,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

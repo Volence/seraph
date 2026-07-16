@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Extreme Boss voice 161",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Extreme Boss",
+      "Big Machines"
+    ],
+    "slot": 161,
+    "hash": "sha256:48a9e1556cecedc7409b1f35f1d36af88dfa50b8b0006c684b85c1f69aa6a322"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Extreme Boss voice 161",
+    "algorithm": 1,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 5,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 27,
+        "d2r": 0,
+        "sustainLevel": 2,
+        "releaseRate": 6,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 75,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 6,
+        "totalLevel": 7,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

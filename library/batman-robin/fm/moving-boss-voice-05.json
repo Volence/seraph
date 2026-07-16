@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Moving Boss voice 05",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Moving Boss"
+    ],
+    "slot": 5,
+    "hash": "sha256:f2f7c5d6bdb085772c5bf420ddc62b5ebb15cbfa5b2dceace3b42aa739c3c70f"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Moving Boss voice 05",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 27,
+        "d2r": 4,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 7,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 6,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 61,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 15,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Big Boss voice 154",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Big Boss"
+    ],
+    "slot": 154,
+    "hash": "sha256:44f099787e398da1f88dd5b362c8bc97f711d460beca7a05ae0529b33ce9c61f"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Big Boss voice 154",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 27,
+        "d2r": 4,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 7,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 32,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 6,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 37,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 15,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

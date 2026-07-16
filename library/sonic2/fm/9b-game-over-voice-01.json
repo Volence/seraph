@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "9B - Game Over voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "9B - Game Over"
+    ],
+    "slot": 1,
+    "hash": "sha256:d991c685e2d262d50a2ae358b71da001cc8b9e6f32372ba5c496866560ceb598"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "9B - Game Over voice 01",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 13,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 3,
+        "rateScale": 2,
+        "attackRate": 22,
+        "ampMod": false,
+        "d1r": 20,
+        "d2r": 4,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 26,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 10,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 3,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 4,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 51,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

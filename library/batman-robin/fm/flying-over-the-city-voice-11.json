@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "name": "Flying Over The City voice 11",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Flying Over The City",
+      "Space Boss",
+      "The Lab",
+      "Big Machines",
+      "Final Boss",
+      "Ending"
+    ],
+    "slot": 11,
+    "hash": "sha256:3b04e3b070c31a9cff5b3a3dc4483aff289b5bd6ddcde66853fbe63e5f1c027a"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Flying Over The City voice 11",
+    "algorithm": 4,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 25,
+        "d2r": 16,
+        "sustainLevel": 0,
+        "releaseRate": 12,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 24,
+        "d2r": 0,
+        "sustainLevel": 11,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 17,
+        "sustainLevel": 3,
+        "releaseRate": 12,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

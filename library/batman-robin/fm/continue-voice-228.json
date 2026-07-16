@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Continue voice 228",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Continue"
+    ],
+    "slot": 228,
+    "hash": "sha256:a563d98036b7f6ba46cf1d3a5dea6c1366b6bb879ff358fcaa768f497f013ef8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Continue voice 228",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 0,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 5,
+        "sustainLevel": 3,
+        "releaseRate": 0,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 3,
+        "sustainLevel": 0,
+        "releaseRate": 0,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 0,
+        "totalLevel": 17,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

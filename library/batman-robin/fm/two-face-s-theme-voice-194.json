@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Two-Face's Theme voice 194",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Two-Face's Theme"
+    ],
+    "slot": 194,
+    "hash": "sha256:f7431fb91ac8ace511b7097aad923c5b27327bec40bf0b2a98bbb77b2441da82"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Two-Face's Theme voice 194",
+    "algorithm": 2,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 6,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 12,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 12,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 37,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 12,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 17,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 9,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 12,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 17,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

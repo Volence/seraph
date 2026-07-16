@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Flying Over The City voice 135",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Flying Over The City"
+    ],
+    "slot": 135,
+    "hash": "sha256:245d193edd0c0ab598c0771f920cc8953bea16ecae46c5b23e3e00e4524a8b58"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Flying Over The City voice 135",
+    "algorithm": 5,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 11,
+        "sustainLevel": 0,
+        "releaseRate": 11,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 12,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 26,
+        "d2r": 10,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 14,
+        "rateScale": 0,
+        "attackRate": 19,
+        "ampMod": false,
+        "d1r": 22,
+        "d2r": 19,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 10,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 4,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "name": "smps env 0C/19/1B",
+  "tags": [
+    "env-19",
+    "env-1b"
+  ],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 12,
+    "hash": "sha256:2b6cfa0ae45f2f4fd91b74bc1f1e6ce4c0c1fbb4681b2e8e9662544c2d5f9965"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 0C/19/1B",
+    "volumeSequence": [
+      15,
+      15,
+      14,
+      14,
+      12,
+      12,
+      11,
+      10
+    ],
+    "loopPoint": null,
+    "silenceOnEnd": true,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 12,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

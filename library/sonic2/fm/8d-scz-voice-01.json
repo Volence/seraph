@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "8D - SCZ voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "8D - SCZ",
+      "95 - Ending"
+    ],
+    "slot": 1,
+    "hash": "sha256:676a9c1f9da4bcfe27327097794ecfcf14a2271acf2eb960eb6fe37982df9e81"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "8D - SCZ voice 01",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 15,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 1,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 1,
+        "attackRate": 15,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 59,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 10,
+        "rateScale": 1,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 46,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 9,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 32,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

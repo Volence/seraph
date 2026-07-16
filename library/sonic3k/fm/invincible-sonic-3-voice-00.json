@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Invincible (Sonic 3) voice 00",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Invincible (Sonic 3)",
+      "Title (Sonic 3)"
+    ],
+    "slot": 0,
+    "hash": "sha256:6250382f8d2fa9323eb7e83721b983f6ae165b7e948496517e7b1895d612fa57"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Invincible (Sonic 3) voice 00",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 8,
+        "totalLevel": 2,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 2,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 1,
+        "sustainLevel": 3,
+        "releaseRate": 5,
+        "totalLevel": 18,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

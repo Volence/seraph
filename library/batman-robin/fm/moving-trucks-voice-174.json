@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Moving Trucks voice 174",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Moving Trucks"
+    ],
+    "slot": 174,
+    "hash": "sha256:0d860513f11c33427650e9c5ce0e65e9d8b65d4ce1da94cebb252322f92b5fd1"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Moving Trucks voice 174",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 12,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 26,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 12,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 20,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 24,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 19,
+        "sustainLevel": 4,
+        "releaseRate": 13,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 29,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 19,
+        "sustainLevel": 7,
+        "releaseRate": 11,
+        "totalLevel": 13,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

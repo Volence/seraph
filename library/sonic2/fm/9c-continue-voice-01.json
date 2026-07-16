@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "9C - Continue voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "9C - Continue"
+    ],
+    "slot": 1,
+    "hash": "sha256:cef19ebcfec2c66931a48afed31a08e5215f821c0ceff170fe98295f9fd58a3c"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "9C - Continue voice 01",
+    "algorithm": 3,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 5,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 1,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 45,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 24,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 0,
+        "sustainLevel": 4,
+        "releaseRate": 15,
+        "totalLevel": 30,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

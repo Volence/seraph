@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Zone Boss voice 07",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Zone Boss"
+    ],
+    "slot": 7,
+    "hash": "sha256:2ea91dffd977c5678fcba5e7947e49a84fb3d25e28803ef63925ce8cd93b62f8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Zone Boss voice 07",
+    "algorithm": 0,
+    "feedback": 2,
+    "operators": [
+      {
+        "detune": 4,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 30,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 11,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 29,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 31,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 29,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 10,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 29,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 37,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

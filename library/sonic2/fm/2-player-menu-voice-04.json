@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "2 Player Menu voice 04",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "81 - 2 Player Menu"
+    ],
+    "slot": 4,
+    "hash": "sha256:c1f44179bc9213ba4b0cc693b980173326cb2ebcad5cb9dc757f4bd8700a9fc5"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "2 Player Menu voice 04",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 10,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 15,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 41,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 0,
+        "sustainLevel": 3,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 15,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 25,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

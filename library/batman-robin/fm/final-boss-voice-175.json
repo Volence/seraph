@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Final Boss voice 175",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Final Boss",
+      "Ending"
+    ],
+    "slot": 175,
+    "hash": "sha256:fffc244a697484c1bbe801644e5cdaabe6f0d690f46fcd724c9834a3311d9286"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Final Boss voice 175",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 27,
+        "d2r": 4,
+        "sustainLevel": 0,
+        "releaseRate": 14,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 7,
+        "sustainLevel": 0,
+        "releaseRate": 14,
+        "totalLevel": 19,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 6,
+        "sustainLevel": 0,
+        "releaseRate": 14,
+        "totalLevel": 61,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 14,
+        "totalLevel": 15,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

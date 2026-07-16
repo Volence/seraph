@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "SOZ2 voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "SOZ2"
+    ],
+    "slot": 2,
+    "hash": "sha256:6e73eadbaf817fe12f7810f1205c53cc52e76b6f3be5624351c1bc9f6e538c56"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "SOZ2 voice 02",
+    "algorithm": 2,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 35,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 22,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 29,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 10,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

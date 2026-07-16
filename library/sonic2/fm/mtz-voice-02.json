@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "MTZ voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "85 - MTZ"
+    ],
+    "slot": 2,
+    "hash": "sha256:66446622ce00908d2d197907423adfb69cd159317b44709cc09c719b24aa28ff"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "MTZ voice 02",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 2,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 3,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 17,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 11,
+        "d2r": 2,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 24,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "8E - CPZ voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "8E - CPZ",
+      "9E - Credits"
+    ],
+    "slot": 2,
+    "hash": "sha256:c9628f9e1e49550e4c8bc953f74d5bc0b0e74cdadfdb18f041ba9331424aeebd"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "8E - CPZ voice 02",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 1,
+        "attackRate": 19,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 0,
+        "rateScale": 1,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 20,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 19,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 4,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 28,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

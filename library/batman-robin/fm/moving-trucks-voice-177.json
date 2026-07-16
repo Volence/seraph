@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "name": "Moving Trucks voice 177",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Moving Trucks",
+      "Not Much Time",
+      "Flying Over The City",
+      "Final Boss",
+      "Ending"
+    ],
+    "slot": 177,
+    "hash": "sha256:b4398cf5860de67397088a71d6bd01eb28829953b7054302b695895e032939b8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Moving Trucks voice 177",
+    "algorithm": 3,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 37,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 17,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 0,
+        "sustainLevel": 6,
+        "releaseRate": 6,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

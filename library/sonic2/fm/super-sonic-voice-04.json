@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Super Sonic voice 04",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "96 - Super Sonic",
+      "9C - Continue"
+    ],
+    "slot": 4,
+    "hash": "sha256:5ea20e557d6814a840fb2a0b357b21d61f89da08f40cdea6b75c5470415e9404"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Super Sonic voice 04",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 3,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 0,
+        "sustainLevel": 10,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 3,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 49,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 12,
+        "rateScale": 3,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 1,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 71,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 3,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 33,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

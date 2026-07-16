@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "9D - Got Emerald voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "9D - Got Emerald"
+    ],
+    "slot": 1,
+    "hash": "sha256:3b8d4166140c035a67c40268bb9b4d1d2bec5f5573b4b8db2fe3db871be5ab77"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "9D - Got Emerald voice 01",
+    "algorithm": 4,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 1,
+        "attackRate": 19,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 7,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 0,
+        "rateScale": 1,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 0,
+        "totalLevel": 22,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 19,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 7,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 0,
+        "totalLevel": 26,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

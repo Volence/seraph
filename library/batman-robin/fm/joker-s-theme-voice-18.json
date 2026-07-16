@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "name": "Joker's Theme voice 18",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Joker's Theme",
+      "Moving Boss",
+      "Extreme Boss",
+      "Dark Studio",
+      "Psycho Section"
+    ],
+    "slot": 18,
+    "hash": "sha256:a340ef659dae3f02431e584a50a2cfdc629da37472ee137ee91d3c7ab8a5b20a"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Joker's Theme voice 18",
+    "algorithm": 0,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 6,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 31,
+        "d2r": 6,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 33,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 21,
+        "sustainLevel": 0,
+        "releaseRate": 8,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 31,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

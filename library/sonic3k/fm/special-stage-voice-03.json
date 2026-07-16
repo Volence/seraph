@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Special Stage voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Special Stage"
+    ],
+    "slot": 3,
+    "hash": "sha256:16f43103a85a40dc50a28732e80c6578e02bbfd5abd5d39749b82684ec5d903d"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Special Stage voice 03",
+    "algorithm": 4,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 5,
+        "totalLevel": 24,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 1,
+        "sustainLevel": 3,
+        "releaseRate": 5,
+        "totalLevel": 16,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

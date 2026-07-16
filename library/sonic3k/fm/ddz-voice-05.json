@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "DDZ voice 05",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "DDZ"
+    ],
+    "slot": 5,
+    "hash": "sha256:1b5422f944cb58b29d89beb116f4374785e39a40e3286192e2262a1d51c66b08"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "DDZ voice 05",
+    "algorithm": 5,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 11,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 0,
+        "rateScale": 0,
+        "attackRate": 22,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 12,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 7,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 23,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 19,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 10,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 12,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 16,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

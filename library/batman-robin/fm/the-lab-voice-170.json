@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "The Lab voice 170",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "The Lab"
+    ],
+    "slot": 170,
+    "hash": "sha256:d9214dc5409419d650846db7dcf76598df940a78a721403040dc4ca162eac8a9"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "The Lab voice 170",
+    "algorithm": 3,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 6,
+        "totalLevel": 10,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 0,
+        "sustainLevel": 6,
+        "releaseRate": 6,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

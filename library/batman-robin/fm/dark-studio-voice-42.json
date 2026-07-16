@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Dark Studio voice 42",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Dark Studio"
+    ],
+    "slot": 42,
+    "hash": "sha256:3d6305092871170e6b271da5ba3b6e136269b263576e57f74d4a51fb8cff376b"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Dark Studio voice 42",
+    "algorithm": 0,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 5,
+        "multiple": 8,
+        "rateScale": 3,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 5,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 4,
+        "multiple": 8,
+        "rateScale": 1,
+        "attackRate": 23,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 5,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": true,
+        "d1r": 16,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 5,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 1,
+        "attackRate": 8,
+        "ampMod": true,
+        "d1r": 11,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 5,
+        "totalLevel": 29,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

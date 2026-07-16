@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "name": "Joker's Theme voice 125",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Joker's Theme",
+      "Extreme Boss",
+      "Animal Boss",
+      "Space Boss",
+      "Big Machines",
+      "Final Boss",
+      "Ending"
+    ],
+    "slot": 125,
+    "hash": "sha256:4c4a363729809ebfd31ea188432173287777391ca1351b2eab0a94c61324da01"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Joker's Theme voice 125",
+    "algorithm": 0,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

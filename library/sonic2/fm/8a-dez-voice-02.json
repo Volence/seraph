@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "8A - DEZ voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "8A - DEZ"
+    ],
+    "slot": 2,
+    "hash": "sha256:2f57a7d606ed7d5b288344c29522143c06475070090ef2916258ebd82095caf3"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "8A - DEZ voice 02",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 14,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 0,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 46,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 5,
+        "rateScale": 1,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 11,
+        "d2r": 0,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 14,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 26,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

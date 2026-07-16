@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "8F - WFZ voice 00",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "8F - WFZ"
+    ],
+    "slot": 0,
+    "hash": "sha256:ab10800df2404c3715dce7c98ea4f3e091dd600ccfe5dc4878f5321d80d0980e"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "8F - WFZ voice 00",
+    "algorithm": 2,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 9,
+        "ampMod": false,
+        "d1r": 22,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 38,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 14,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 32,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 14,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 30,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "name": "Silence voice 40",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Silence",
+      "Main Title",
+      "Gotham by Night",
+      "Big Boss",
+      "Moving Trucks",
+      "Two-Face's Theme",
+      "Not Much Time",
+      "Flying Over The City",
+      "Final Boss",
+      "Ending"
+    ],
+    "slot": 40,
+    "hash": "sha256:f8e01c791055a8ba0351de87b12db2eb3317becf09d1701587f67de3de91e528"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Silence voice 40",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 4,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 7,
+        "sustainLevel": 3,
+        "releaseRate": 4,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 17,
+        "d2r": 4,
+        "sustainLevel": 0,
+        "releaseRate": 3,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 16,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 2,
+        "totalLevel": 17,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

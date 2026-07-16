@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Credits (Sonic & Knuckles) voice 25",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Credits (Sonic & Knuckles)",
+      "SOZ1"
+    ],
+    "slot": 25,
+    "hash": "sha256:8d3de5dae6a9833d613fe906a558ea33f85b2f8f158a6535473d020e600e4c0f"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Credits (Sonic & Knuckles) voice 25",
+    "algorithm": 2,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 22,
+        "ampMod": false,
+        "d1r": 3,
+        "d2r": 11,
+        "sustainLevel": 8,
+        "releaseRate": 15,
+        "totalLevel": 1,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 12,
+        "sustainLevel": 13,
+        "releaseRate": 15,
+        "totalLevel": 34,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 0,
+        "rateScale": 3,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 19,
+        "sustainLevel": 14,
+        "releaseRate": 15,
+        "totalLevel": 29,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 21,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 12,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 61,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

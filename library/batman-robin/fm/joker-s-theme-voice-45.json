@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Joker's Theme voice 45",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Joker's Theme"
+    ],
+    "slot": 45,
+    "hash": "sha256:b9502d6d1b0e76a7e75796c6384e9c1810d90fd5dd4f94fa48efb881aa4702f1"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Joker's Theme voice 45",
+    "algorithm": 7,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 5,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 11,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 31,
+        "sustainLevel": 14,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 8,
+        "rateScale": 3,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 26,
+        "ampMod": false,
+        "d1r": 19,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

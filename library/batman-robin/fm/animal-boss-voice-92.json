@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Animal Boss voice 92",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Animal Boss"
+    ],
+    "slot": 92,
+    "hash": "sha256:e7956fe1d3a7b46f9be769719b71e6a5673b1dca7323cf39e8d1b9ab429b0549"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Animal Boss voice 92",
+    "algorithm": 3,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 27,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 2,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 22,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 2,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 23,
+        "d2r": 0,
+        "sustainLevel": 6,
+        "releaseRate": 15,
+        "totalLevel": 1,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

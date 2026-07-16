@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Miniboss (Sonic 3) voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Miniboss (Sonic 3)"
+    ],
+    "slot": 3,
+    "hash": "sha256:7f37269bbbc2991152a5378b53fbff05ad0ec49826f00a6f99140f1a28f36bc0"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Miniboss (Sonic 3) voice 03",
+    "algorithm": 4,
+    "feedback": 3,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 7,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 11,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 17,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 18,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 7,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 24,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

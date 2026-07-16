@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Title Screen voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "99 - Title Screen",
+      "9E - Credits"
+    ],
+    "slot": 1,
+    "hash": "sha256:a3e026953980f5813cc5b84ac3fc62947c9777b1007742e77b661fcfd1c26b41"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Title Screen voice 01",
+    "algorithm": 0,
+    "feedback": 4,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 8,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 0,
+        "rateScale": 2,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 19,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 5,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 55,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 6,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 25,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Azure Lake voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Azure Lake"
+    ],
+    "slot": 3,
+    "hash": "sha256:b026bc7c32476b1932a7e1c3fccf93b0c818ee61898cba591de4f6ce256a62b2"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Azure Lake voice 03",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 2,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 27,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 6,
+        "sustainLevel": 7,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 24,
+        "ampMod": false,
+        "d1r": 4,
+        "d2r": 6,
+        "sustainLevel": 5,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 24,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 5,
+        "sustainLevel": 8,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 28,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 6,
+        "sustainLevel": 6,
+        "releaseRate": 15,
+        "totalLevel": 23,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

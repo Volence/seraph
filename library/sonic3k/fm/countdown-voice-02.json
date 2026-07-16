@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Countdown voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "Countdown"
+    ],
+    "slot": 2,
+    "hash": "sha256:34888d8c4d03ecc2a0a356e0f0c493457810841c0ddcfaa19aaa43dfa7644171"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Countdown voice 02",
+    "algorithm": 4,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 3,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 2,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 4,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 20,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 18,
+        "ampMod": false,
+        "d1r": 10,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 2,
+        "ssgEg": 0
+      },
+      {
+        "detune": 5,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 21,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

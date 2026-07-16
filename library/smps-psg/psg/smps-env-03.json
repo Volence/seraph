@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "name": "smps env 03",
+  "tags": [],
+  "provenance": {
+    "game": "SMPS PSG",
+    "songs": [],
+    "slot": 3,
+    "hash": "sha256:f5b3e7cbf391d9ab4a10031a5fd5c0843924bc29b212a87d14306e5e8482c216"
+  },
+  "type": "psg",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "smps env 03",
+    "volumeSequence": [
+      13,
+      14,
+      15,
+      15,
+      14,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      12,
+      12,
+      12,
+      11,
+      11,
+      11,
+      10
+    ],
+    "loopPoint": null,
+    "silenceOnEnd": false,
+    "noiseMode": null,
+    "smpsEnvelopeIndex": 3,
+    "metadata": {
+      "category": "SMPS PSG",
+      "author": "",
+      "tags": []
+    }
+  }
+}

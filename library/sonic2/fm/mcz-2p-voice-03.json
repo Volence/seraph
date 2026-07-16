@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "MCZ 2P voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "83 - MCZ 2P",
+      "84 - OOZ"
+    ],
+    "slot": 3,
+    "hash": "sha256:fb00e2df5b35e4ba536448e7a3672cc7df1948db1ee5f2e9bfb96c6e473b0738"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "MCZ 2P voice 03",
+    "algorithm": 6,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 14,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 0,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 3,
+        "rateScale": 1,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 0,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 23,
+        "ssgEg": 0
+      },
+      {
+        "detune": 2,
+        "multiple": 3,
+        "rateScale": 0,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 0,
+        "sustainLevel": 2,
+        "releaseRate": 15,
+        "totalLevel": 20,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 9,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 16,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

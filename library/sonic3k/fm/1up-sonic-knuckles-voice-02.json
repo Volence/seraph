@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "1UP (Sonic & Knuckles) voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "1UP (Sonic & Knuckles)",
+      "Balloon Park"
+    ],
+    "slot": 2,
+    "hash": "sha256:f5d56bde3debbf7feadb969ad8a002a94c0bc0784f47babcee752c33082f1ed2"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "1UP (Sonic & Knuckles) voice 02",
+    "algorithm": 4,
+    "feedback": 0,
+    "operators": [
+      {
+        "detune": 7,
+        "multiple": 4,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 10,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 6,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 35,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 3,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 8,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 7,
+        "rateScale": 1,
+        "attackRate": 31,
+        "ampMod": false,
+        "d1r": 0,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 28,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

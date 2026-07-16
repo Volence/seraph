@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "name": "1UP (Sonic & Knuckles) voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "1UP (Sonic & Knuckles)",
+      "1UP (Sonic 3)",
+      "Invincible (Sonic 3)",
+      "Special Stage",
+      "Title (Sonic 3)"
+    ],
+    "slot": 3,
+    "hash": "sha256:87a786f03f287b8cddda1f0b042e74deed27ffb2b1db0c317c879c4b24332818"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "1UP (Sonic & Knuckles) voice 03",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 25,
+        "ampMod": false,
+        "d1r": 13,
+        "d2r": 4,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 15,
+        "d2r": 7,
+        "sustainLevel": 2,
+        "releaseRate": 5,
+        "totalLevel": 21,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

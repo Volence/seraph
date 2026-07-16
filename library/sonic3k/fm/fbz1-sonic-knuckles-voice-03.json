@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "FBZ1 (Sonic & Knuckles) voice 03",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "FBZ1 (Sonic & Knuckles)",
+      "FBZ1 (Sonic 3)"
+    ],
+    "slot": 3,
+    "hash": "sha256:9d009f916c4928616ab04d01d74af3f84fb20a521af1ce1075236699543cd5ec"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "FBZ1 (Sonic & Knuckles) voice 03",
+    "algorithm": 4,
+    "feedback": 6,
+    "operators": [
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 3,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 6,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 9,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 23,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 17,
+        "ampMod": false,
+        "d1r": 1,
+        "d2r": 0,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 5,
+        "ssgEg": 0
+      },
+      {
+        "detune": 6,
+        "multiple": 1,
+        "rateScale": 0,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 6,
+        "d2r": 8,
+        "sustainLevel": 8,
+        "releaseRate": 15,
+        "totalLevel": 25,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

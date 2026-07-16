@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "Psycho Section voice 205",
+  "tags": [],
+  "provenance": {
+    "game": "Batman & Robin",
+    "songs": [
+      "Psycho Section"
+    ],
+    "slot": 205,
+    "hash": "sha256:0a359b24ebe74a412c90f69d97e1b1211c89fb13f491d416aa3634c245ca16e4"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Psycho Section voice 205",
+    "algorithm": 0,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 0,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 4,
+        "rateScale": 3,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 0,
+        "attackRate": 31,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 15,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 3,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Batman & Robin",
+      "author": "",
+      "tags": []
+    }
+  }
+}

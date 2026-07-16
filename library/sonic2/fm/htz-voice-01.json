@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "HTZ voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "86 - HTZ",
+      "9E - Credits"
+    ],
+    "slot": 1,
+    "hash": "sha256:40badf6166ff4d4a224a40fc30b3104f86a0e068300c452d1f995ecfbcd06316"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "HTZ voice 01",
+    "algorithm": 0,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 14,
+        "ampMod": true,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 1,
+        "releaseRate": 10,
+        "totalLevel": 6,
+        "ssgEg": 0
+      },
+      {
+        "detune": 1,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 2,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 9,
+        "totalLevel": 25,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 10,
+        "rateScale": 0,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 0,
+        "sustainLevel": 0,
+        "releaseRate": 9,
+        "totalLevel": 44,
+        "ssgEg": 0
+      },
+      {
+        "detune": 3,
+        "multiple": 10,
+        "rateScale": 3,
+        "attackRate": 20,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 0,
+        "sustainLevel": 9,
+        "releaseRate": 9,
+        "totalLevel": 45,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

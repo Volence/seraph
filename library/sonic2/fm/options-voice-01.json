@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "name": "Options voice 01",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 2",
+    "songs": [
+      "91 - Options",
+      "95 - Ending"
+    ],
+    "slot": 1,
+    "hash": "sha256:c6c62a696673f31e317d1b7458c9c91873ee591308c83fde268b63c8c51041d8"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Options voice 01",
+    "algorithm": 5,
+    "feedback": 7,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 1,
+        "attackRate": 19,
+        "ampMod": false,
+        "d1r": 5,
+        "d2r": 4,
+        "sustainLevel": 0,
+        "releaseRate": 15,
+        "totalLevel": 0,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 15,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 39,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 8,
+        "rateScale": 2,
+        "attackRate": 13,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 3,
+        "sustainLevel": 15,
+        "releaseRate": 15,
+        "totalLevel": 40,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 1,
+        "rateScale": 2,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 14,
+        "d2r": 2,
+        "sustainLevel": 1,
+        "releaseRate": 15,
+        "totalLevel": 22,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 2",
+      "author": "",
+      "tags": []
+    }
+  }
+}

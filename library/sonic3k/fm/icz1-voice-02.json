@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "name": "ICZ1 voice 02",
+  "tags": [],
+  "provenance": {
+    "game": "Sonic 3 & Knuckles",
+    "songs": [
+      "ICZ1"
+    ],
+    "slot": 2,
+    "hash": "sha256:8fe6dfd8b48f7864ef5f312324846d92ef076f57a809e139b96e7b589682c25c"
+  },
+  "type": "fm",
+  "instrument": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "ICZ1 voice 02",
+    "algorithm": 5,
+    "feedback": 5,
+    "operators": [
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 5,
+        "sustainLevel": 1,
+        "releaseRate": 11,
+        "totalLevel": 9,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 5,
+        "sustainLevel": 1,
+        "releaseRate": 11,
+        "totalLevel": 6,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 8,
+        "d2r": 5,
+        "sustainLevel": 1,
+        "releaseRate": 11,
+        "totalLevel": 6,
+        "ssgEg": 0
+      },
+      {
+        "detune": 0,
+        "multiple": 2,
+        "rateScale": 0,
+        "attackRate": 16,
+        "ampMod": false,
+        "d1r": 7,
+        "d2r": 1,
+        "sustainLevel": 2,
+        "releaseRate": 8,
+        "totalLevel": 32,
+        "ssgEg": 0
+      }
+    ],
+    "metadata": {
+      "category": "Sonic 3 & Knuckles",
+      "author": "",
+      "tags": []
+    }
+  }
+}

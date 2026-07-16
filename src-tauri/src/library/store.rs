@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::entry::{content_hash, LibraryEntryFile, LibraryInstrument};
+use super::entry::{LibraryEntryFile, LibraryInstrument};
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -74,7 +74,11 @@ pub fn scan_root(root: &Path, label: &str, precedence: usize)
             } else if p.extension().is_some_and(|x| x == "json")
                 && !p.file_name().is_some_and(|n| {
                     let n = n.to_string_lossy();
-                    n.starts_with('_') || n == "index-meta.json"
+                    // index-meta.json is only special at the root itself — an
+                    // instrument legitimately named "Index Meta" inside fm/
+                    // must not be invisible.
+                    n.starts_with('_')
+                        || (n == "index-meta.json" && p.parent() == Some(root))
                 })
             {
                 match fs::read_to_string(&p)
@@ -98,6 +102,9 @@ pub fn scan_root(root: &Path, label: &str, precedence: usize)
 
 /// Merge scanned roots: same hash collapses to the LOWEST precedence
 /// (bundled=0 wins display); provenance songs are unioned.
+/// Only `songs` are unioned; the losing entry's name/tags/slot are dropped —
+/// per-user customization must go through overrides, which key on hash and
+/// survive merge.
 pub fn merge(mut entries: Vec<IndexedEntry>) -> Vec<IndexedEntry> {
     entries.sort_by(|a, b| {
         a.root_precedence.cmp(&b.root_precedence)
@@ -168,8 +175,11 @@ pub fn apply_filter(list: &[LibraryListEntry], f: &LibraryFilter) -> Vec<Library
 }
 
 /// Write one entry file (used by import-to-library, save-from-project, and
-/// the extractor). Skips the write when an identical file exists (idempotent
-/// re-runs → zero diff). Returns the path written (or existing).
+/// the extractor). Skips the write when an identical file exists, so re-runs
+/// are idempotent UNDER STABLE NAMES — if the naming scheme ever changes, a
+/// stale same-hash stray is left at the old name (merge hides it from the
+/// index; cleaning it up is extractor territory). Returns the path written
+/// (or existing).
 pub fn write_entry(dir: &Path, file: &LibraryEntryFile) -> Result<PathBuf, String> {
     let sub = match file.instrument {
         LibraryInstrument::Fm(_) => "fm",
@@ -177,7 +187,14 @@ pub fn write_entry(dir: &Path, file: &LibraryEntryFile) -> Result<PathBuf, Strin
     };
     let d = dir.join(sub);
     fs::create_dir_all(&d).map_err(|e| e.to_string())?;
-    let base = kebab(&file.name);
+    // A name with no ASCII alphanumerics kebabs to "" — fall back to a
+    // hash-derived base ("untitled-<8 hex>") so the file never becomes an
+    // extensionless ".json" that scan_root skips forever. Hash-derived keeps
+    // re-runs idempotent.
+    let base = match kebab(&file.name) {
+        b if b.is_empty() => format!("untitled-{}", &file.provenance.hash[7..15]),
+        b => b,
+    };
     let mut path = d.join(format!("{base}.json"));
     let body = serde_json::to_string_pretty(file).map_err(|e| e.to_string())? + "\n";
     let mut n = 1;
@@ -185,16 +202,21 @@ pub fn write_entry(dir: &Path, file: &LibraryEntryFile) -> Result<PathBuf, Strin
         match fs::read_to_string(&path) {
             Ok(existing) if existing == body => return Ok(path), // identical: no-op
             Ok(existing) => {
-                // Name collision with different content — but if it's the SAME
-                // hash (renamed re-extract), overwrite; else suffix.
-                let same_hash = serde_json::from_str::<LibraryEntryFile>(&existing)
-                    .map(|e| e.provenance.hash == file.provenance.hash)
-                    .unwrap_or(false);
-                if same_hash { break; }
-                n += 1;
-                path = d.join(format!("{base}-{n}.json"));
+                // Name collision with different content. Different hash →
+                // suffix. Same hash (renamed re-extract) → overwrite in
+                // place. Unparseable (truncated/corrupt after a crash
+                // mid-write) → self-heal by overwriting in place rather than
+                // forking a suffixed corpse.
+                match serde_json::from_str::<LibraryEntryFile>(&existing) {
+                    Ok(e) if e.provenance.hash != file.provenance.hash => {
+                        n += 1;
+                        path = d.join(format!("{base}-{n}.json"));
+                    }
+                    _ => break, // same hash or corrupt: overwrite in place
+                }
             }
-            Err(_) => break,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => break,
+            Err(e) => return Err(format!("{}: {}", path.display(), e)),
         }
     }
     fs::write(&path, body).map_err(|e| e.to_string())?;
@@ -219,7 +241,7 @@ pub fn kebab(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::library::entry::{Provenance, LIBRARY_SCHEMA};
+    use crate::library::entry::{content_hash, Provenance, LIBRARY_SCHEMA};
     use crate::model::instrument::{FmInstrument, FmOperator, InstrumentMetadata};
     use uuid::Uuid;
 
@@ -315,6 +337,36 @@ mod tests {
         let p3 = write_entry(t.path(), &other).unwrap();
         assert_ne!(p1, p3);
         assert!(p3.to_string_lossy().contains("a-name-2"));
+    }
+
+    #[test]
+    fn write_entry_untitled_fallback_for_empty_kebab() {
+        let t = tempfile::tempdir().unwrap();
+        let e = entry_named("!!!", 1, "G"); // kebabs to ""
+        let p = write_entry(t.path(), &e).unwrap();
+        assert!(p.to_string_lossy().contains("untitled-"));
+        // idempotent under the fallback name too
+        assert_eq!(write_entry(t.path(), &e).unwrap(), p);
+        // and a rescan actually finds it (no invisible fm/.json)
+        let (found, warns) = scan_root(t.path(), "r", 0);
+        assert!(warns.is_empty());
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].file.name, "!!!");
+    }
+
+    #[test]
+    fn write_entry_same_hash_overwrites_in_place() {
+        let t = tempfile::tempdir().unwrap();
+        let mut e = entry_named("Voice", 1, "G");
+        e.provenance.songs = vec!["song-a".into()];
+        let p1 = write_entry(t.path(), &e).unwrap();
+        // same patch (same hash), updated provenance → overwrite, no fork
+        e.provenance.songs.push("song-b".into());
+        let p2 = write_entry(t.path(), &e).unwrap();
+        assert_eq!(p1, p2);
+        let on_disk: LibraryEntryFile =
+            serde_json::from_str(&fs::read_to_string(&p2).unwrap()).unwrap();
+        assert_eq!(on_disk.provenance.songs, vec!["song-a", "song-b"]);
     }
 
     #[test]

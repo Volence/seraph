@@ -97,7 +97,9 @@ designs target the banked specs (normative); manifest flags carry the gates.
   against `sound_constants.emp` + the `emit_sound_blob` contract at pinned aeon
   SHA `236c306b`, and parse constants from source at use time — never transcribe
   them into seraph-side constants that can drift. Three caveats from the aeon
-  ruling (transcribed; aeon side to anchor): (1) aeon sound packages 5/6 are
+  ruling (ANCHORED aeon-side: `0062e8ce`, docs/DEFERRED_WORK.md §"Seraph
+  coupling anchor" — verified to match this transcription, which closes the
+  transcription-not-quotation flag): (1) aeon sound packages 5/6 are
   still open, and the 2026-08-13 sound-lens sweep has an unmerged packet (two
   live findings: multi-slot SFX cap; a DAC/DMA wedge class) — any MEV/constants
   change from that work arrives as explicit notice BEFORE landing, contract-style.

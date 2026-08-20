@@ -85,6 +85,29 @@ designs target the banked specs (normative); manifest flags carry the gates.
   Sub-Terrania/Red Zone parser extension, DAC samples (library v2),
   PSG preset name curation, keyboard/touch audition, list virtualization.
 
+- 2026-08-19: **S0 UNPARKED** — the aeon overseer session ruled the park condition
+  satisfied, and this session verified the claims firsthand at aeon `236c306b`
+  (master HEAD): `engine/sound/sound_constants.emp` is the constants authority,
+  `sound_constants.asm` no longer exists anywhere in the aeon tree, and sigil's
+  `emit_sound_blob` release binary (`SIGIL_EMIT`, hard-required by aeon's
+  build.sh) is the production blob path. Last sound-touching aeon commit:
+  `8b39969d` (2026-08-11, SFX content import — no format change). **Re-grounding
+  required before executing S0**: the banked plan predates the asm→.emp move and
+  still references `sound_constants.asm`/`song_packer.py`; re-ground its inputs
+  against `sound_constants.emp` + the `emit_sound_blob` contract at pinned aeon
+  SHA `236c306b`, and parse constants from source at use time — never transcribe
+  them into seraph-side constants that can drift. Three caveats from the aeon
+  ruling (transcribed; aeon side to anchor): (1) aeon sound packages 5/6 are
+  still open, and the 2026-08-13 sound-lens sweep has an unmerged packet (two
+  live findings: multi-slot SFX cap; a DAC/DMA wedge class) — any MEV/constants
+  change from that work arrives as explicit notice BEFORE landing, contract-style.
+  (2) The MEV_EXT registry invariants (slots 0/1/2) are load-bearing aeon-side —
+  extending the registry is a cross-repo ask via the demand-doc flow, never a
+  unilateral read. (3) aeon's streaming arc may later couple to the driver's
+  DMA-survival design (max-contiguous-DMA-stall) — if S0 work touches DAC/DMA
+  timing assumptions, notify aeon and coordinate. S0 is now READY TO EXECUTE;
+  actually opening the execution session is an owner call.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

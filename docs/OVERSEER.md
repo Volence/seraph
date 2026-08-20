@@ -32,13 +32,14 @@ Current state (2026-08-19):
 - **S0 is PARKED** (2026-07-15 ruling) and it gates S1 Tasks 2–8 and everything
   downstream. Park condition: aeon's sound format was still moving (MEV changes,
   the sigil DSM migration, `sound_constants.asm` on the .emp conversion path).
-- **The park condition looks satisfied now**: aeon carries
-  `engine/sound/sound_constants.emp` and builds through sigil's `emit_sound_blob`
-  release binary (`SIGIL_EMIT` in aeon's build). **First queue action for a fresh
-  overseer: confirm with the aeon side (or by reading aeon's tree/handoffs) that
-  the MEV format and sound pipeline are stable, then unpark S0.** Do not re-derive
-  the S0 plan — it's banked; only its aeon-facing inputs need re-grounding against
-  today's `.emp`/sigil reality (the plan predates the asm→.emp move).
+- **S0 UNPARKED 2026-08-19** (aeon overseer ruling, verified firsthand at aeon
+  `236c306b` — full ruling, verification, and three standing caveats in the queue
+  doc's Log entry for that date). S0 is READY TO EXECUTE; opening the execution
+  session is an owner call. Do not re-derive the S0 plan — it's banked; its
+  aeon-facing inputs must be re-grounded against `sound_constants.emp` + the
+  `emit_sound_blob` contract at the pinned SHA (the plan predates the asm→.emp
+  move), parsing constants from source at use time — never transcribing them
+  into seraph-side constants that can drift.
 - Done so far: S1 Task 1 (tauri-specta, merged `437841e`); instrument library
   shipped independently of the S-queue (merged `1799c3c`, deferrals listed in the
   queue Log entry for 2026-07-16).

@@ -110,6 +110,33 @@ designs target the banked specs (normative); manifest flags carry the gates.
   timing assumptions, notify aeon and coordinate. S0 is now READY TO EXECUTE;
   actually opening the execution session is an owner call.
 
+- 2026-08-21: **S0 HELD (owner ruling)** — offered to open the unparked S0; owner
+  chose "hold S0, other work" and reported a major gap: no way to create a measure
+  to write music. **COMPOSE-FROM-SCRATCH PATH SHIPPED** same session (merged
+  `3c6ee0d`; lanes on merged tree: cargo 214/0, vitest 18/18, build clean, zero
+  bindings drift). Research finding (verified firsthand): the gap was pure UI
+  omission — model (`Region`) + IPC (`add_track`/`add_region`/`add_note`) fully
+  supported composing, but the frontend had ZERO call sites for addTrack/addRegion
+  (`AddTrackDialog` existed since `14c1fa4`, never mounted), `create` seeded no
+  tracks, and the `+ FM/+ PSG/+ DAC` buttons added instruments while claiming to
+  add tracks. Shipped: (1) create seeds one instrumentless track per driver
+  channel, derived from `DriverProfile::channel_layout()` (owner ruled: seed full
+  roster); instrument add now binds to the lowest empty lane of its kind and
+  delete unbinds (lane + regions survive — also removes a latent data-loss path);
+  (2) `+ Track` mounts AddTrackDialog; buttons renamed `+ FM Patch`/`+ PSG Env`/
+  `+ DAC Sample`; (3) empty-lane double-click creates a bar-snapped one-bar
+  region, auto-selects (piano roll opens), reloadSequence for audibility;
+  (4) `src/utils/grid.ts:ticksPerBar(meta)` is the ONE derived bar-length seam
+  (PianoRoll/useArrangementZoom/region default de-hardcoded from 480×4) — S1's
+  tick-native grid lands there. S4 checked: its noun is *region*; no design fork.
+  DEFERRED (booked here): drag-to-length region creation (empty-lane drag is
+  marquee-select; UX call for S4); stale lane name after instrument unbind;
+  `get_playback_state` returns hardcoded `playing:false/loop:None`
+  (commands.rs:950-965); PianoRoll "1/1" snap now means one bar (ratified).
+  OWNER GATE OPEN: visual/audible pass — fresh project shows full lane roster,
+  + Track works, double-click creates a measure, a placed note plays after
+  reload; also confirm empty 11-channel project plays silent/stable.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

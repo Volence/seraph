@@ -6,7 +6,9 @@ import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { TrackHeader, channelLevelIndex } from "./TrackHeader";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineCanvas } from "./TimelineCanvas";
+import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
+import * as grid from "../utils/grid";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -47,9 +49,10 @@ export function ArrangementView({
   selectedInstrument,
 }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [showAddTrack, setShowAddTrack] = useState(false);
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
-  const zoom = useArrangementZoom(projectMeta.ticksPerBeat);
+  const zoom = useArrangementZoom(projectMeta);
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const [seekTick, setSeekTick] = useState(0);
   const trackHeight = 60;
@@ -155,6 +158,26 @@ export function ArrangementView({
     refresh();
   }
 
+  /** Empty-lane double-click: create a one-bar region, open it in the piano
+   *  roll (region selection drives BottomPanel), and reload the sequence so
+   *  subsequent playback reflects it. */
+  async function handleRegionCreate(trackIdx: number, startTick: number) {
+    const track = visibleTracks[trackIdx];
+    if (!track) return;
+    const oneBar = grid.ticksPerBar(projectMeta);
+    const regionId = await ipc.addRegion(track.id, startTick, oneBar);
+    await refresh();
+    onSelectRegions([{
+      trackId: track.id,
+      trackName: track.name,
+      regionId,
+      channelType: channelType(track),
+      startTick,
+      durationTicks: oneBar,
+    }]);
+    await ipc.reloadSequence();
+  }
+
   async function handleSeek(tick: number) {
     setSeekTick(tick);
     await ipc.transportSeek(tick);
@@ -250,9 +273,10 @@ export function ArrangementView({
             );
           })}
           <div className={styles.addButtons}>
-            <button className={styles.addBtn} onClick={addFm}>+ FM</button>
-            <button className={styles.addBtn} onClick={addPsg}>+ PSG</button>
-            <button className={styles.addBtn} onClick={addDac}>+ DAC</button>
+            <button className={styles.addBtn} onClick={() => setShowAddTrack(true)}>+ Track</button>
+            <button className={styles.addBtn} onClick={addFm}>+ FM Patch</button>
+            <button className={styles.addBtn} onClick={addPsg}>+ PSG Env</button>
+            <button className={styles.addBtn} onClick={addDac}>+ DAC Sample</button>
           </div>
         </div>
         <TimelineCanvas
@@ -289,10 +313,21 @@ export function ArrangementView({
           onSelectRegions={onSelectRegions}
           onRegionMove={handleRegionMove}
           onRegionResize={handleRegionResize}
+          onRegionCreate={handleRegionCreate}
           onSeek={handleSeek}
           seekTick={seekTick}
         />
       </div>
+      {showAddTrack && (
+        <AddTrackDialog
+          driverId={projectMeta.driverId}
+          onClose={() => setShowAddTrack(false)}
+          onCreated={() => {
+            setShowAddTrack(false);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

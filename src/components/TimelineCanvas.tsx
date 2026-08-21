@@ -17,6 +17,8 @@ interface TimelineCanvasProps {
   onSelectRegions: (regions: SelectedRegion[]) => void;
   onRegionMove: (srcTrackId: string, regionId: string, dstTrackId: string, startTick: number, tickDelta: number, trackDelta: number) => void;
   onRegionResize: (trackId: string, regionId: string, startTick: number, durationTicks: number) => void;
+  /** Double-click on an empty stretch of a track lane: create a region there (bar-snapped). */
+  onRegionCreate: (trackIdx: number, startTick: number) => void;
   onSeek: (tick: number) => void;
   seekTick: number;
 }
@@ -67,6 +69,7 @@ export function TimelineCanvas({
   onSelectRegions,
   onRegionMove,
   onRegionResize,
+  onRegionCreate,
   onSeek,
   seekTick,
 }: TimelineCanvasProps) {
@@ -482,8 +485,16 @@ export function TimelineCanvas({
     if (hit) {
       onRegionDoubleClick(hit.trackId, hit.regionId);
     } else {
-      const tick = pixelToTick(x);
-      onSeek(Math.max(0, Math.round(tick)));
+      const trackIdx = Math.floor(y / trackHeight);
+      if (trackIdx >= 0 && trackIdx < tracks.length) {
+        // Empty stretch of a track lane: create a region at the bar the
+        // click landed in. Seeking stays on the ruler (TimelineRuler).
+        onRegionCreate(trackIdx, snapToBar(Math.max(0, pixelToTick(x))));
+      } else {
+        // Below the last lane there is nothing to create in — keep seek.
+        const tick = pixelToTick(x);
+        onSeek(Math.max(0, Math.round(tick)));
+      }
     }
   }
 

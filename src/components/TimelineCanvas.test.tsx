@@ -1,0 +1,109 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render } from "@testing-library/react";
+import { fireEvent } from "@testing-library/dom";
+import { TimelineCanvas } from "./TimelineCanvas";
+import type { Track } from "../types/model";
+
+// jsdom canvases have no 2d context and getBoundingClientRect() is all
+// zeros, so drawing is a no-op and event clientX/clientY map 1:1 onto
+// canvas coordinates — which makes the hit-test/gesture math testable.
+
+function makeTrack(overrides: Partial<Track> = {}): Track {
+  return {
+    id: "track-1",
+    name: "FM1",
+    channel: { Fm: 0 },
+    instrumentId: null,
+    regions: [],
+    muted: false,
+    solo: false,
+    volume: 100,
+    pan: "Center",
+    pitchOffset: 0,
+    ...overrides,
+  };
+}
+
+const handlers = {
+  onRegionClick: vi.fn(),
+  onRegionDoubleClick: vi.fn(),
+  onSelectRegions: vi.fn(),
+  onRegionMove: vi.fn(),
+  onRegionResize: vi.fn(),
+  onRegionCreate: vi.fn(),
+  onSeek: vi.fn(),
+};
+
+// Deliberately non-4/4 so a hardcoded 4-beats-per-bar snap would fail.
+const gridProps = {
+  ticksPerPixel: 10,
+  scrollLeft: 0,
+  trackHeight: 60,
+  ticksPerBeat: 480,
+  beatsPerBar: 3,
+  playbackTick: 0,
+  playing: false,
+  selectedRegions: [],
+  seekTick: 0,
+};
+
+function renderCanvas(tracks: Track[]) {
+  const { container } = render(
+    <TimelineCanvas tracks={tracks} {...gridProps} {...handlers} />,
+  );
+  const canvas = container.querySelector("canvas");
+  expect(canvas).not.toBeNull();
+  return canvas as HTMLCanvasElement;
+}
+
+describe("TimelineCanvas double-click", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates a bar-snapped region on an empty stretch of a track lane", () => {
+    const canvas = renderCanvas([makeTrack()]);
+
+    const clickX = 200; // inside lane 0, no region there
+    fireEvent.doubleClick(canvas, { clientX: clickX, clientY: 10 });
+
+    const barTicks = gridProps.ticksPerBeat * gridProps.beatsPerBar;
+    const clickTick = clickX * gridProps.ticksPerPixel;
+    const snapped = Math.floor(clickTick / barTicks) * barTicks;
+    expect(snapped).toBeGreaterThan(0); // the case must actually exercise snapping
+    expect(handlers.onRegionCreate).toHaveBeenCalledWith(0, snapped);
+    expect(handlers.onSeek).not.toHaveBeenCalled();
+  });
+
+  it("keeps seek below the last lane", () => {
+    const canvas = renderCanvas([makeTrack()]);
+
+    const clickX = 200;
+    fireEvent.doubleClick(canvas, {
+      clientX: clickX,
+      clientY: gridProps.trackHeight + 10, // one lane exists; this is below it
+    });
+
+    expect(handlers.onSeek).toHaveBeenCalledWith(
+      Math.round(clickX * gridProps.ticksPerPixel),
+    );
+    expect(handlers.onRegionCreate).not.toHaveBeenCalled();
+  });
+
+  it("opens the region under the cursor instead of creating", () => {
+    const region = {
+      id: "region-1",
+      startTick: 0,
+      durationTicks: 5000,
+      notes: [],
+    };
+    const track = makeTrack({ regions: [region] });
+    const canvas = renderCanvas([track]);
+
+    fireEvent.doubleClick(canvas, { clientX: 200, clientY: 10 });
+
+    expect(handlers.onRegionDoubleClick).toHaveBeenCalledWith(track.id, region.id);
+    expect(handlers.onRegionCreate).not.toHaveBeenCalled();
+    expect(handlers.onSeek).not.toHaveBeenCalled();
+  });
+});

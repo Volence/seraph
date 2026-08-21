@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { ticksPerBar as ticksPerBarOf, type GridMeta } from "../utils/grid";
 
 interface ZoomState {
   ticksPerPixel: number;
@@ -10,8 +11,8 @@ interface ZoomState {
   pixelToTick: (px: number) => number;
 }
 
-export function useArrangementZoom(ticksPerBeat: number): ZoomState {
-  const ticksPerBar = ticksPerBeat * 4;
+export function useArrangementZoom(meta: GridMeta): ZoomState {
+  const ticksPerBar = ticksPerBarOf(meta);
   const defaultTicksPerPixel = (ticksPerBar * 16) / 1200;
   const [ticksPerPixel, setTicksPerPixel] = useState(defaultTicksPerPixel);
   const [scrollLeft, setScrollLeft] = useState(0);

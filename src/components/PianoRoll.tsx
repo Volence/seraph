@@ -5,6 +5,7 @@ import { PianoRollKeys } from "./PianoRollKeys";
 import { PianoRollCanvas } from "./PianoRollCanvas";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
+import * as grid from "../utils/grid";
 import styles from "./PianoRoll.module.css";
 
 interface PianoRollProps {
@@ -53,8 +54,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
   const [scrollTop, setScrollTop] = useState(0);
-  const ticksPerBeat = 480;
-  const gridSnapTicks = Math.round(ticksPerBeat * 4 / GRID_OPTIONS[gridIdx].divisor);
+  const ticksPerBeat = projectMeta.ticksPerBeat;
+  const ticksPerBar = grid.ticksPerBar(projectMeta);
+  const gridSnapTicks = Math.round(ticksPerBar / GRID_OPTIONS[gridIdx].divisor);
 
   const isDac = region.channelType === "dac";
   const computedRange = (() => {
@@ -71,7 +73,6 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const [minPitch, maxPitch] = computedRange;
   const drumLabels: Record<number, string> | undefined = isDac ? DAC_SAMPLE_NAMES : undefined;
   const rowHeight = isDac ? 22 : 14;
-  const ticksPerBar = ticksPerBeat * 4;
   const defaultTpp = Math.min(region.durationTicks / 800, ticksPerBar * 8 / 800);
   const [ticksPerPixel, setTicksPerPixel] = useState(defaultTpp);
   const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
@@ -193,8 +194,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     }
   }
 
-  const barStart = Math.floor(region.startTick / (ticksPerBeat * 4)) + 1;
-  const barEnd = Math.ceil((region.startTick + region.durationTicks) / (ticksPerBeat * 4));
+  const barStart = Math.floor(region.startTick / ticksPerBar) + 1;
+  const barEnd = Math.ceil((region.startTick + region.durationTicks) / ticksPerBar);
 
   const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   function noteName(pitch: number): string {

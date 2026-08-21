@@ -43,9 +43,11 @@ impl ProjectManager {
         tempo: f64,
         time_sig: (u8, u8),
     ) -> Result<(), String> {
-        if self.driver_registry.get(driver_id).is_none() {
-            return Err(format!("unknown driver: {driver_id}"));
-        }
+        let layout = self
+            .driver_registry
+            .get(driver_id)
+            .ok_or_else(|| format!("unknown driver: {driver_id}"))?
+            .channel_layout();
 
         fs::create_dir_all(path).map_err(|e| e.to_string())?;
         fs::create_dir_all(path.join("instruments/fm")).map_err(|e| e.to_string())?;
@@ -68,21 +70,63 @@ impl ProjectManager {
             driver_id: driver_id.to_string(),
         };
 
+        // Seed one instrument-less track per driver channel so a fresh
+        // project opens with the full lane roster ready to compose into.
+        let tracks = Self::default_tracks_for_layout(&layout);
+
         let project_file = ProjectFile {
             metadata: metadata.clone(),
-            tracks: Vec::new(),
+            tracks: tracks.clone(),
         };
         let json = serde_json::to_string_pretty(&project_file).map_err(|e| e.to_string())?;
         fs::write(path.join("project.json"), json).map_err(|e| e.to_string())?;
 
         self.project_path = Some(path.to_path_buf());
         self.metadata = Some(metadata);
-        self.tracks = Vec::new();
+        self.tracks = tracks;
         self.instruments = InstrumentBank::default();
         self.dirty_instruments.clear();
         self.dac_pcm_cache.clear();
 
         Ok(())
+    }
+
+    /// One instrument-less track per driver channel, named after the channel,
+    /// in FM → PSG → DAC order. Derived from the driver's `ChannelLayout` so
+    /// the roster follows whatever driver the project was created with.
+    fn default_tracks_for_layout(layout: &crate::model::driver::ChannelLayout) -> Vec<Track> {
+        fn lane(name: &str, channel: ChannelAssignment) -> Track {
+            Track {
+                id: Uuid::new_v4(),
+                name: name.to_string(),
+                channel,
+                instrument_id: None,
+                regions: Vec::new(),
+                muted: false,
+                solo: false,
+                volume: 100,
+                pan: Pan::Center,
+                pitch_offset: 0,
+                modulation: None,
+            }
+        }
+
+        let mut tracks = Vec::new();
+        for ch in &layout.fm_channels {
+            tracks.push(lane(&ch.name, ChannelAssignment::Fm(ch.index)));
+        }
+        for ch in &layout.psg_channels {
+            let assign = if ch.is_noise {
+                ChannelAssignment::PsgNoise
+            } else {
+                ChannelAssignment::Psg(ch.index)
+            };
+            tracks.push(lane(&ch.name, assign));
+        }
+        for ch in &layout.dac_channels {
+            tracks.push(lane(&ch.name, ChannelAssignment::Dac(ch.index)));
+        }
+        tracks
     }
 
     pub fn open(&mut self, path: &Path) -> Result<Song, String> {
@@ -230,14 +274,56 @@ impl ProjectManager {
 
     // --- FM CRUD ---
 
+    /// Bind instrument `id` to the first empty lane whose channel `rank`s
+    /// (lowest rank wins), renaming the lane to the instrument — the
+    /// convention everywhere is that a track's name follows its bound
+    /// instrument. Returns false when no empty lane of that kind exists.
+    fn bind_to_empty_lane(
+        &mut self,
+        id: Uuid,
+        name: &str,
+        rank: impl Fn(&ChannelAssignment) -> Option<u8>,
+    ) -> bool {
+        let target = self
+            .tracks
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.instrument_id.is_none())
+            .filter_map(|(i, t)| rank(&t.channel).map(|r| (r, i)))
+            .min()
+            .map(|(_, i)| i);
+        match target {
+            Some(i) => {
+                self.tracks[i].instrument_id = Some(id);
+                self.tracks[i].name = name.to_string();
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Clear `instrument_id` on any track bound to `id`. Lanes survive
+    /// instrument deletion (the seeded roster is the channel layout).
+    fn unbind_instrument_from_tracks(&mut self, id: Uuid) {
+        for track in self.tracks.iter_mut().filter(|t| t.instrument_id == Some(id)) {
+            track.instrument_id = None;
+        }
+    }
+
     pub fn add_fm_instrument(&mut self, mut inst: FmInstrument) -> Uuid {
         let id = Uuid::new_v4();
         inst.id = id;
-        let channel = self.next_available_fm_channel();
         let track_name = inst.name.clone();
         self.instruments.fm.push(inst);
         self.dirty_instruments.insert(id);
-        self.add_track(track_name, channel, Some(id));
+        let bound = self.bind_to_empty_lane(id, &track_name, |c| match c {
+            ChannelAssignment::Fm(n) => Some(*n),
+            _ => None,
+        });
+        if !bound {
+            let channel = self.next_available_fm_channel();
+            self.add_track(track_name, channel, Some(id));
+        }
         id
     }
 
@@ -269,7 +355,7 @@ impl ProjectManager {
             .ok_or("FM instrument not found")?;
         self.instruments.fm.remove(pos);
         self.dirty_instruments.remove(&id);
-        self.tracks.retain(|t| t.instrument_id != Some(id));
+        self.unbind_instrument_from_tracks(id);
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/fm/{id}.json"));
             if file.exists() { let _ = fs::remove_file(file); }
@@ -290,11 +376,19 @@ impl ProjectManager {
     pub fn add_psg_instrument(&mut self, mut inst: PsgInstrument) -> Uuid {
         let id = Uuid::new_v4();
         inst.id = id;
-        let channel = self.next_available_psg_channel(&inst);
+        let is_noise = inst.noise_mode.is_some();
         let track_name = inst.name.clone();
+        let fallback_channel = self.next_available_psg_channel(&inst);
         self.instruments.psg.push(inst);
         self.dirty_instruments.insert(id);
-        self.add_track(track_name, channel, Some(id));
+        let bound = self.bind_to_empty_lane(id, &track_name, |c| match c {
+            ChannelAssignment::PsgNoise if is_noise => Some(0),
+            ChannelAssignment::Psg(n) if !is_noise => Some(*n),
+            _ => None,
+        });
+        if !bound {
+            self.add_track(track_name, fallback_channel, Some(id));
+        }
         id
     }
 
@@ -329,7 +423,7 @@ impl ProjectManager {
             .ok_or("PSG instrument not found")?;
         self.instruments.psg.remove(pos);
         self.dirty_instruments.remove(&id);
-        self.tracks.retain(|t| t.instrument_id != Some(id));
+        self.unbind_instrument_from_tracks(id);
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/psg/{id}.json"));
             if file.exists() { let _ = fs::remove_file(file); }
@@ -444,7 +538,13 @@ impl ProjectManager {
         self.dac_pcm_cache.insert(id, Arc::new(pcm_data));
         self.instruments.dac.push(inst);
         self.dirty_instruments.insert(id);
-        self.add_track(track_name, ChannelAssignment::Dac(0), Some(id));
+        let bound = self.bind_to_empty_lane(id, &track_name, |c| match c {
+            ChannelAssignment::Dac(n) => Some(*n),
+            _ => None,
+        });
+        if !bound {
+            self.add_track(track_name, ChannelAssignment::Dac(0), Some(id));
+        }
         id
     }
 
@@ -467,7 +567,7 @@ impl ProjectManager {
         let inst = self.instruments.dac.remove(pos);
         self.dirty_instruments.remove(&id);
         self.dac_pcm_cache.remove(&id);
-        self.tracks.retain(|t| t.instrument_id != Some(id));
+        self.unbind_instrument_from_tracks(id);
         if let Some(path) = &self.project_path {
             for name in [
                 format!("instruments/dac/{id}.json"),
@@ -1031,6 +1131,80 @@ mod tests {
         cleanup(&path);
     }
 
+    /// The channel roster a fresh project should be seeded with, derived from
+    /// the driver's own channel layout (never hardcoded lane counts).
+    fn expected_roster(layout: &crate::model::driver::ChannelLayout) -> Vec<(String, ChannelAssignment)> {
+        let mut expected: Vec<(String, ChannelAssignment)> = Vec::new();
+        for ch in &layout.fm_channels {
+            expected.push((ch.name.clone(), ChannelAssignment::Fm(ch.index)));
+        }
+        for ch in &layout.psg_channels {
+            let assign = if ch.is_noise { ChannelAssignment::PsgNoise } else { ChannelAssignment::Psg(ch.index) };
+            expected.push((ch.name.clone(), assign));
+        }
+        for ch in &layout.dac_channels {
+            expected.push((ch.name.clone(), ChannelAssignment::Dac(ch.index)));
+        }
+        expected
+    }
+
+    #[test]
+    fn test_create_seeds_default_track_roster() {
+        use crate::model::driver::DriverProfile as _;
+
+        let path = temp_project_path("seed_roster");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Seeded", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let expected = expected_roster(&FlamedriverProfile.channel_layout());
+        assert!(!expected.is_empty(), "layout must expose channels");
+
+        let tracks = mgr.list_tracks();
+        assert_eq!(tracks.len(), expected.len(), "one seeded track per driver channel");
+        for (track, (name, channel)) in tracks.iter().zip(&expected) {
+            assert_eq!(&track.name, name);
+            assert_eq!(
+                format!("{:?}", track.channel),
+                format!("{:?}", channel),
+                "track '{}' channel assignment", name
+            );
+            assert_eq!(track.instrument_id, None, "seeded tracks carry no instrument");
+            assert!(track.regions.is_empty());
+        }
+
+        // create() writes project.json itself — the roster must be persisted
+        // without an explicit save.
+        let mut mgr2 = ProjectManager::new(test_registry());
+        let song = mgr2.open(&path).unwrap();
+        assert_eq!(song.tracks.len(), expected.len(), "roster persisted to project.json");
+
+        cleanup(&path);
+    }
+
+    /// With a seeded roster, adding an instrument must bind it to the first
+    /// empty lane of its kind instead of growing a duplicate-channel track,
+    /// and deleting the instrument must unbind — the lane survives.
+    #[test]
+    fn test_add_fm_instrument_binds_to_empty_roster_lane() {
+        let path = temp_project_path("bind_lane");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Bind", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_count = mgr.list_tracks().len();
+        let id = mgr.add_fm_instrument(assign_test_fm());
+        assert_eq!(mgr.list_tracks().len(), track_count, "binds to an empty FM lane, no new track");
+        let track = mgr.list_tracks().iter().find(|t| t.instrument_id == Some(id))
+            .expect("instrument bound to a track");
+        assert!(matches!(track.channel, ChannelAssignment::Fm(0)), "lowest empty FM lane first");
+        assert_eq!(track.name, "Library Lead", "lane renamed to the bound instrument");
+
+        mgr.delete_fm_instrument(id).unwrap();
+        assert_eq!(mgr.list_tracks().len(), track_count, "delete unbinds; the lane survives");
+        assert!(mgr.list_tracks().iter().all(|t| t.instrument_id.is_none()));
+
+        cleanup(&path);
+    }
+
     #[test]
     fn test_create_rejects_unknown_driver() {
         let path = temp_project_path("bad_driver");
@@ -1168,16 +1342,20 @@ mod tests {
         let mut mgr = ProjectManager::new(test_registry());
         mgr.create(&path, "Track Test", "flamedriver", 120.0, (4, 4)).unwrap();
 
+        let baseline = mgr.list_tracks().len(); // seeded roster
         let id = mgr.add_track("FM1-Bass".into(), ChannelAssignment::Fm(0), None);
-        assert_eq!(mgr.list_tracks().len(), 1);
-        assert_eq!(mgr.list_tracks()[0].name, "FM1-Bass");
+        assert_eq!(mgr.list_tracks().len(), baseline + 1);
+        let added = mgr.list_tracks().iter().find(|t| t.id == id).unwrap();
+        assert_eq!(added.name, "FM1-Bass");
 
         mgr.update_track(id, "FM1-Lead".into(), ChannelAssignment::Fm(0), None, true, false, 80, Pan::Left, 0).unwrap();
-        assert_eq!(mgr.list_tracks()[0].name, "FM1-Lead");
-        assert!(mgr.list_tracks()[0].muted);
+        let added = mgr.list_tracks().iter().find(|t| t.id == id).unwrap();
+        assert_eq!(added.name, "FM1-Lead");
+        assert!(added.muted);
 
         mgr.delete_track(id).unwrap();
-        assert!(mgr.list_tracks().is_empty());
+        assert_eq!(mgr.list_tracks().len(), baseline);
+        assert!(mgr.list_tracks().iter().all(|t| t.id != id));
 
         cleanup(&path);
     }
@@ -1189,14 +1367,15 @@ mod tests {
         mgr.create(&path, "Region Test", "flamedriver", 120.0, (4, 4)).unwrap();
 
         let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
-        assert_eq!(mgr.list_tracks()[0].regions.len(), 1);
+        assert_eq!(track(&mgr).regions.len(), 1);
 
         mgr.update_region(track_id, region_id, 480, 960).unwrap();
-        assert_eq!(mgr.list_tracks()[0].regions[0].start_tick, 480);
+        assert_eq!(track(&mgr).regions[0].start_tick, 480);
 
         mgr.delete_region(track_id, region_id).unwrap();
-        assert!(mgr.list_tracks()[0].regions.is_empty());
+        assert!(track(&mgr).regions.is_empty());
 
         cleanup(&path);
     }
@@ -1208,17 +1387,18 @@ mod tests {
         mgr.create(&path, "Note Test", "flamedriver", 120.0, (4, 4)).unwrap();
 
         let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
 
         let idx = mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
         assert_eq!(idx, 0);
-        assert_eq!(mgr.list_tracks()[0].regions[0].notes.len(), 1);
+        assert_eq!(track(&mgr).regions[0].notes.len(), 1);
 
         mgr.update_note(track_id, region_id, 0, 120, 64, 80, 480).unwrap();
-        assert_eq!(mgr.list_tracks()[0].regions[0].notes[0].pitch, 64);
+        assert_eq!(track(&mgr).regions[0].notes[0].pitch, 64);
 
         mgr.delete_note(track_id, region_id, 0).unwrap();
-        assert!(mgr.list_tracks()[0].regions[0].notes.is_empty());
+        assert!(track(&mgr).regions[0].notes.is_empty());
 
         cleanup(&path);
     }
@@ -1234,14 +1414,16 @@ mod tests {
         mgr.add_note(track_id, region_id, 0, 60, 100, 480).unwrap();
         mgr.add_note(track_id, region_id, 480, 64, 80, 240).unwrap();
 
+        let track_count = mgr.list_tracks().len();
         mgr.save().unwrap();
         mgr.close();
 
         let song = mgr.open(&path).unwrap();
-        assert_eq!(song.tracks.len(), 1);
-        assert_eq!(song.tracks[0].regions.len(), 1);
-        assert_eq!(song.tracks[0].regions[0].notes.len(), 2);
-        assert_eq!(song.tracks[0].regions[0].notes[0].pitch, 60);
+        assert_eq!(song.tracks.len(), track_count);
+        let track = song.tracks.iter().find(|t| t.id == track_id).unwrap();
+        assert_eq!(track.regions.len(), 1);
+        assert_eq!(track.regions[0].notes.len(), 2);
+        assert_eq!(track.regions[0].notes[0].pitch, 60);
 
         cleanup(&path);
     }
@@ -1255,7 +1437,14 @@ mod tests {
         let snap = mgr.build_snapshot();
         assert_eq!(snap.tempo_bpm, 140.0);
         assert_eq!(snap.ticks_per_beat, 480);
-        assert!(snap.channels.is_empty());
+        // The seeded roster surfaces one channel per driver lane, all silent.
+        {
+            use crate::model::driver::DriverProfile as _;
+            let layout = FlamedriverProfile.channel_layout();
+            let lane_count = layout.fm_channels.len() + layout.psg_channels.len() + layout.dac_channels.len();
+            assert_eq!(snap.channels.len(), lane_count, "one channel per seeded lane");
+        }
+        assert!(snap.channels.iter().all(|c| c.events.is_empty()), "empty project has no events");
 
         cleanup(&path);
     }
@@ -1288,7 +1477,12 @@ mod tests {
         });
 
         let snap = mgr.build_snapshot();
-        assert!(snap.channels.is_empty(), "muted track should be excluded");
+        // The other seeded lanes still surface (silent) channels; the muted
+        // track's notes must not reach any of them.
+        assert!(
+            snap.channels.iter().all(|c| c.events.is_empty()),
+            "muted track's events should be excluded"
+        );
 
         cleanup(&path);
     }
@@ -1396,8 +1590,10 @@ mod tests {
         });
 
         let snap = mgr.build_snapshot();
-        assert_eq!(snap.channels.len(), 1);
-        assert!(!snap.channels[0].overlaps.is_empty(), "should detect overlap");
+        let fm0 = snap.channels.iter()
+            .find(|c| matches!(c.channel_type, ChannelType::Fm(0)))
+            .expect("FM1 channel present");
+        assert!(!fm0.overlaps.is_empty(), "should detect overlap");
 
         cleanup(&path);
     }
@@ -1432,7 +1628,10 @@ mod tests {
         });
 
         let snap = mgr.build_snapshot();
-        let ticks: Vec<u64> = snap.channels[0].events.iter().map(|e| e.tick()).collect();
+        let channel = snap.channels.iter()
+            .find(|c| !c.events.is_empty())
+            .expect("the note-carrying channel is present");
+        let ticks: Vec<u64> = channel.events.iter().map(|e| e.tick()).collect();
         assert!(ticks.windows(2).all(|w| w[0] <= w[1]), "events should be sorted by tick");
 
         cleanup(&path);

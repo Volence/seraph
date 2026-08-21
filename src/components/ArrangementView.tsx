@@ -8,6 +8,7 @@ import { TimelineRuler } from "./TimelineRuler";
 import { TimelineCanvas } from "./TimelineCanvas";
 import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
+import * as grid from "../utils/grid";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -51,7 +52,7 @@ export function ArrangementView({
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
-  const zoom = useArrangementZoom(projectMeta.ticksPerBeat);
+  const zoom = useArrangementZoom(projectMeta);
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const [seekTick, setSeekTick] = useState(0);
   const trackHeight = 60;
@@ -163,7 +164,7 @@ export function ArrangementView({
   async function handleRegionCreate(trackIdx: number, startTick: number) {
     const track = visibleTracks[trackIdx];
     if (!track) return;
-    const oneBar = projectMeta.ticksPerBeat * projectMeta.timeSignature[0];
+    const oneBar = grid.ticksPerBar(projectMeta);
     const regionId = await ipc.addRegion(track.id, startTick, oneBar);
     await refresh();
     onSelectRegions([{

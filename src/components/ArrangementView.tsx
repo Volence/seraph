@@ -9,6 +9,7 @@ import { TimelineCanvas } from "./TimelineCanvas";
 import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
+import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -112,6 +113,10 @@ export function ArrangementView({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.length > 0) {
+        // Opening a region in the piano roll selects it, so while the roll
+        // has a note selection Delete belongs to the notes — never cascade
+        // into deleting the enclosing region (G1).
+        if (pianoRollNoteSelectionActive()) return;
         e.preventDefault();
         Promise.all(selectedRegions.map((r) => ipc.deleteRegion(r.trackId, r.regionId))).then(() => {
           onSelectRegions([]);

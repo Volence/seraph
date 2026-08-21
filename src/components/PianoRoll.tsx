@@ -7,6 +7,7 @@ import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes } from "../utils/pianoRollEdit";
+import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import styles from "./PianoRoll.module.css";
 
 interface PianoRollProps {
@@ -99,6 +100,14 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Publish whether this piano roll owns a note selection, so the
+  // arrangement's window-level Delete handler defers to us (G1). Cleared on
+  // unmount so region deletion works again once the roll closes.
+  useEffect(() => {
+    setPianoRollNoteSelectionActive(selectedNotes.size > 0);
+  }, [selectedNotes]);
+  useEffect(() => () => setPianoRollNoteSelectionActive(false), []);
+
   async function handleNoteAdd(tick: number, pitch: number, duration: number) {
     await ipc.addNote(region.trackId, region.regionId, tick, pitch, 100, duration);
     refresh();
@@ -173,7 +182,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           })();
         }
       }
-      if (e.key === "Delete" && selectedNotes.size > 0) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedNotes.size > 0) {
         const sorted = Array.from(selectedNotes).sort((a, b) => b - a);
         (async () => {
           for (const idx of sorted) {

@@ -39,6 +39,8 @@ use ipc::{
     add_region, update_region, move_region, delete_region,
     // Note CRUD
     add_note, update_note, delete_note,
+    // Undo / redo
+    undo, redo, begin_undo_group, end_undo_group, get_undo_state,
     // Transport
     transport_play, transport_stop, transport_seek,
     transport_set_loop, transport_clear_loop, get_playback_state, reload_sequence, set_master_volume,
@@ -114,6 +116,12 @@ fn build_specta() -> Builder<tauri::Wry> {
         add_note,
         update_note,
         delete_note,
+        // Undo / redo
+        undo,
+        redo,
+        begin_undo_group,
+        end_undo_group,
+        get_undo_state,
         // Transport
         transport_play,
         transport_stop,

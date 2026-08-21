@@ -754,6 +754,64 @@ pub fn list_tracks(state: State<'_, ProjectState>) -> Result<Vec<crate::model::s
     Ok(mgr.list_tracks().to_vec())
 }
 
+// --- Undo / Redo (song edits) ---
+
+/// Combined undo/redo/dirty state for the frontend (Save indicator,
+/// menu enablement, close-confirm).
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UndoState {
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub dirty: bool,
+}
+
+/// Undo the last song edit and return the restored tracks (the frontend
+/// re-renders from this — same payload shape as `list_tracks`). A no-op
+/// (empty stack) returns the current tracks unchanged.
+#[tauri::command]
+#[specta::specta]
+pub fn undo(state: State<'_, ProjectState>) -> Result<Vec<crate::model::song::Track>, String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr.undo())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn redo(state: State<'_, ProjectState>) -> Result<Vec<crate::model::song::Track>, String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr.redo())
+}
+
+/// Open a coalescing undo group (drag gesture / batch loop): until
+/// `end_undo_group`, only the first mutation pushes an undo snapshot.
+#[tauri::command]
+#[specta::specta]
+pub fn begin_undo_group(state: State<'_, ProjectState>) -> Result<(), String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.begin_undo_group();
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn end_undo_group(state: State<'_, ProjectState>) -> Result<(), String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.end_undo_group();
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_undo_state(state: State<'_, ProjectState>) -> Result<UndoState, String> {
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(UndoState {
+        can_undo: mgr.can_undo(),
+        can_redo: mgr.can_redo(),
+        dirty: mgr.is_dirty(),
+    })
+}
+
 // --- Region CRUD ---
 
 #[tauri::command]

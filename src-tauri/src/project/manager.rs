@@ -12,6 +12,10 @@ use crate::sequencer::{
     ModulationParams,
 };
 
+/// Maximum song-edit undo steps retained; the oldest snapshot is dropped
+/// once the stack exceeds this.
+pub const MAX_UNDO_DEPTH: usize = 100;
+
 pub struct ProjectManager {
     project_path: Option<PathBuf>,
     metadata: Option<SongMetadata>,
@@ -20,6 +24,19 @@ pub struct ProjectManager {
     dirty_instruments: HashSet<Uuid>,
     dac_pcm_cache: HashMap<Uuid, Arc<Vec<u8>>>,
     driver_registry: DriverRegistry,
+    /// Snapshots of `tracks` taken BEFORE each in-scope song edit
+    /// (notes, regions, tracks). Instrument-parameter edits, library
+    /// operations, and project create/open are out of undo scope.
+    undo_stack: Vec<Vec<Track>>,
+    redo_stack: Vec<Vec<Track>>,
+    /// True between `begin_undo_group` / `end_undo_group`: only the first
+    /// mutation of the group pushes a snapshot (drag-gesture coalescing).
+    in_undo_group: bool,
+    group_pushed: bool,
+    /// Unsaved-changes flag: set by EVERY mutation (in-scope and
+    /// out-of-scope-for-undo alike — dirty is about saving, not undo),
+    /// cleared by save/create/open/close. Undo/redo do NOT clear it.
+    dirty: bool,
 }
 
 impl ProjectManager {
@@ -32,7 +49,95 @@ impl ProjectManager {
             dirty_instruments: HashSet::new(),
             dac_pcm_cache: HashMap::new(),
             driver_registry,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            in_undo_group: false,
+            group_pushed: false,
+            dirty: false,
         }
+    }
+
+    // --- Undo / Redo (song edits only: notes, regions, tracks) ---
+
+    /// Record an in-scope song edit: mark dirty and push an undo snapshot of
+    /// the CURRENT tracks state (call after validation, before mutating).
+    /// Inside an undo group only the first mutation pushes (gesture
+    /// coalescing); every new snapshot invalidates the redo branch.
+    fn record_song_edit(&mut self) {
+        self.dirty = true;
+        if self.in_undo_group {
+            if self.group_pushed {
+                return;
+            }
+            self.group_pushed = true;
+        }
+        self.undo_stack.push(self.tracks.clone());
+        if self.undo_stack.len() > MAX_UNDO_DEPTH {
+            self.undo_stack.remove(0);
+        }
+        self.redo_stack.clear();
+    }
+
+    /// Open a coalescing group (drag gesture / batch loop): until
+    /// `end_undo_group`, only the first mutation pushes a snapshot.
+    /// A nested begin is ignored with a warning.
+    pub fn begin_undo_group(&mut self) {
+        if self.in_undo_group {
+            eprintln!("[undo] warning: begin_undo_group while a group is already open; ignoring nested begin");
+            return;
+        }
+        self.in_undo_group = true;
+        self.group_pushed = false;
+    }
+
+    /// Close the current coalescing group. An end without an open group is
+    /// a no-op.
+    pub fn end_undo_group(&mut self) {
+        self.in_undo_group = false;
+        self.group_pushed = false;
+    }
+
+    /// Restore the previous song-edit state. Returns the (possibly
+    /// unchanged, when there is nothing to undo) current tracks.
+    /// Undo marks dirty — the in-memory state now differs from disk.
+    pub fn undo(&mut self) -> Vec<Track> {
+        if let Some(prev) = self.undo_stack.pop() {
+            let current = std::mem::replace(&mut self.tracks, prev);
+            self.redo_stack.push(current);
+            self.dirty = true;
+        }
+        self.tracks.clone()
+    }
+
+    pub fn redo(&mut self) -> Vec<Track> {
+        if let Some(next) = self.redo_stack.pop() {
+            let current = std::mem::replace(&mut self.tracks, next);
+            self.undo_stack.push(current);
+            self.dirty = true;
+        }
+        self.tracks.clone()
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Reset undo history and the dirty flag — project boundary
+    /// (create/open/close).
+    fn reset_edit_state(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+        self.in_undo_group = false;
+        self.group_pushed = false;
+        self.dirty = false;
     }
 
     pub fn create(
@@ -87,6 +192,7 @@ impl ProjectManager {
         self.instruments = InstrumentBank::default();
         self.dirty_instruments.clear();
         self.dac_pcm_cache.clear();
+        self.reset_edit_state();
 
         Ok(())
     }
@@ -190,6 +296,7 @@ impl ProjectManager {
         self.tracks = project_file.tracks.clone();
         self.instruments = instruments.clone();
         self.dirty_instruments.clear();
+        self.reset_edit_state();
 
         Ok(Song {
             metadata: project_file.metadata,
@@ -236,6 +343,7 @@ impl ProjectManager {
         }
 
         self.dirty_instruments.clear();
+        self.dirty = false;
         Ok(())
     }
 
@@ -246,6 +354,7 @@ impl ProjectManager {
         self.instruments = InstrumentBank::default();
         self.dirty_instruments.clear();
         self.dac_pcm_cache.clear();
+        self.reset_edit_state();
     }
 
     pub fn is_open(&self) -> bool {
@@ -316,13 +425,15 @@ impl ProjectManager {
         let track_name = inst.name.clone();
         self.instruments.fm.push(inst);
         self.dirty_instruments.insert(id);
+        self.dirty = true;
         let bound = self.bind_to_empty_lane(id, &track_name, |c| match c {
             ChannelAssignment::Fm(n) => Some(*n),
             _ => None,
         });
         if !bound {
             let channel = self.next_available_fm_channel();
-            self.add_track(track_name, channel, Some(id));
+            // raw push: instrument operations are out of undo scope
+            self.push_track_raw(track_name, channel, Some(id));
         }
         id
     }
@@ -344,6 +455,7 @@ impl ProjectManager {
         let new_name = inst.name.clone();
         *existing = inst;
         self.dirty_instruments.insert(id);
+        self.dirty = true;
         if let Some(track) = self.tracks.iter_mut().find(|t| t.instrument_id == Some(id)) {
             track.name = new_name;
         }
@@ -355,6 +467,7 @@ impl ProjectManager {
             .ok_or("FM instrument not found")?;
         self.instruments.fm.remove(pos);
         self.dirty_instruments.remove(&id);
+        self.dirty = true;
         self.unbind_instrument_from_tracks(id);
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/fm/{id}.json"));
@@ -381,13 +494,14 @@ impl ProjectManager {
         let fallback_channel = self.next_available_psg_channel(&inst);
         self.instruments.psg.push(inst);
         self.dirty_instruments.insert(id);
+        self.dirty = true;
         let bound = self.bind_to_empty_lane(id, &track_name, |c| match c {
             ChannelAssignment::PsgNoise if is_noise => Some(0),
             ChannelAssignment::Psg(n) if !is_noise => Some(*n),
             _ => None,
         });
         if !bound {
-            self.add_track(track_name, fallback_channel, Some(id));
+            self.push_track_raw(track_name, fallback_channel, Some(id));
         }
         id
     }
@@ -412,6 +526,7 @@ impl ProjectManager {
         let new_name = inst.name.clone();
         *existing = inst;
         self.dirty_instruments.insert(id);
+        self.dirty = true;
         if let Some(track) = self.tracks.iter_mut().find(|t| t.instrument_id == Some(id)) {
             track.name = new_name;
         }
@@ -423,6 +538,7 @@ impl ProjectManager {
             .ok_or("PSG instrument not found")?;
         self.instruments.psg.remove(pos);
         self.dirty_instruments.remove(&id);
+        self.dirty = true;
         self.unbind_instrument_from_tracks(id);
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/psg/{id}.json"));
@@ -479,6 +595,11 @@ impl ProjectManager {
                 return Err("cannot assign a PSG voice to a non-PSG track".into());
             }
         }
+
+        // The TRACK binding change is an undoable song edit (the instrument
+        // added to the bank below, if any, stays — instrument operations are
+        // out of undo scope; undo only restores the binding).
+        self.record_song_edit();
 
         let existing = match inst {
             LibraryInstrument::Fm(_) => self.instruments.fm.iter()
@@ -538,12 +659,13 @@ impl ProjectManager {
         self.dac_pcm_cache.insert(id, Arc::new(pcm_data));
         self.instruments.dac.push(inst);
         self.dirty_instruments.insert(id);
+        self.dirty = true;
         let bound = self.bind_to_empty_lane(id, &track_name, |c| match c {
             ChannelAssignment::Dac(n) => Some(*n),
             _ => None,
         });
         if !bound {
-            self.add_track(track_name, ChannelAssignment::Dac(0), Some(id));
+            self.push_track_raw(track_name, ChannelAssignment::Dac(0), Some(id));
         }
         id
     }
@@ -555,6 +677,7 @@ impl ProjectManager {
         let new_name = inst.name.clone();
         *existing = inst;
         self.dirty_instruments.insert(id);
+        self.dirty = true;
         if let Some(track) = self.tracks.iter_mut().find(|t| t.instrument_id == Some(id)) {
             track.name = new_name;
         }
@@ -566,6 +689,7 @@ impl ProjectManager {
             .ok_or("DAC instrument not found")?;
         let inst = self.instruments.dac.remove(pos);
         self.dirty_instruments.remove(&id);
+        self.dirty = true;
         self.dac_pcm_cache.remove(&id);
         self.unbind_instrument_from_tracks(id);
         if let Some(path) = &self.project_path {
@@ -596,6 +720,7 @@ impl ProjectManager {
     pub fn update_dac_pcm(&mut self, id: Uuid, pcm_data: Vec<u8>) {
         self.dac_pcm_cache.insert(id, Arc::new(pcm_data));
         self.dirty_instruments.insert(id);
+        self.dirty = true;
     }
 
     // --- Snapshot Builder ---
@@ -917,7 +1042,14 @@ impl ProjectManager {
 
     // --- Track CRUD ---
 
+    /// Song-edit entry point (undoable). Instrument add paths use
+    /// `push_track_raw` instead — instrument operations are out of undo scope.
     pub fn add_track(&mut self, name: String, channel: ChannelAssignment, instrument_id: Option<Uuid>) -> Uuid {
+        self.record_song_edit();
+        self.push_track_raw(name, channel, instrument_id)
+    }
+
+    fn push_track_raw(&mut self, name: String, channel: ChannelAssignment, instrument_id: Option<Uuid>) -> Uuid {
         let id = Uuid::new_v4();
         self.tracks.push(Track {
             id,
@@ -947,8 +1079,10 @@ impl ProjectManager {
         pan: Pan,
         pitch_offset: i8,
     ) -> Result<(), String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == id)
+        let idx = self.tracks.iter().position(|t| t.id == id)
             .ok_or("track not found")?;
+        self.record_song_edit();
+        let track = &mut self.tracks[idx];
         track.name = name;
         track.channel = channel;
         track.instrument_id = instrument_id;
@@ -963,6 +1097,7 @@ impl ProjectManager {
     pub fn delete_track(&mut self, id: Uuid) -> Result<(), String> {
         let pos = self.tracks.iter().position(|t| t.id == id)
             .ok_or("track not found")?;
+        self.record_song_edit();
         self.tracks.remove(pos);
         Ok(())
     }
@@ -974,8 +1109,10 @@ impl ProjectManager {
     // --- Region CRUD ---
 
     pub fn add_region(&mut self, track_id: Uuid, start_tick: u64, duration_ticks: u64) -> Result<Uuid, String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+        let idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
+        self.record_song_edit();
+        let track = &mut self.tracks[idx];
         let id = Uuid::new_v4();
         track.regions.push(Region {
             id,
@@ -988,42 +1125,45 @@ impl ProjectManager {
     }
 
     pub fn update_region(&mut self, track_id: Uuid, region_id: Uuid, start_tick: u64, duration_ticks: u64) -> Result<(), String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
-        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+        let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
             .ok_or("region not found")?;
+        self.record_song_edit();
+        let region = &mut self.tracks[t_idx].regions[r_idx];
         region.start_tick = start_tick;
         region.duration_ticks = duration_ticks;
         Ok(())
     }
 
     pub fn move_region(&mut self, src_track_id: Uuid, region_id: Uuid, dst_track_id: Uuid, start_tick: u64) -> Result<(), String> {
+        // Validate every lookup BEFORE recording/mutating: a missing
+        // destination must not lose the region (or push a snapshot).
+        let src_idx = self.tracks.iter().position(|t| t.id == src_track_id)
+            .ok_or("source track not found")?;
+        let pos = self.tracks[src_idx].regions.iter().position(|r| r.id == region_id)
+            .ok_or("region not found")?;
         if src_track_id == dst_track_id {
-            let track = self.tracks.iter_mut().find(|t| t.id == src_track_id)
-                .ok_or("source track not found")?;
-            let region = track.regions.iter_mut().find(|r| r.id == region_id)
-                .ok_or("region not found")?;
-            region.start_tick = start_tick;
+            self.record_song_edit();
+            self.tracks[src_idx].regions[pos].start_tick = start_tick;
             return Ok(());
         }
-        let src = self.tracks.iter_mut().find(|t| t.id == src_track_id)
-            .ok_or("source track not found")?;
-        let pos = src.regions.iter().position(|r| r.id == region_id)
-            .ok_or("region not found")?;
-        let mut region = src.regions.remove(pos);
-        region.start_tick = start_tick;
-        let dst = self.tracks.iter_mut().find(|t| t.id == dst_track_id)
+        let dst_idx = self.tracks.iter().position(|t| t.id == dst_track_id)
             .ok_or("destination track not found")?;
-        dst.regions.push(region);
+        self.record_song_edit();
+        let mut region = self.tracks[src_idx].regions.remove(pos);
+        region.start_tick = start_tick;
+        self.tracks[dst_idx].regions.push(region);
         Ok(())
     }
 
     pub fn delete_region(&mut self, track_id: Uuid, region_id: Uuid) -> Result<(), String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
-        let pos = track.regions.iter().position(|r| r.id == region_id)
+        let pos = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
             .ok_or("region not found")?;
-        track.regions.remove(pos);
+        self.record_song_edit();
+        self.tracks[t_idx].regions.remove(pos);
         Ok(())
     }
 
@@ -1038,10 +1178,12 @@ impl ProjectManager {
         velocity: u8,
         duration_ticks: u64,
     ) -> Result<usize, String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
-        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+        let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
             .ok_or("region not found")?;
+        self.record_song_edit();
+        let region = &mut self.tracks[t_idx].regions[r_idx];
         let idx = region.notes.len();
         region.notes.push(Note { tick, pitch, velocity, duration_ticks, instrument_id: None, detune: 0, pan_override: None, modulation: None });
         Ok(idx)
@@ -1057,12 +1199,15 @@ impl ProjectManager {
         velocity: u8,
         duration_ticks: u64,
     ) -> Result<(), String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
-        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+        let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
             .ok_or("region not found")?;
-        let note = region.notes.get_mut(note_index)
-            .ok_or("note index out of range")?;
+        if note_index >= self.tracks[t_idx].regions[r_idx].notes.len() {
+            return Err("note index out of range".into());
+        }
+        self.record_song_edit();
+        let note = &mut self.tracks[t_idx].regions[r_idx].notes[note_index];
         note.tick = tick;
         note.pitch = pitch;
         note.velocity = velocity;
@@ -1076,14 +1221,15 @@ impl ProjectManager {
         region_id: Uuid,
         note_index: usize,
     ) -> Result<(), String> {
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
-        let region = track.regions.iter_mut().find(|r| r.id == region_id)
+        let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
             .ok_or("region not found")?;
-        if note_index >= region.notes.len() {
+        if note_index >= self.tracks[t_idx].regions[r_idx].notes.len() {
             return Err("note index out of range".into());
         }
-        region.notes.remove(note_index);
+        self.record_song_edit();
+        self.tracks[t_idx].regions[r_idx].notes.remove(note_index);
         Ok(())
     }
 
@@ -1787,6 +1933,340 @@ mod tests {
                 assert_eq!(note.instrument_id, None, "note override must be cleared");
             }
         }
+
+        cleanup(&path);
+    }
+
+    // --- Undo / redo (song edits) ---
+
+    /// Fresh project + one empty region on a new track; returns
+    /// (mgr, path, track_id, region_id).
+    fn undo_fixture(name: &str) -> (ProjectManager, PathBuf, Uuid, Uuid) {
+        let path = temp_project_path(name);
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Undo", "flamedriver", 120.0, (4, 4)).unwrap();
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        (mgr, path, track_id, region_id)
+    }
+
+    fn region_notes(mgr: &ProjectManager, track_id: Uuid, region_id: Uuid) -> Vec<Note> {
+        mgr.list_tracks().iter()
+            .find(|t| t.id == track_id).expect("track present")
+            .regions.iter()
+            .find(|r| r.id == region_id).expect("region present")
+            .notes.clone()
+    }
+
+    #[test]
+    fn test_undo_redo_note_add_round_trip() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_note_add");
+
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        assert_eq!(region_notes(&mgr, track_id, region_id).len(), 1);
+        assert!(mgr.can_undo());
+
+        let tracks = mgr.undo();
+        assert!(
+            region_notes(&mgr, track_id, region_id).is_empty(),
+            "undo must remove the added note"
+        );
+        // undo returns the restored state
+        let ret_region = tracks.iter().find(|t| t.id == track_id).unwrap()
+            .regions.iter().find(|r| r.id == region_id).unwrap().clone();
+        assert!(ret_region.notes.is_empty());
+        assert!(mgr.can_redo());
+
+        mgr.redo();
+        let notes = region_notes(&mgr, track_id, region_id);
+        assert_eq!(notes.len(), 1, "redo must restore the note");
+        assert_eq!(notes[0].pitch, 60);
+        assert_eq!(notes[0].velocity, 100);
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_redo_note_update_and_delete() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_note_upd");
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+
+        mgr.update_note(track_id, region_id, 0, 480, 64, 90, 120).unwrap();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 64);
+        mgr.undo();
+        let n = &region_notes(&mgr, track_id, region_id)[0];
+        assert_eq!((n.tick, n.pitch, n.velocity, n.duration_ticks), (0, 60, 100, 240),
+            "undo restores the pre-update note");
+        mgr.redo();
+        let n = &region_notes(&mgr, track_id, region_id)[0];
+        assert_eq!((n.tick, n.pitch, n.velocity, n.duration_ticks), (480, 64, 90, 120));
+
+        mgr.delete_note(track_id, region_id, 0).unwrap();
+        assert!(region_notes(&mgr, track_id, region_id).is_empty());
+        mgr.undo();
+        assert_eq!(region_notes(&mgr, track_id, region_id).len(), 1,
+            "undo restores the deleted note");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_redo_region_ops() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_region");
+        let track2 = mgr.add_track("FM2".into(), ChannelAssignment::Fm(1), None);
+
+        // update_region
+        mgr.update_region(track_id, region_id, 480, 960).unwrap();
+        mgr.undo();
+        let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert_eq!(t.regions[0].start_tick, 0, "undo restores region start");
+        assert_eq!(t.regions[0].duration_ticks, 1920);
+
+        // move_region across tracks
+        mgr.move_region(track_id, region_id, track2, 240).unwrap();
+        assert!(mgr.list_tracks().iter().find(|t| t.id == track2).unwrap()
+            .regions.iter().any(|r| r.id == region_id));
+        mgr.undo();
+        assert!(mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap()
+            .regions.iter().any(|r| r.id == region_id),
+            "undo returns the region to its source track");
+
+        // delete_region
+        mgr.delete_region(track_id, region_id).unwrap();
+        mgr.undo();
+        assert!(mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap()
+            .regions.iter().any(|r| r.id == region_id),
+            "undo restores the deleted region");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_redo_track_ops() {
+        let (mut mgr, path, track_id, _region_id) = undo_fixture("undo_track");
+
+        // update_track (mute)
+        mgr.update_track(track_id, "FM1".into(), ChannelAssignment::Fm(0), None,
+            true, false, 80, Pan::Left, 2).unwrap();
+        mgr.undo();
+        let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert!(!t.muted, "undo restores mute state");
+        assert_eq!(t.volume, 100);
+        assert_eq!(t.pitch_offset, 0);
+        mgr.redo();
+        let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert!(t.muted);
+        assert_eq!(t.volume, 80);
+
+        // delete_track / undo restores it with its regions
+        let count = mgr.list_tracks().len();
+        mgr.delete_track(track_id).unwrap();
+        assert_eq!(mgr.list_tracks().len(), count - 1);
+        mgr.undo();
+        assert_eq!(mgr.list_tracks().len(), count, "undo restores the deleted track");
+        assert!(mgr.list_tracks().iter().any(|t| t.id == track_id));
+
+        // add_track / undo removes it
+        let new_id = mgr.add_track("Extra".into(), ChannelAssignment::Fm(2), None);
+        mgr.undo();
+        assert!(mgr.list_tracks().iter().all(|t| t.id != new_id),
+            "undo removes the added track");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_group_coalesces_to_one_step() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_group");
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+
+        // A drag gesture: one update per mousemove, bracketed by the group.
+        mgr.begin_undo_group();
+        for pitch in [61u8, 62, 63, 64] {
+            mgr.update_note(track_id, region_id, 0, 0, pitch, 100, 240).unwrap();
+        }
+        mgr.end_undo_group();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 64);
+
+        // ONE undo step jumps all the way back to the pre-gesture state.
+        mgr.undo();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 60,
+            "grouped updates must coalesce into a single undo step");
+        // And redo restores the gesture's final state.
+        mgr.redo();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 64);
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_group_unbalanced_begin_end_are_safe() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_group_unbal");
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+
+        // Nested begin is a no-op; the inner end closes the (single) group.
+        mgr.begin_undo_group();
+        mgr.begin_undo_group();
+        mgr.update_note(track_id, region_id, 0, 0, 61, 100, 240).unwrap();
+        mgr.update_note(track_id, region_id, 0, 0, 62, 100, 240).unwrap();
+        mgr.end_undo_group();
+        mgr.end_undo_group(); // end without open group: no-op
+
+        mgr.undo();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 60,
+            "nested begins must not fragment the group");
+
+        // After the stray end, normal per-mutation snapshots resume.
+        mgr.redo();
+        mgr.update_note(track_id, region_id, 0, 0, 70, 100, 240).unwrap();
+        mgr.update_note(track_id, region_id, 0, 0, 71, 100, 240).unwrap();
+        mgr.undo();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 70,
+            "post-group mutations get individual undo steps again");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_redo_cleared_on_new_mutation() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_redo_clear");
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.undo();
+        assert!(mgr.can_redo());
+
+        // A fresh mutation invalidates the redo branch.
+        mgr.add_note(track_id, region_id, 480, 72, 100, 240).unwrap();
+        assert!(!mgr.can_redo(), "new mutation must clear the redo stack");
+        let before = region_notes(&mgr, track_id, region_id);
+        mgr.redo(); // must be a no-op
+        assert_eq!(region_notes(&mgr, track_id, region_id).len(), before.len());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_stack_cap_enforced() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_cap");
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+
+        // Well past the cap (setup already pushed a few snapshots).
+        for i in 0..(MAX_UNDO_DEPTH + 50) {
+            mgr.update_note(track_id, region_id, 0, 0, (i % 90) as u8 + 20, 100, 240).unwrap();
+        }
+        let mut undos = 0;
+        while mgr.can_undo() {
+            mgr.undo();
+            undos += 1;
+            assert!(undos <= MAX_UNDO_DEPTH, "stack must be capped at MAX_UNDO_DEPTH");
+        }
+        assert_eq!(undos, MAX_UNDO_DEPTH, "exactly MAX_UNDO_DEPTH steps retained");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_dirty_transitions() {
+        let path = temp_project_path("dirty");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Dirty", "flamedriver", 120.0, (4, 4)).unwrap();
+        assert!(!mgr.is_dirty(), "fresh project starts clean");
+
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        assert!(mgr.is_dirty(), "song edit marks dirty");
+        mgr.save().unwrap();
+        assert!(!mgr.is_dirty(), "save clears dirty");
+
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        mgr.save().unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        assert!(mgr.is_dirty());
+        mgr.undo();
+        assert!(mgr.is_dirty(), "undo does NOT clear dirty — state differs from disk");
+
+        // Out-of-undo-scope mutations still mark dirty (dirty is about saving).
+        mgr.save().unwrap();
+        let fm_id = mgr.add_fm_instrument(assign_test_fm());
+        assert!(mgr.is_dirty(), "instrument add marks dirty");
+        mgr.save().unwrap();
+        assert!(!mgr.is_dirty());
+        let mut inst = mgr.get_fm_instrument(&fm_id).unwrap().clone();
+        inst.feedback = 5;
+        mgr.update_fm_instrument(fm_id, inst).unwrap();
+        assert!(mgr.is_dirty(), "instrument update marks dirty");
+
+        // Re-open clears dirty and the undo history.
+        mgr.save().unwrap();
+        mgr.close();
+        mgr.open(&path).unwrap();
+        assert!(!mgr.is_dirty(), "open starts clean");
+        assert!(!mgr.can_undo(), "undo history does not cross open");
+        assert!(!mgr.can_redo());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_instrument_ops_do_not_enter_undo_stack() {
+        let path = temp_project_path("undo_scope");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Scope", "flamedriver", 120.0, (4, 4)).unwrap();
+        assert!(!mgr.can_undo());
+
+        // Instrument library ops are out of undo scope even though the add
+        // path binds a track lane.
+        let fm_id = mgr.add_fm_instrument(assign_test_fm());
+        assert!(!mgr.can_undo(), "instrument add is not undoable");
+        let mut inst = mgr.get_fm_instrument(&fm_id).unwrap().clone();
+        inst.feedback = 7;
+        mgr.update_fm_instrument(fm_id, inst).unwrap();
+        assert!(!mgr.can_undo(), "instrument update is not undoable");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_assign_library_voice_is_undoable_track_binding() {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
+        let path = temp_project_path("undo_assign");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Assign", "flamedriver", 120.0, (4, 4)).unwrap();
+        let track_id = mgr.add_track("Empty".into(), ChannelAssignment::Fm(0), None);
+
+        let voice = LibraryInstrument::Fm(assign_test_fm());
+        let hash = content_hash(&voice);
+        mgr.assign_library_instrument_to_track(track_id, &voice, &hash).unwrap();
+        let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert!(t.instrument_id.is_some());
+
+        mgr.undo();
+        let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert_eq!(t.instrument_id, None, "undo restores the pre-assign binding");
+        assert_eq!(t.name, "Empty", "undo restores the pre-assign track name");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_failed_mutation_pushes_no_snapshot() {
+        let (mut mgr, path, track_id, region_id) = undo_fixture("undo_failed");
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.save().unwrap();
+        assert!(!mgr.is_dirty());
+        let depth_probe = mgr.can_undo(); // history exists from setup
+        assert!(depth_probe);
+
+        // Failing calls must not push snapshots (or mark dirty).
+        assert!(mgr.update_note(track_id, region_id, 99, 0, 60, 100, 240).is_err());
+        assert!(mgr.delete_note(Uuid::new_v4(), region_id, 0).is_err());
+        assert!(mgr.delete_region(track_id, Uuid::new_v4()).is_err());
+        assert!(mgr.delete_track(Uuid::new_v4()).is_err());
+        assert!(!mgr.is_dirty(), "failed mutations must not mark dirty");
+
+        // The next undo must revert the add_note, not a phantom snapshot.
+        mgr.undo();
+        assert!(region_notes(&mgr, track_id, region_id).is_empty(),
+            "failed mutations must not have pushed snapshots");
 
         cleanup(&path);
     }

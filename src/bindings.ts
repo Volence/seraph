@@ -326,6 +326,55 @@ async deleteNote(trackId: string, regionId: string, noteIndex: number) : Promise
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Undo the last song edit and return the restored tracks (the frontend
+ * re-renders from this — same payload shape as `list_tracks`). A no-op
+ * (empty stack) returns the current tracks unchanged.
+ */
+async undo() : Promise<Result<Track[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("undo") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async redo() : Promise<Result<Track[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("redo") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Open a coalescing undo group (drag gesture / batch loop): until
+ * `end_undo_group`, only the first mutation pushes an undo snapshot.
+ */
+async beginUndoGroup() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("begin_undo_group") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async endUndoGroup() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("end_undo_group") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getUndoState() : Promise<Result<UndoState, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_undo_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async transportPlay() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("transport_play") };
@@ -675,6 +724,11 @@ export type Song = { metadata: SongMetadata; tracks: Track[]; instruments: Instr
 export type SongMetadata = { name: string; tempo: number; timeSignature: [number, number]; ticksPerBeat: number; driverId: string }
 export type Track = { id: string; name: string; channel: ChannelAssignment; instrumentId: string | null; regions: Region[]; muted: boolean; solo: boolean; volume: number; pan: Pan; pitchOffset?: number; modulation?: TrackModulation | null }
 export type TrackModulation = { wait: number; speed: number; delta: number; steps: number }
+/**
+ * Combined undo/redo/dirty state for the frontend (Save indicator,
+ * menu enablement, close-confirm).
+ */
+export type UndoState = { canUndo: boolean; canRedo: boolean; dirty: boolean }
 
 /** tauri-specta globals **/
 

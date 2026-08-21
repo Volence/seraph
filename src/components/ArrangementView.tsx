@@ -157,6 +157,26 @@ export function ArrangementView({
     refresh();
   }
 
+  /** Empty-lane double-click: create a one-bar region, open it in the piano
+   *  roll (region selection drives BottomPanel), and reload the sequence so
+   *  subsequent playback reflects it. */
+  async function handleRegionCreate(trackIdx: number, startTick: number) {
+    const track = visibleTracks[trackIdx];
+    if (!track) return;
+    const oneBar = projectMeta.ticksPerBeat * projectMeta.timeSignature[0];
+    const regionId = await ipc.addRegion(track.id, startTick, oneBar);
+    await refresh();
+    onSelectRegions([{
+      trackId: track.id,
+      trackName: track.name,
+      regionId,
+      channelType: channelType(track),
+      startTick,
+      durationTicks: oneBar,
+    }]);
+    await ipc.reloadSequence();
+  }
+
   async function handleSeek(tick: number) {
     setSeekTick(tick);
     await ipc.transportSeek(tick);
@@ -292,6 +312,7 @@ export function ArrangementView({
           onSelectRegions={onSelectRegions}
           onRegionMove={handleRegionMove}
           onRegionResize={handleRegionResize}
+          onRegionCreate={handleRegionCreate}
           onSeek={handleSeek}
           seekTick={seekTick}
         />

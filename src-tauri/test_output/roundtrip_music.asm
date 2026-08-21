@@ -1,6 +1,6 @@
 ; ============================================================
 ; Song: Snd AIZ1 Header
-; Exported from MegaDAW
+; Exported from Seraph
 ; ============================================================
 
 Snd_AIZ1_Header_Header:

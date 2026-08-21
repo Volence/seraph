@@ -1,6 +1,6 @@
 ; ============================================================
 ; Voice Bank: AIZ1_Header
-; Exported from MegaDAW
+; Exported from Seraph
 ; ============================================================
 
 Snd_AIZ1_Header_Voices:

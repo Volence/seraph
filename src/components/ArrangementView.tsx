@@ -10,6 +10,7 @@ import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { isEditableTarget } from "../utils/keyboard";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -112,6 +113,8 @@ export function ArrangementView({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Never hijack keys while the user is typing in a field (G2).
+      if (isEditableTarget(e.target)) return;
       if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.length > 0) {
         // Opening a region in the piano roll selects it, so while the roll
         // has a note selection Delete belongs to the notes — never cascade

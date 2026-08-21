@@ -109,6 +109,41 @@ beforeEach(() => {
   vi.mocked(lib.libraryWarnings).mockResolvedValue([]);
 });
 
+describe("global shortcuts are inert while typing in text inputs (G2)", () => {
+  it("Space in a text input does not toggle playback", async () => {
+    await openProject();
+    const search = screen.getByPlaceholderText("Search name, game, tag…");
+    fireEvent.keyDown(search, { key: " " });
+    await act(async () => {});
+    expect(ipc.transportPlay).not.toHaveBeenCalled();
+    expect(ipc.transportStop).not.toHaveBeenCalled();
+  });
+
+  it("'l' in a text input does not toggle the loop", async () => {
+    await openProject();
+    const search = screen.getByPlaceholderText("Search name, game, tag…");
+    fireEvent.keyDown(search, { key: "l" });
+    await act(async () => {});
+    expect(ipc.transportSetLoop).not.toHaveBeenCalled();
+    expect(ipc.transportClearLoop).not.toHaveBeenCalled();
+  });
+
+  it("Delete in a text input does not delete the selected region", async () => {
+    const { container } = await openProject();
+    await openRegionInPianoRoll(container);
+    const search = screen.getByPlaceholderText("Search name, game, tag…");
+    fireEvent.keyDown(search, { key: "Delete" });
+    await act(async () => {});
+    expect(ipc.deleteRegion).not.toHaveBeenCalled();
+  });
+
+  it("Space outside inputs still starts playback", async () => {
+    await openProject();
+    fireEvent.keyDown(window, { key: " " });
+    await waitFor(() => expect(ipc.transportPlay).toHaveBeenCalled());
+  });
+});
+
 describe("Delete scoping between piano roll notes and arrangement regions (G1)", () => {
   it("Delete with notes selected deletes the notes, NOT the enclosing region", async () => {
     const { container } = await openProject();

@@ -9,6 +9,7 @@ import { StatusBar } from "./components/StatusBar";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
 import { LibraryPanel } from "./components/LibraryPanel";
+import { isEditableTarget } from "./utils/keyboard";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -45,9 +46,13 @@ export default function App() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        // Deliberately above the editable-target guard: saving must work
+        // (and suppress the browser default) even while typing in a field.
         e.preventDefault();
         handleSave();
       }
+      // Plain-key shortcuts must not fire while the user is typing (G2).
+      if (isEditableTarget(e.target)) return;
       if (e.key === " " && projectMeta) {
         e.preventDefault();
         if (playing) {

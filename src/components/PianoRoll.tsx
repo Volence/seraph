@@ -8,6 +8,7 @@ import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes } from "../utils/pianoRollEdit";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { isEditableTarget } from "../utils/keyboard";
 import styles from "./PianoRoll.module.css";
 
 interface PianoRollProps {
@@ -161,9 +162,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // Don't hijack keys while the user is in a form control (e.g. the
-      // grid-size <select>, where arrows change the value).
-      const target = e.target as HTMLElement | null;
-      if (target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
+      // grid-size <select>, where arrows change the value) or any other
+      // editable target (G2).
+      if (isEditableTarget(e.target)) return;
 
       if ((e.key === "ArrowUp" || e.key === "ArrowDown") && selectedNotes.size > 0) {
         e.preventDefault();

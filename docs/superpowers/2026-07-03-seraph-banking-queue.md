@@ -137,6 +137,31 @@ designs target the banked specs (normative); manifest flags carry the gates.
   + Track works, double-click creates a measure, a placed note plays after
   reload; also confirm empty 11-channel project plays silent/stable.
 
+- 2026-08-21 (cont.): **PIANO ROLL SELECT+TRANSPOSE SHIPPED** (owner-reported gap;
+  merged, lanes on merged tree: cargo 214/0, vitest 47/47, build clean, no
+  bindings drift). Marquee left-drag select (Shift additive), click selects
+  before drag (3px threshold), group drag moves the whole selection
+  (interval-clamped), Arrow=±1 semitone / Ctrl+Arrow=±octave transpose
+  (block-whole-move at range edge, intervals intact), pan moved to
+  middle-button/Alt+drag. Pure helpers in `src/utils/pianoRollEdit.ts`.
+  **OWNER RULINGS (banked):** piano-roll mouse grammar = Ableton-style
+  (double-click draws, drag marquees, middle/Alt pans); Stop semantics =
+  pause-in-place + double-tap returns to playback start + Home=zero; undo v1
+  scope = song edits (notes/regions/tracks), instrument knobs excluded.
+  **FULL UX AUDIT BANKED** (41 gaps G1–G41, priorities, S4 collision map) —
+  see Log context; headline bugs: G1 piano-roll Delete also deletes the region
+  (two live window handlers); G2 shortcuts fire while typing in inputs; G3 no
+  undo anywhere; G4 no dirty flag/confirm-on-close; G5 velocity lane drawn
+  offset by the key-column width; G6 region single-click select possibly
+  swallowed (stale closure). Next waves dispatched: A = safety/transport/
+  playhead (G1,G2,G5,G6,G28,G22,G29,G30,G37); B = undo/redo + dirty flag
+  (G3,G4, new IPC + bindings regen). Remaining backlog for later waves:
+  note/region clipboard (G11,G23), loop-region drag + snap control (G25,G26),
+  tempo/time-sig editing (G34, needs new IPC), track rename/delete (G27),
+  right-click/draw grammar completion per Ableton ruling (G13,G14), QWERTY
+  step entry (G36, owner call pending). S4-deferred: per-note detune UI (G20),
+  track reorder (G27-reorder), velocity mapping changes.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

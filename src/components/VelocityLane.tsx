@@ -8,12 +8,15 @@ interface VelocityLaneProps {
   ticksPerPixel: number;
   scrollLeft: number;
   channelColor: string;
+  /** Width of the piano-roll key column; the lane is offset by this so
+   *  velocity bars sit directly under their notes (G5). */
+  keysWidth: number;
   onVelocityChange: (noteIndex: number, velocity: number) => void;
 }
 
 const LANE_HEIGHT = 60;
 
-export function VelocityLane({ notes, durationTicks, ticksPerPixel, scrollLeft, channelColor, onVelocityChange }: VelocityLaneProps) {
+export function VelocityLane({ notes, durationTicks, ticksPerPixel, scrollLeft, channelColor, keysWidth, onVelocityChange }: VelocityLaneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +73,7 @@ export function VelocityLane({ notes, durationTicks, ticksPerPixel, scrollLeft, 
   }
 
   return (
-    <div ref={containerRef} className={styles.lane}>
+    <div ref={containerRef} className={styles.lane} style={{ marginLeft: keysWidth }}>
       <canvas ref={canvasRef} onMouseDown={handleMouseDown} />
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Note, SelectedRegion, SongMetadata } from "../types/model";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
-import { PianoRollKeys } from "./PianoRollKeys";
+import { PianoRollKeys, MELODIC_KEYS_WIDTH, DAC_KEYS_WIDTH } from "./PianoRollKeys";
 import { PianoRollCanvas } from "./PianoRollCanvas";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
@@ -72,6 +72,13 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const rowHeight = isDac ? 22 : 14;
   const defaultTpp = Math.min(region.durationTicks / 800, ticksPerBar * 8 / 800);
   const [ticksPerPixel, setTicksPerPixel] = useState(defaultTpp);
+  // Key-column width is owned here so the velocity lane can offset itself by
+  // the same amount (G5). Reset when the channel kind flips (DAC keys are
+  // wider and user-resizable).
+  const [keysWidth, setKeysWidth] = useState(isDac ? DAC_KEYS_WIDTH : MELODIC_KEYS_WIDTH);
+  useEffect(() => {
+    setKeysWidth(isDac ? DAC_KEYS_WIDTH : MELODIC_KEYS_WIDTH);
+  }, [isDac]);
   const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
 
@@ -286,6 +293,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           maxPitch={maxPitch}
           rowHeight={rowHeight}
           scrollTop={scrollTop}
+          width={keysWidth}
+          onWidthChange={setKeysWidth}
           onAudition={handleAudition}
           drumLabels={drumLabels}
         />
@@ -320,6 +329,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
         ticksPerPixel={ticksPerPixel}
         scrollLeft={pianoScrollLeft}
         channelColor={channelColor}
+        keysWidth={keysWidth}
         onVelocityChange={handleVelocityChange}
       />
     </div>

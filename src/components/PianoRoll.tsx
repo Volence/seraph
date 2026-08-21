@@ -6,6 +6,7 @@ import { PianoRollCanvas } from "./PianoRollCanvas";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
+import { PITCH_RANGES, DEFAULT_PITCH_RANGE } from "../utils/pianoRollEdit";
 import styles from "./PianoRoll.module.css";
 
 interface PianoRollProps {
@@ -32,12 +33,6 @@ const CHANNEL_COLORS: Record<string, string> = {
   dac: "#ff8844",
 };
 
-const PITCH_RANGES: Record<string, [number, number]> = {
-  fm: [24, 106],
-  psg: [33, 106],
-  dac: [24, 72],
-};
-
 const DAC_SAMPLE_NAMES: Record<number, string> = {
   36: "Snare S3", 37: "High Tom", 38: "Mid Tom S3", 39: "Low Tom S3",
   40: "Floor Tom S3", 41: "Kick S3", 42: "Muffled Snare", 43: "Crash Cymbal",
@@ -60,7 +55,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
 
   const isDac = region.channelType === "dac";
   const computedRange = (() => {
-    const [defaultMin, defaultMax] = PITCH_RANGES[region.channelType] || [24, 95];
+    const [defaultMin, defaultMax] = PITCH_RANGES[region.channelType] || DEFAULT_PITCH_RANGE;
     if (notes.length === 0) return [defaultMin, defaultMax] as [number, number];
     const pitches = notes.map(n => n.pitch);
     const lo = Math.min(...pitches);
@@ -109,8 +104,26 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     refresh();
   }
 
-  async function handleNoteClick(index: number) {
-    setSelectedNotes(new Set([index]));
+  async function handleNoteClick(index: number, additive: boolean) {
+    setSelectedNotes((prev) => {
+      if (!additive) return new Set([index]);
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
+  }
+
+  function handleMarqueeSelect(indices: number[], additive: boolean) {
+    setSelectedNotes((prev) => {
+      if (!additive) return new Set(indices);
+      const next = new Set(prev);
+      for (const i of indices) next.add(i);
+      return next;
+    });
+  }
+
+  function handleClearSelection() {
+    setSelectedNotes(new Set());
   }
 
   async function handleNoteResize(index: number, newDurationTicks: number) {
@@ -120,10 +133,12 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     refresh();
   }
 
-  async function handleNoteMove(index: number, newTick: number, newPitch: number) {
-    const note = notes[index];
-    if (!note) return;
-    await ipc.updateNote(region.trackId, region.regionId, index, newTick, newPitch, note.velocity, note.durationTicks);
+  async function handleNotesMove(moves: { index: number; tick: number; pitch: number }[]) {
+    for (const m of moves) {
+      const note = notes[m.index];
+      if (!note) continue;
+      await ipc.updateNote(region.trackId, region.regionId, m.index, m.tick, m.pitch, note.velocity, note.durationTicks);
+    }
     refresh();
   }
 
@@ -254,10 +269,12 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           channelColor={channelColor}
           selectedNotes={selectedNotes}
           onNoteClick={handleNoteClick}
+          onMarqueeSelect={handleMarqueeSelect}
+          onClearSelection={handleClearSelection}
           onNoteAdd={handleNoteAdd}
           onAudition={handleAudition}
           onNoteResize={handleNoteResize}
-          onNoteMove={handleNoteMove}
+          onNotesMove={handleNotesMove}
           onScrollTopChange={setScrollTop}
           onScrollLeftChange={setPianoScrollLeft}
           onZoom={handleZoom}

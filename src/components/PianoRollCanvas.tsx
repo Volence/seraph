@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import type { Note } from "../types/model";
+import { notesIntersectingRect } from "../utils/pianoRollEdit";
 import styles from "./PianoRollCanvas.module.css";
 
 interface PianoRollCanvasProps {
@@ -13,11 +14,13 @@ interface PianoRollCanvasProps {
   gridSnapTicks: number;
   channelColor: string;
   selectedNotes: Set<number>;
-  onNoteClick: (index: number) => void;
+  onNoteClick: (index: number, additive: boolean) => void;
+  onMarqueeSelect: (indices: number[], additive: boolean) => void;
+  onClearSelection: () => void;
   onNoteAdd: (tick: number, pitch: number, durationTicks: number) => void;
   onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
-  onNoteMove: (index: number, newTick: number, newPitch: number) => void;
+  onNotesMove: (moves: { index: number; tick: number; pitch: number }[]) => void;
   onScrollTopChange: (scrollTop: number) => void;
   onScrollLeftChange: (scrollLeft: number) => void;
   onZoom: (delta: number, centerX: number) => void;
@@ -26,6 +29,8 @@ interface PianoRollCanvasProps {
 }
 
 const EDGE_THRESHOLD = 6;
+// A press-drag shorter than this (px) counts as a plain click, not a drag.
+const CLICK_SLOP = 4;
 
 function isBlackKey(pitch: number): boolean {
   return [1, 3, 6, 8, 10].includes(pitch % 12);
@@ -43,10 +48,12 @@ export function PianoRollCanvas({
   channelColor,
   selectedNotes,
   onNoteClick,
+  onMarqueeSelect,
+  onClearSelection,
   onNoteAdd,
   onAudition,
   onNoteResize,
-  onNoteMove,
+  onNotesMove,
   onScrollTopChange,
   onScrollLeftChange,
   onZoom,
@@ -56,11 +63,21 @@ export function PianoRollCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ noteIndex: number; startX: number; origDuration: number } | null>(null);
-  const [moveDrag, setMoveDrag] = useState<{ noteIndex: number; startX: number; startY: number; origTick: number; origPitch: number } | null>(null);
+  const [moveDrag, setMoveDrag] = useState<{
+    startX: number;
+    startY: number;
+    anchorTick: number;
+    // Positions at drag start of every note the drag moves (the whole
+    // selection when the pressed note was already selected).
+    targets: { index: number; tick: number; pitch: number }[];
+  } | null>(null);
   const drawingRef = useRef<{ startTick: number; pitch: number; endTick: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const panRef = useRef<{ startX: number; startY: number; startScrollLeft: number; startScrollTop: number } | null>(null);
+  // Marquee (rubber-band) selection; x in view px, y in canvas/content px.
+  const marqueeRef = useRef<{ startX: number; startY: number; currentX: number; currentY: number; additive: boolean } | null>(null);
+  const [isMarquee, setIsMarquee] = useState(false);
 
   const totalNotes = maxPitch - minPitch + 1;
   const canvasHeight = totalNotes * rowHeight;
@@ -171,6 +188,21 @@ export function PianoRollCanvas({
       ctx.setLineDash([]);
     }
 
+    const mq = marqueeRef.current;
+    if (mq) {
+      const x1 = Math.min(mq.startX, mq.currentX);
+      const x2 = Math.max(mq.startX, mq.currentX);
+      const y1 = Math.min(mq.startY, mq.currentY);
+      const y2 = Math.max(mq.startY, mq.currentY);
+      ctx.fillStyle = "rgba(74, 158, 255, 0.1)";
+      ctx.strokeStyle = "rgba(74, 158, 255, 0.6)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.setLineDash([]);
+    }
+
     if (playheadTick >= 0 && playheadTick <= durationTicks) {
       const px = (playheadTick - startTick) / ticksPerPixel;
       if (px >= 0 && px <= viewW) {
@@ -233,29 +265,47 @@ export function PianoRollCanvas({
 
     if (hit) {
       e.preventDefault();
-      onNoteClick(hit.index);
+      const additive = e.shiftKey;
+      const wasSelected = selectedNotes.has(hit.index);
+      // A plain press on an unselected note selects it (replacing the
+      // selection) before any drag; a press on an already-selected note
+      // keeps the selection so the whole group can be dragged.
+      if (additive || !wasSelected) {
+        onNoteClick(hit.index, additive);
+      }
       onAudition(notes[hit.index].pitch);
-      const note = notes[hit.index];
+      const targetIndices = wasSelected
+        ? Array.from(selectedNotes)
+        : additive
+          ? [...selectedNotes, hit.index]
+          : [hit.index];
       setMoveDrag({
-        noteIndex: hit.index,
         startX: e.clientX,
         startY: e.clientY,
-        origTick: note.tick,
-        origPitch: note.pitch,
+        anchorTick: notes[hit.index].tick,
+        targets: targetIndices
+          .filter((i) => notes[i])
+          .map((i) => ({ index: i, tick: notes[i].tick, pitch: notes[i].pitch })),
       });
       return;
     }
 
-    // Any click on empty space: pan
+    // Empty space: middle button or Alt+drag pans; plain left-drag marquees.
     e.preventDefault();
-    const container = containerRef.current;
-    panRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      startScrollLeft: scrollLeft,
-      startScrollTop: container?.scrollTop ?? 0,
-    };
-    setIsPanning(true);
+    if (e.button === 1 || e.altKey) {
+      const container = containerRef.current;
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startScrollLeft: scrollLeft,
+        startScrollTop: container?.scrollTop ?? 0,
+      };
+      setIsPanning(true);
+      return;
+    }
+
+    marqueeRef.current = { startX: x, startY: y, currentX: x, currentY: y, additive: e.shiftKey };
+    setIsMarquee(true);
   }
 
   function handleDoubleClick(e: React.MouseEvent) {
@@ -306,6 +356,56 @@ export function PianoRollCanvas({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isPanning, onScrollLeftChange]);
+
+  // Marquee (rubber-band) selection effect
+  useEffect(() => {
+    if (!isMarquee) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const canvas = canvasRef.current;
+      const mq = marqueeRef.current;
+      if (!canvas || !mq) return;
+      const rect = canvas.getBoundingClientRect();
+      mq.currentX = e.clientX - rect.left;
+      mq.currentY = e.clientY - rect.top;
+      draw();
+    }
+
+    function handleMouseUp() {
+      const mq = marqueeRef.current;
+      marqueeRef.current = null;
+      setIsMarquee(false);
+      if (!mq) return;
+      const movedEnough =
+        Math.abs(mq.currentX - mq.startX) > CLICK_SLOP || Math.abs(mq.currentY - mq.startY) > CLICK_SLOP;
+      if (movedEnough) {
+        const x1 = Math.min(mq.startX, mq.currentX);
+        const x2 = Math.max(mq.startX, mq.currentX);
+        const y1 = Math.min(mq.startY, mq.currentY);
+        const y2 = Math.max(mq.startY, mq.currentY);
+        const hits = notesIntersectingRect(notes, {
+          tickMin: pixelToTick(x1),
+          tickMax: pixelToTick(x2),
+          // Rows are drawn top-down from maxPitch, so the top edge is the
+          // high pitch; every row the rect touches is included.
+          pitchMin: maxPitch - Math.floor(y2 / rowHeight),
+          pitchMax: maxPitch - Math.floor(y1 / rowHeight),
+        });
+        onMarqueeSelect(hits, mq.additive);
+      } else if (!mq.additive) {
+        // Plain click on empty grid: clear the selection.
+        onClearSelection();
+      }
+      draw();
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isMarquee, notes, maxPitch, rowHeight, ticksPerPixel, scrollLeft, onMarqueeSelect, onClearSelection, draw]);
 
   useEffect(() => {
     if (!isDrawing) return;
@@ -382,21 +482,29 @@ export function PianoRollCanvas({
     let moved = false;
 
     function handleMouseMove(e: MouseEvent) {
-      if (!moveDrag) return;
+      if (!moveDrag || moveDrag.targets.length === 0) return;
       const canvas = canvasRef.current;
       if (canvas) canvas.style.cursor = "grabbing";
       const deltaX = e.clientX - moveDrag.startX;
       const deltaY = e.clientY - moveDrag.startY;
       if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) moved = true;
       if (!moved) return;
-      const deltaTicks = deltaX * ticksPerPixel;
-      const deltaRows = Math.round(deltaY / rowHeight);
-      const rawTick = moveDrag.origTick + deltaTicks;
+      // Snap the anchor note, then apply the same deltas to every target so
+      // the group keeps its internal offsets.
+      const rawTick = moveDrag.anchorTick + deltaX * ticksPerPixel;
       const snappedTick = e.ctrlKey
-        ? Math.max(0, Math.round(rawTick))
-        : Math.max(0, Math.round(rawTick / gridSnapTicks) * gridSnapTicks);
-      const newPitch = Math.max(minPitch, Math.min(maxPitch, moveDrag.origPitch - deltaRows));
-      onNoteMove(moveDrag.noteIndex, snappedTick, newPitch);
+        ? Math.round(rawTick)
+        : Math.round(rawTick / gridSnapTicks) * gridSnapTicks;
+      let tickDelta = snappedTick - moveDrag.anchorTick;
+      let pitchDelta = -Math.round(deltaY / rowHeight);
+      const minTick = Math.min(...moveDrag.targets.map((t) => t.tick));
+      const loPitch = Math.min(...moveDrag.targets.map((t) => t.pitch));
+      const hiPitch = Math.max(...moveDrag.targets.map((t) => t.pitch));
+      tickDelta = Math.max(tickDelta, -minTick);
+      pitchDelta = Math.max(minPitch - loPitch, Math.min(maxPitch - hiPitch, pitchDelta));
+      onNotesMove(
+        moveDrag.targets.map((t) => ({ index: t.index, tick: t.tick + tickDelta, pitch: t.pitch + pitchDelta })),
+      );
     }
 
     function handleMouseUp() {
@@ -411,10 +519,10 @@ export function PianoRollCanvas({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [moveDrag, ticksPerPixel, gridSnapTicks, rowHeight, minPitch, maxPitch, onNoteMove]);
+  }, [moveDrag, ticksPerPixel, gridSnapTicks, rowHeight, minPitch, maxPitch, onNotesMove]);
 
   function handleMouseMove(e: React.MouseEvent) {
-    if (drag || moveDrag || isDrawing || isPanning) return;
+    if (drag || moveDrag || isDrawing || isPanning || isMarquee) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();

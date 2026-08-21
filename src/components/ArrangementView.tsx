@@ -6,6 +6,7 @@ import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { TrackHeader, channelLevelIndex } from "./TrackHeader";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineCanvas } from "./TimelineCanvas";
+import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
 import styles from "./ArrangementView.module.css";
 
@@ -47,6 +48,7 @@ export function ArrangementView({
   selectedInstrument,
 }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [showAddTrack, setShowAddTrack] = useState(false);
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta.ticksPerBeat);
@@ -250,9 +252,10 @@ export function ArrangementView({
             );
           })}
           <div className={styles.addButtons}>
-            <button className={styles.addBtn} onClick={addFm}>+ FM</button>
-            <button className={styles.addBtn} onClick={addPsg}>+ PSG</button>
-            <button className={styles.addBtn} onClick={addDac}>+ DAC</button>
+            <button className={styles.addBtn} onClick={() => setShowAddTrack(true)}>+ Track</button>
+            <button className={styles.addBtn} onClick={addFm}>+ FM Patch</button>
+            <button className={styles.addBtn} onClick={addPsg}>+ PSG Env</button>
+            <button className={styles.addBtn} onClick={addDac}>+ DAC Sample</button>
           </div>
         </div>
         <TimelineCanvas
@@ -293,6 +296,16 @@ export function ArrangementView({
           seekTick={seekTick}
         />
       </div>
+      {showAddTrack && (
+        <AddTrackDialog
+          driverId={projectMeta.driverId}
+          onClose={() => setShowAddTrack(false)}
+          onCreated={() => {
+            setShowAddTrack(false);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

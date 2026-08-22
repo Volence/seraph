@@ -258,6 +258,17 @@ impl Sequencer {
         self.playing
     }
 
+    /// The armed loop, if any. Lives in the snapshot, so a `load_snapshot`
+    /// (new sequence) drops it while a `reload_snapshot` (live edit commit)
+    /// carries it across — `get_playback_state` must report whichever the
+    /// sequencer actually holds, not what the UI last asked for.
+    pub fn loop_range(&self) -> Option<(u64, u64)> {
+        match (self.snapshot.loop_start, self.snapshot.loop_end) {
+            (Some(start), Some(end)) => Some((start, end)),
+            _ => None,
+        }
+    }
+
     pub fn current_tick_u64(&self) -> u64 {
         self.current_tick as u64
     }

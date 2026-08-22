@@ -89,12 +89,29 @@ export function lastCopiedKind(): ClipboardKind | null {
   return lastCopied;
 }
 
-/** Test seam: clear all module state between test cases. */
-export function resetClipboardForTest(): void {
+/**
+ * Drop everything on the clipboard.
+ *
+ * The clipboard survives region and view switches on purpose, but NOT a
+ * project switch: `noteClipboard` entries carry `instrumentId`s from the old
+ * project and `regionClipboard` carries old `trackId`/`regionId`s, so a paste
+ * after new/open/import either fails a backend validation or (worse) resolves
+ * an id that now means something else. App calls this on every path that
+ * changes the open project.
+ */
+export function resetClipboard(): void {
   noteClipboard = [];
   noteClipboardChannelType = null;
   regionClipboard = [];
   lastCopied = null;
+}
+
+/** Test seam: clear all module state between test cases. Deliberately an
+ *  alias of `resetClipboard` rather than a second copy of the body — two
+ *  bodies drift the moment a third clipboard slot is added, and the separate
+ *  name keeps test intent ("isolate the case") readable at the call site. */
+export function resetClipboardForTest(): void {
+  resetClipboard();
 }
 
 export interface NotePastePlan {

@@ -220,32 +220,43 @@ only (`App.tsx:244`) — dead under CapsLock/Shift. No keymap/help panel (G39 bo
 
 ## Findings table
 
+> **Citations re-grounded 2026-08-22 on `fix/booked-defect-sweep` (base
+> `ecb2fcd`)** (still-open rows only; the
+> FIXED rows keep their historical coordinates). The `Where` column names
+> **symbols, not line numbers**, on purpose: a repaired line number goes stale on
+> the same clock as the one it replaced — "a correction that carries a line
+> number inherits the defect it was correcting" (empyrean
+> `docs/OVERSEER-PROTOCOL.md`). Each symbol below was verified to exist at that
+> revision. Note the earlier prose sections still cite `file:line` and were NOT
+> re-grounded; and `src-tauri/src/commands.rs` never existed — the module is
+> `src-tauri/src/ipc/commands.rs`.
+
 | ID | Finding | Class | Severity | Where | G-ref |
 |----|---------|-------|----------|-------|-------|
-| F1 | Note-level edits inaudible while transport runs (PianoRoll never reloads sequence) | missing | **critical** | PianoRoll.tsx (no reloadSequence); commands.rs:960-971 | G30 fixed regions only — notes missed |
+| F1 | Note-level edits inaudible while transport runs (PianoRoll never reloads sequence) | missing | **critical** | PianoRoll.tsx (no reloadSequence); src-tauri/src/ipc/commands.rs | G30 fixed regions only — notes missed |
 | F2 | Silent-track trap: instrument-less lanes drop notes with zero feedback; audition no-ops | feedback + discoverability | **critical** | manager.rs:825,1030-1036; PianoRoll.tsx:353-354; TrackHeader.tsx | adjacent to booked "stale lane name" wart |
 | F3 | FM/PSG param edits inaudible during playback (snapshot embeds patches; editors don't reload) | missing | **high** | FmEditor.tsx:30-38; manager.rs:833-842 | **FIXED** 2026-08-22 (`fix/live-param-audibility`) |
-| F4 | All previews/auditions hardcode ch0 → auditioning fights the playing mix | clunky | **high** | commands.rs:386-401,487-501; engine.rs:248-259 | — |
-| F5 | No QWERTY note input / step record anywhere | missing | **high** | grep; PianoKeys.tsx:18-26 | G36 (booked, owner call open) |
-| F6 | Double-click-per-note placement; no pencil/paint; right-click inert (no erase/menu) | clunky | **high** | PianoRollCanvas.tsx:332-352,590-592 | G13/G14 (booked) |
-| F7 | From-scratch DAC kits impossible on one track; drum-name rows all play one sample | missing + feedback | **high** | sequencer/mod.rs:243-247; song.rs:77; ipc.ts:256-264; PianoRoll.tsx:42-51 | — |
-| F8 | Piano-roll PSG audition has no stop path (looped envelope may ring); FM audition fixed 500 ms | feedback | med | PianoRoll.tsx:349-365; engine.rs:236-259 | — |
-| F9 | No audible pitch feedback on transpose or drag-across-pitches | feedback | med | PianoRoll.tsx:202-224; PianoRollCanvas.tsx:297 | — |
-| F10 | No section markers / region names / colors — song assembly by bar-number memory | missing | **high** | song.rs:60-67; TimelineRuler.tsx:84-106 | — |
-| F11 | No h-scrollbar/minimap/zoom-to-fit; arrangement zoom not cursor-anchored | clunky | med | ArrangementView.module.css:26-27; useArrangementZoom.ts:40-44 | G31/G32 (booked) |
-| F12 | No song end: playback runs forever past last note; export needs manual duration | missing (design Q) | med | sequencer/mod.rs:137-155; TopBar.tsx:93-109 | booked design Q — noted only |
+| F4 | All previews/auditions hardcode ch0 → auditioning fights the playing mix | clunky | **high** | src-tauri/src/ipc/commands.rs `preview_fm_instrument`, `do_preview_psg` (both pin ch 0); src-tauri/src/audio/engine.rs `AudioEngine::process_command` (`StopPreview` arm's `invalidate_fm_cache(0)` recovery) | — |
+| F5 | No QWERTY note input / step record anywhere | missing | **high** | grep (no QWERTY handler anywhere); src/widgets/PianoKeys.tsx `PianoKeys` / `handleKey` (mouse-only) | G36 (booked, owner call open) |
+| F6 | Double-click-per-note placement; no pencil/paint; right-click inert (no erase/menu) | clunky | **high** | src/components/PianoRollCanvas.tsx `handleDoubleClick` (place a note), `handleContextMenu` (right-click = `preventDefault` only) | G13/G14 (booked) |
+| F7 | From-scratch DAC kits impossible on one track; drum-name rows all play one sample | missing + feedback | **high** | src-tauri/src/sequencer/mod.rs `Sequencer::process_event` (`ChannelType::Dac` arm); src-tauri/src/model/song.rs `Note.instrument_id`; src/api/ipc.ts `addNote`; src/components/PianoRoll.tsx `DAC_SAMPLE_NAMES` | — |
+| F8 | Piano-roll PSG audition has no stop path (looped envelope may ring); FM audition fixed 500 ms | feedback | med | src/components/PianoRoll.tsx `handleAudition`; src-tauri/src/audio/engine.rs `AudioEngine::process_command` (`PsgEnvelopePreview` arm) + `AudioEngine::render` (preview-envelope stepping) | — |
+| F9 | No audible pitch feedback on transpose or drag-across-pitches | feedback | med | src/components/PianoRoll.tsx `handleKeyDown` (transpose/nudge, no audition); src/components/PianoRollCanvas.tsx `moveDrag`'s `handleMouseMove` | — |
+| F10 | No section markers / region names / colors — song assembly by bar-number memory | missing | **high** | src-tauri/src/model/song.rs `Region` (no name/color); src/components/TimelineRuler.tsx `TimelineRuler`'s `draw` | — |
+| F11 | No h-scrollbar/minimap/zoom-to-fit; arrangement zoom not cursor-anchored | clunky | med | src/components/ArrangementView.module.css `.body` (`overflow-x: hidden`); src/hooks/useArrangementZoom.ts `useArrangementZoom`'s `handleWheel` (no `zoomAroundPixel`) | G31/G32 (booked) |
+| F12 | No song end: playback runs forever past last note; export needs manual duration | missing (design Q) | med | src-tauri/src/sequencer/mod.rs `Sequencer::advance` (loop bounds only); src/components/TopBar.tsx `handleExportWav` (hardcoded 60 s) | booked design Q — noted only |
 | F13 | Volume-slider ride = reload (silence_all+reprogram) per input event during playback | feedback | **high** | TrackHeader.tsx:162-171; sequencer/mod.rs:65-77 | **FIXED** 2026-08-22 (`fix/live-param-audibility`) |
-| F14 | No master meter/clip latch; meters dead when stopped; master vol resets per launch | missing | med | TrackHeader.tsx:44-48,184; TopBar.tsx:46 | — |
-| F15 | Zero view-state persistence: reopen loses roll/zoom/scroll/loop/snap/panel/filters | missing | **critical** | manager.rs:308-341; song.rs; grep (no localStorage) | — |
-| F16 | Cold-start ceremony: forced Browse, no default location/scratch project, no recents | clunky | med | NewProjectDialog.tsx:70-82; App.tsx:260-276 | — |
-| F17 | Core gestures invisible: lane dbl-click, grid dbl-click, ruler halves, header drag-drop, auto-bind | discoverability | **high** | TimelineCanvas.tsx:508-513; TimelineRuler.tsx:146-151; manager.rs:419-423 | G39 (keymap panel, booked) |
-| F18 | One region at a time: no ghost notes, no multi-region editing across channels | missing | **high** | App.tsx:405; PianoRoll.tsx:109-120 | — |
-| F19 | Can't click-empty to deselect regions; roll closes only via tiny x; no Esc | clunky | low | TimelineCanvas.tsx:434,491-495; PianoRoll.tsx:405 | — |
+| F14 | No master meter/clip latch; meters dead when stopped; master vol resets per launch | missing | med | src/components/TrackHeader.tsx `levelColor` (no peak/clip latch); src/components/ArrangementView.tsx channel-level polling effect (clears levels when `!playing`); src/components/TopBar.tsx `masterVol` | — |
+| F15 | Zero view-state persistence: reopen loses roll/zoom/scroll/loop/snap/panel/filters | missing | **critical** | src-tauri/src/project/manager.rs `ProjectManager::open` / `ProjectManager::save`; src-tauri/src/model/song.rs `ProjectFile`; grep (no localStorage) | — |
+| F16 | Cold-start ceremony: forced Browse, no default location/scratch project, no recents | clunky | med | src/components/NewProjectDialog.tsx `handleBrowse`; src/App.tsx `handleNewProject`, `handleOpenProject` | — |
+| F17 | Core gestures invisible: lane dbl-click, grid dbl-click, ruler halves, header drag-drop, auto-bind | discoverability | **high** | src/components/TimelineCanvas.tsx `handleDoubleClick`; src/components/TimelineRuler.tsx `zoneAt` (invisible upper/lower half); src-tauri/src/project/manager.rs `ProjectManager::bind_to_empty_lane` (+ FM Patch auto-bind), `ProjectManager::assign_library_instrument_to_track` (header drag-drop) | G39 (keymap panel, booked) |
+| F18 | One region at a time: no ghost notes, no multi-region editing across channels | missing | **high** | src/App.tsx `selectedRegions` (last-wins into `BottomPanel`'s `selectedRegion`); src/components/PianoRoll.tsx `loaded` / `notes` (one region) | — |
+| F19 | Can't click-empty to deselect regions; roll closes only via tiny x; no Esc | clunky | low | src/components/TimelineCanvas.tsx `handleMouseUp` (marquee), `handleClick` (hit-only); src/components/PianoRoll.tsx `closeBtn` button (no Esc anywhere in the file) | — |
 | F20 | Mouse-only surface: no seek/zoom/track-focus/M-S/dialog keys; no Esc anywhere; `l` case-sensitive | missing | **high** | inventory above | G39/G40 (booked) |
-| F21 | Velocity lane: click-only, first-hit-by-x (chords un-editable), no paint/numeric/audition | clunky | med | VelocityLane.tsx:56-73 | G17 (booked) |
-| F22 | Single-note readout is header text only; no inspector for exact tick/len/vel | missing | low | PianoRoll.tsx:377-387 | S4 NoteInspector (planned) |
-| F23 | 1 s polling for dirty state + track list — laggy dirty dot / cross-view refresh | feedback | low | App.tsx:66-71; ArrangementView.tsx:133-136 | — |
-| F24 | Failures console-only: paste overflow skips, library assign errors, save-to-library errors | feedback | med | PianoRoll.tsx:289-293; TrackHeader.tsx:125-126; FmEditor.tsx:113 | — |
+| F21 | Velocity lane: click-only, first-hit-by-x (chords un-editable), no paint/numeric/audition | clunky | med | src/components/VelocityLane.tsx `VelocityLane`'s `handleMouseDown` | G17 (booked) |
+| F22 | Single-note readout is header text only; no inspector for exact tick/len/vel | missing | low | src/components/PianoRoll.tsx `selInfo` | S4 NoteInspector (planned) |
+| F23 | 1 s polling for dirty state + track list — laggy dirty dot / cross-view refresh | feedback | low | src/App.tsx `refreshUndoState` poll effect; src/components/ArrangementView.tsx `refresh` + its 1 s interval effect | — |
+| F24 | Failures console-only: paste overflow skips, library assign errors, save-to-library errors | feedback | med | src/components/PianoRoll.tsx `handleKeyDown` (paste `console.warn`); src/components/TrackHeader.tsx `handleDrop`; src/components/FmEditor.tsx save-to-library button `onClick` | — |
 
 ## Top-10 biggest feel wins (ranked)
 

@@ -275,7 +275,15 @@ export function ArrangementView({
           await refresh();
           // The pasted regions become the selection.
           onSelectRegions(newSel);
-        })();
+        })().catch((err) => {
+          // Both paste branches can reject: duplicateRegion when the source
+          // ids are gone (a clipboard from another project), and the
+          // addRegion/addNote replay behind it. Unhandled, that surfaced as
+          // an unhandled promise rejection. This view has no notice element
+          // (the app has no toast system and the piano-roll header hint is
+          // not reachable from here), so the console is the honest floor.
+          console.error("Region paste failed:", err);
+        });
       }
     }
     window.addEventListener("keydown", handleKeyDown);

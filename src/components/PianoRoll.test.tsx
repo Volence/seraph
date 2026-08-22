@@ -327,6 +327,30 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240, null));
   });
 
+  it("a rejected paste shows the header notice instead of an unhandled rejection", async () => {
+    // add_note validates an explicit voice strictly (kind gate, overlap rule,
+    // unknown instrument id — e.g. a clipboard carried over from another
+    // project). Before the .catch, that rejection surfaced ONLY as an
+    // unhandled promise rejection; vitest fails the run on those, which is
+    // the other half of this gate.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { getByText } = await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    // …Once: vi.clearAllMocks() between tests clears calls but NOT
+    // implementations, so a sticky rejection would leak into later cases.
+    vi.mocked(ipc.addNote).mockRejectedValueOnce("instrument not found");
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+
+    // The paste chain is entirely mocked promises (no timers), so one async
+    // act() drains it and flushes the notice render — deterministic, with no
+    // polling budget for a loaded box to blow through.
+    await act(async () => {});
+    expect(getByText(/Paste failed: instrument not found/)).toBeInTheDocument();
+    expect(error).toHaveBeenCalledWith("Paste failed:", "instrument not found");
+    error.mockRestore();
+  });
+
   it("Ctrl+C with no selection copies nothing", async () => {
     await renderRoll([note(0, 60)]);
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { ArrangementView } from "./ArrangementView";
 import * as ipc from "../api/ipc";
 import { ticksPerBar } from "../utils/grid";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
-import { resetClipboardForTest } from "../utils/clipboard";
+import { getRegionClipboard, resetClipboardForTest } from "../utils/clipboard";
 import type { SongMetadata, Track } from "../types/model";
 
 vi.mock("../api/ipc");
@@ -252,16 +252,44 @@ describe("ArrangementView", () => {
       await screen.findByText("Bass Lane");
 
       fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      // Assert the copy landed BEFORE depending on it: a copy that silently
+      // no-ops (empty `tracks`, so the region lookup misses) would otherwise
+      // show up as the paste assertions timing out — a slow, load-sensitive
+      // failure that reads like a flake instead of the bug it is.
+      expect(getRegionClipboard()).toHaveLength(1);
       // The source region was deleted after the copy: server-side clone fails.
-      vi.mocked(ipc.duplicateRegion).mockRejectedValue("region not found");
+      vi.mocked(ipc.duplicateRegion).mockRejectedValueOnce("region not found");
       fireEvent.keyDown(window, { key: "v", ctrlKey: true });
 
-      await waitFor(() =>
-        expect(ipc.addRegion).toHaveBeenCalledWith(fmTrack.id, 0, oneBar),
-      );
-      await waitFor(() =>
-        expect(ipc.addNote).toHaveBeenCalledWith(fmTrack.id, "region-new", 0, 60, 100, 240, null),
-      );
+      // The paste chain is entirely mocked promises (no timers), so one
+      // async act() drains it. Deterministic: no polling, no timeout budget
+      // that a loaded CI box can blow through.
+      await act(async () => {});
+      expect(ipc.addRegion).toHaveBeenCalledWith(fmTrack.id, 0, oneBar);
+      expect(ipc.addNote).toHaveBeenCalledWith(fmTrack.id, "region-new", 0, 60, 100, 240, null);
+    });
+
+    it("a paste whose backend calls all reject is reported, not left unhandled", async () => {
+      // Both branches fail — the shape of a clipboard carried over from a
+      // different project: the ids name nothing here, and the replay fallback
+      // is rejected too. Before the .catch this surfaced ONLY as an unhandled
+      // promise rejection (vitest fails the run on those, which is the other
+      // half of this gate).
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderView({ selectedRegions: [selected], seekTick: 0 });
+      await screen.findByText("Bass Lane");
+
+      fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      expect(getRegionClipboard()).toHaveLength(1);
+      // …Once: vi.clearAllMocks() between tests clears calls but NOT
+      // implementations, so a sticky rejection would leak into later cases.
+      vi.mocked(ipc.duplicateRegion).mockRejectedValueOnce("region not found");
+      vi.mocked(ipc.addRegion).mockRejectedValueOnce("track not found");
+      fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+
+      await act(async () => {});
+      expect(error).toHaveBeenCalledWith("Region paste failed:", "track not found");
+      error.mockRestore();
     });
   });
 

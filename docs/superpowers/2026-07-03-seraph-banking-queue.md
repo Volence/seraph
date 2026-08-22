@@ -616,7 +616,10 @@ designs target the banked specs (normative); manifest flags carry the gates.
     TALLER region keeps the old vertical position. Not fixed because
     neither surviving NOR resetting to 0 is right: the correct behavior is
     scroll-to-the-region's-notes, which is a feature, not a bug fix.
-  - *Clipboard is stale across a PROJECT switch, not a region switch.*
+  - ~~*Clipboard is stale across a PROJECT switch, not a region switch.*~~
+    **CLOSED 2026-08-22** — fixed on `fix/booked-defect-sweep`; see the
+    entry at the end of this log. The "three project-change paths" guess
+    below was re-derived from the call sites and confirmed exact.
     `noteClipboard` entries carry `instrumentId`s from the old project and
     `regionClipboard` carries old `trackId`/`regionId`s; App's open/new/
     import paths clear `selectedRegions` but never the module clipboard.
@@ -968,6 +971,148 @@ designs target the banked specs (normative); manifest flags carry the gates.
   portamento (attack at the slid pitch).
   **OWNER GATE OPEN (by-ear):** overlapping notes on one channel must now
   re-attack rather than drop out.
+
+- 2026-08-22 (cont.): **BOOKED-DEFECT SWEEP — clipboard project boundary +
+  an honest `get_playback_state`** (branch `fix/booked-defect-sweep`,
+  commits `54ce277` + `e190a0c` + this doc; lanes: cargo **263/0**, vitest
+  **309/309** across 31 files, build clean **0 warnings**, no bindings
+  drift). Closes the clipboard deferral booked under REGION-SWITCH
+  STALENESS and G41.
+
+  **1. CLIPBOARD ACROSS A PROJECT SWITCH (`54ce277`).** `clipboard.ts` had
+  no production reset at all — only `resetClipboardForTest`. Added
+  `resetClipboard()`; `resetClipboardForTest` is now an ALIAS of it, not a
+  second copy of the body (two bodies drift the moment a third slot is
+  added, and the test-named export keeps test intent readable).
+  **Enumeration (by what TOUCHES the state, not what declares it):** grepped
+  every `openProject` / `createProject` / `importSong|importVgm|
+  importZyrinxSong` / `closeProject` call site in `src/`. Three UI paths
+  change the open project, and all three funnel through App handlers —
+  `handleOpenProject` (TopBar "Open" and the MainArea welcome button),
+  `handleProjectCreated` (`NewProjectDialog.handleCreate` → `onCreated`),
+  `handleImported` (`ImportDialog.handleImport` → `onImported`; it does its
+  own `closeProject` + `openProject` first). The booked count of three was
+  right. Judged SAFE and left alone: `TopBar`'s `onProjectMetaChange`
+  (renames/tempo edits the SAME project — ids stay valid) and
+  `LibraryPanel`'s instrument import (adds to the library, does not switch
+  projects). The calls are explicit at each of the three sites rather than
+  folded into `resetSeekCursor`, so a fourth path is a visible omission;
+  the three tests below are the gate that would catch one.
+  **The unhandled rejection ("the real wart") is fixed too**, on BOTH paste
+  handlers — each ran an async IIFE with no `catch`. PianoRoll routes the
+  rejection to the existing auto-clearing header notice (`showVoiceHint`,
+  the seam the `set_note_instrument` parcel added). ArrangementView has no
+  notice element and the header hint is not reachable from it, so it logs
+  `console.error("Region paste failed:", err)` — **flagged judgement call:**
+  the least-invasive honest handling, chosen over inventing a toast system
+  (that would have been a BLOCKED design call, not a thing to build). A
+  region-paste failure is therefore still console-only; that is audit
+  finding **F24**, unchanged and still open.
+  **Tests (red-first, runner `npm test` / vitest):** new
+  `src/App.projectSwitch.test.tsx` — "New Project clears it", "Open Project
+  clears it", "Import clears it"; all three failed with
+  `expected [ { tick: +0, pitch: 60, …(3) } ] to deeply equal []` with the
+  three `resetClipboard()` calls commented out. Plus "a rejected paste shows
+  the header notice instead of an unhandled rejection" (PianoRoll.test.tsx)
+  and "a paste whose backend calls all reject is reported, not left
+  unhandled" (ArrangementView.test.tsx); both failed with the `.catch`
+  stripped, and vitest additionally reported the unhandled rejections
+  (`Unknown Error: instrument not found` / `track not found`) — which is
+  the other half of that gate. Note for future tests here: `vi.clearAllMocks()`
+  clears calls but NOT implementations, so a sticky `mockRejectedValue`
+  leaks into later cases — use `…Once`. Also, firing several dialog
+  `Browse` clicks in one tick races the `@tauri-apps/plugin-dialog` module
+  mock (the losers reach the real plugin and reject); click them one at a
+  time.
+
+  **2. `get_playback_state` MADE HONEST (G41, `e190a0c`).** It returned a
+  real `tick` and real `channel_levels` next to a hardcoded
+  `playing: false` / `loop_start: None` / `loop_end: None`.
+  **Consumer enumeration first** (`src/`, `src-tauri/`, `src/bindings.ts`):
+  `tick` is read by `App` (the G29 stop-sync effect and `startPlayback`'s
+  play-start memory) and by `TransportControls.handlePlayStop`;
+  `channelLevels` by `ArrangementView`'s 60 ms meter poll. **`playing`,
+  `loopStart` and `loopEnd` have NO reader** — every view keeps its own
+  optimistic copy (`App`'s `playing`/`loopEnabled` state). So this is not
+  the dead-wiring shape the `bff898d` triage found; it is a supply-side
+  lie with no consumer yet.
+  **Fix:** the truth lives in `Sequencer` (`playing`, `snapshot.loop_start/
+  end`) but `AudioEngine` is moved into the cpal callback closure, so the
+  command side cannot borrow it. New `TransportPublish` (an atomic block
+  next to the existing `position_tick` publish) is republished by
+  `AudioEngine::publish_transport` after EVERY command. **Publishing from
+  the sequencer rather than from the command that was sent is what makes it
+  honest:** `Sequencer::play` refuses on an empty snapshot (the UI still
+  flips its button to playing), and `LoadSequence` drops the loop with the
+  snapshot that held it while `reload_snapshot` carries it across.
+  **Judgement call, flagged:** this is new plumbing, but it is the SAME
+  publish channel `position_tick` already uses, widened — not a new
+  subsystem. The alternative (remembering in `AudioState` what the frontend
+  last asked for) would have made it *look* honest, which the parcel names
+  as the failure mode.
+  **Tests (red-first, runner `cargo test`):** four
+  `audio::engine::tests::transport_publish_*` cases — play/stop, the
+  refused-play divergence, the loop range, and reload-vs-load. With
+  `self.publish_transport()` commented out: `after TransportPlay the
+  sequencer is playing`, `a reload does not stop the transport`, and
+  `assertion left == right failed: left: None, right: Some((480, 1920))`.
+  No IPC type changed, so `src/bindings.ts` is untouched (verified: `cargo
+  test` regenerates it and `git status` is clean).
+  **BOOKED — the loop-bound publish can be read torn (overseer FIX 1).**
+  `TransportPublish`'s Release/Acquire on `loop_active` gates the bounds
+  correctly for UNARMED -> ARMED and for disarming, but it does NOT make an
+  armed -> RE-ARMED range change atomic: with the flag already `true` a
+  reader can acquire it from the previous publish and then relaxed-load the
+  new `loop_start` next to the previous `loop_end` — a torn
+  `(new_start, old_end)`. The window is open on every drag of a loop edge.
+  Deliberately NOT fixed here: nothing reads `loopStart`/`loopEnd` (that
+  enumeration is above), so a seqlock for a field with no reader is
+  gold-plating. **CLOSE IT (seqlock, or pack both bounds into one
+  `AtomicU64`) BEFORE the first consumer wires either field to anything.**
+  The type's doc comment now states the guarantee it actually provides and
+  names the window — the original comment asserted the strong version, and a
+  stale claim inside a comment outlives every doc that recorded it because
+  nobody re-reads a comment to check whether it still holds.
+  **NOT DONE, deliberately:** no view was rewired to the now-honest
+  `playing` / loop range. Doing so changes transport UI behaviour (the
+  button would stop lying about a refused play) and is a separate call.
+  The command-level `get_playback_state` itself has no test — it needs a
+  live `AudioThread` (a real output device); the engine-level publish is
+  the honest gate.
+
+  **3. FEEL-AUDIT CITATIONS RE-GROUNDED (docs only).** See
+  `docs/superpowers/2026-08-21-daw-feel-audit.md`: the findings table cited
+  `commands.rs:NNN` — a path that does not exist (the module is
+  `src-tauri/src/ipc/commands.rs`) — and line numbers that had already
+  drifted. Still-open rows now name the SYMBOL instead of a line, per the
+  empyrean OVERSEER-PROTOCOL rule that "a correction that carries a line
+  number inherits the defect it was correcting". Severities and verdicts
+  untouched; this was citation hygiene, not a re-audit.
+
+  **FLAKE KILLED, NOT WATCH-LISTED (overseer FIX 2).**
+  `ArrangementView.test.tsx` > "paste replays the copied payload when the
+  source region is gone" timed out its 1 s `waitFor` ONCE in ~9 full-suite
+  runs. Rather than raise the budget, the assertions were made
+  DETERMINISTIC: the paste chain is entirely mocked promises with no timers,
+  so one `await act(async () => {})` drains it and the assertions run
+  synchronously — no polling, no timeout for a loaded box to blow through.
+  Proven to still have teeth: with the expected trackId swapped for a
+  sentinel the test fails in **19 ms** with a real argument diff, i.e. the
+  drain genuinely completed rather than the assertion being skipped. The
+  same treatment was applied to both paste-rejection tests added by this
+  parcel, so the parcel adds no new load-sensitive gate. It also now asserts
+  `getRegionClipboard()` is non-empty BEFORE the paste: a copy that silently
+  no-ops (empty `tracks`) used to surface as a slow timeout that reads like
+  a flake instead of the bug it is.
+  **Reusable rule:** in this suite, `waitFor` on a chain of mocked promises
+  buys nothing but a 1 s failure budget — drain with async `act` and assert
+  directly. Keep `waitFor` for genuinely timed or event-loop-deferred work.
+
+  **TAGGED for foreground confirmation (no emulator/app launched here):**
+  copy notes in project A, open project B, Ctrl+V — nothing should paste
+  and nothing should appear in the devtools console as an unhandled
+  rejection; and a paste that the backend rejects should show the
+  auto-clearing notice in the piano-roll header.
 
 ## EXECUTION HANDOFF (cold start — read this first)
 

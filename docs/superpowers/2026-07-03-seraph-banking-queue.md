@@ -379,6 +379,27 @@ designs target the banked specs (normative); manifest flags carry the gates.
   marquee preview, loop-armed = static view across wraps, full-volume
   defaults (new track + new note ≈ audition loudness).
 
+- 2026-08-21 (cont.): **OWNER RULINGS BANKED + WAVE 3B DISPATCHED.** Rulings:
+  (1) item 7 APPROVED — Space pauses in place and pause/resume must NEVER
+  move the double-Space return point; the return point updates only on an
+  explicit seek (mouse/ruler/Home/the return-jump itself) followed by play.
+  (2) Voice-per-track: owner approved BOTH shapes — Shape A now (set voice
+  on selected notes, same piano roll) AND, with S4, per-voice viewing;
+  ratified direction: S4's one-grid colored lanes + a per-voice filter
+  toggle ("piano roll per voice" as a lens, not a separate editor), storage
+  truth stays per-note instrument_id. (3) F15 view-state persistence
+  DEPRIORITIZED (owner: current behavior matches how they work); next audit
+  pick after in-flight parcels = F3/#4 live knob-tweak audibility (shares
+  the F1 reload seam — deliberately sequenced after it lands). (4) No
+  migration for old 100-velocity projects (throwaway test data).
+  IN FLIGHT (3 parcels): `fix/live-edit-audibility` (audit F1+F2+stale-lane-
+  name wart), `feat/note-voice-set` (Shape A: set_note_instrument IPC with
+  validate-first kind gate + correct-by-construction different-voice overlap
+  rejection at the mutation site, add_note voice passthrough + paste
+  preservation, drag-voice-onto-selection, per-voice note colors + patch
+  chips, drag-to-track wipe confirm), `fix/play-start-memory` (item 7
+  ruling, transportMemory pure-function redesign).
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

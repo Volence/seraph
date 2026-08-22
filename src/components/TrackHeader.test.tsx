@@ -87,6 +87,26 @@ describe("TrackHeader rename", () => {
   });
 });
 
+describe("TrackHeader silent-lane cue (F2)", () => {
+  // Seeded lanes carry instrumentId: null and build_snapshot silently drops
+  // their notes — the header must say so instead of looking bound.
+
+  it("marks an instrument-less lane with a 'no voice' cue and a how-to-fix tooltip", () => {
+    render(<TrackHeader track={track} {...handlers} />);
+
+    const marker = screen.getByText("no voice");
+    expect(marker).toBeInTheDocument();
+    // The tooltip must state the consequence and the fix.
+    expect(marker.getAttribute("title")).toMatch(/won't sound/);
+    expect(marker.getAttribute("title")).toMatch(/Library/);
+  });
+
+  it("shows no cue once an instrument is bound", () => {
+    render(<TrackHeader track={{ ...track, instrumentId: "inst-1" }} {...handlers} />);
+    expect(screen.queryByText("no voice")).toBeNull();
+  });
+});
+
 describe("TrackHeader delete", () => {
   it("confirmed delete calls deleteTrack and reloads the sequence", async () => {
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));

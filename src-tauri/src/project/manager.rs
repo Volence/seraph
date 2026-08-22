@@ -499,11 +499,45 @@ impl ProjectManager {
         }
     }
 
+    /// The seeded lane name for `channel` under the current project's
+    /// driver — the same `ChannelLayout` source `default_tracks_for_layout`
+    /// reads (never hardcoded). None when no project is open, the driver is
+    /// unknown, or the channel isn't in the layout.
+    fn default_lane_name(&self, channel: &ChannelAssignment) -> Option<String> {
+        let driver_id = &self.metadata.as_ref()?.driver_id;
+        let layout = self.driver_registry.get(driver_id)?.channel_layout();
+        match channel {
+            ChannelAssignment::Fm(n) => layout
+                .fm_channels.iter().find(|c| c.index == *n).map(|c| c.name.clone()),
+            ChannelAssignment::Psg(n) => layout
+                .psg_channels.iter().find(|c| !c.is_noise && c.index == *n).map(|c| c.name.clone()),
+            ChannelAssignment::PsgNoise => layout
+                .psg_channels.iter().find(|c| c.is_noise).map(|c| c.name.clone()),
+            ChannelAssignment::Dac(n) => layout
+                .dac_channels.iter().find(|c| c.index == *n).map(|c| c.name.clone()),
+        }
+    }
+
     /// Clear `instrument_id` on any track bound to `id`. Lanes survive
     /// instrument deletion (the seeded roster is the channel layout).
-    fn unbind_instrument_from_tracks(&mut self, id: Uuid) {
-        for track in self.tracks.iter_mut().filter(|t| t.instrument_id == Some(id)) {
-            track.instrument_id = None;
+    ///
+    /// Binding names lanes after their instrument, so a lane still carrying
+    /// the deleted instrument's name would masquerade as bound (F2c): when
+    /// the lane's name equals `instrument_name` it is reset to its channel
+    /// default. A name that differs is a user-custom rename and is kept.
+    fn unbind_instrument_from_tracks(&mut self, id: Uuid, instrument_name: &str) {
+        let bound: Vec<usize> = self.tracks.iter().enumerate()
+            .filter(|(_, t)| t.instrument_id == Some(id))
+            .map(|(i, _)| i)
+            .collect();
+        for i in bound {
+            self.tracks[i].instrument_id = None;
+            if self.tracks[i].name == instrument_name {
+                let channel = self.tracks[i].channel.clone();
+                if let Some(default) = self.default_lane_name(&channel) {
+                    self.tracks[i].name = default;
+                }
+            }
         }
     }
 
@@ -553,10 +587,10 @@ impl ProjectManager {
     pub fn delete_fm_instrument(&mut self, id: Uuid) -> Result<(), String> {
         let pos = self.instruments.fm.iter().position(|i| i.id == id)
             .ok_or("FM instrument not found")?;
-        self.instruments.fm.remove(pos);
+        let inst = self.instruments.fm.remove(pos);
         self.dirty_instruments.remove(&id);
         self.dirty = true;
-        self.unbind_instrument_from_tracks(id);
+        self.unbind_instrument_from_tracks(id, &inst.name);
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/fm/{id}.json"));
             if file.exists() { let _ = fs::remove_file(file); }
@@ -624,10 +658,10 @@ impl ProjectManager {
     pub fn delete_psg_instrument(&mut self, id: Uuid) -> Result<(), String> {
         let pos = self.instruments.psg.iter().position(|i| i.id == id)
             .ok_or("PSG instrument not found")?;
-        self.instruments.psg.remove(pos);
+        let inst = self.instruments.psg.remove(pos);
         self.dirty_instruments.remove(&id);
         self.dirty = true;
-        self.unbind_instrument_from_tracks(id);
+        self.unbind_instrument_from_tracks(id, &inst.name);
         if let Some(path) = &self.project_path {
             let file = path.join(format!("instruments/psg/{id}.json"));
             if file.exists() { let _ = fs::remove_file(file); }
@@ -798,7 +832,7 @@ impl ProjectManager {
         self.dirty_instruments.remove(&id);
         self.dirty = true;
         self.dac_pcm_cache.remove(&id);
-        self.unbind_instrument_from_tracks(id);
+        self.unbind_instrument_from_tracks(id, &inst.name);
         if let Some(path) = &self.project_path {
             for name in [
                 format!("instruments/dac/{id}.json"),
@@ -1637,6 +1671,76 @@ mod tests {
         mgr.delete_fm_instrument(id).unwrap();
         assert_eq!(mgr.list_tracks().len(), track_count, "delete unbinds; the lane survives");
         assert!(mgr.list_tracks().iter().all(|t| t.instrument_id.is_none()));
+
+        cleanup(&path);
+    }
+
+    /// Deleting an instrument unbinds its lane — and must also reset the
+    /// lane's name to the channel default (derived from the driver layout,
+    /// the same source `default_tracks_for_layout` reads), or the dead
+    /// instrument's name keeps masquerading as a live binding (F2c).
+    #[test]
+    fn test_delete_instrument_resets_lane_name_to_channel_default() {
+        use crate::model::driver::DriverProfile as _;
+
+        let path = temp_project_path("unbind_name_reset");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Unbind", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let id = mgr.add_fm_instrument(assign_test_fm());
+        let track_id = mgr.list_tracks().iter()
+            .find(|t| t.instrument_id == Some(id))
+            .map(|t| t.id)
+            .expect("instrument bound to a lane");
+        // Binding renamed the lane to the instrument.
+        assert_eq!(
+            mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().name,
+            "Library Lead"
+        );
+
+        mgr.delete_fm_instrument(id).unwrap();
+
+        let track = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
+        assert_eq!(track.instrument_id, None);
+        // Expected name comes from the driver's own layout — never hardcoded.
+        let layout = FlamedriverProfile.channel_layout();
+        let default_name = match track.channel {
+            ChannelAssignment::Fm(n) => layout.fm_channels.iter()
+                .find(|c| c.index == n).map(|c| c.name.clone()),
+            _ => None,
+        }.expect("lane channel present in the driver layout");
+        assert_eq!(
+            track.name, default_name,
+            "unbound lane must fall back to its channel-default name, not keep the dead instrument's"
+        );
+
+        cleanup(&path);
+    }
+
+    /// A lane the USER renamed after binding keeps its custom name on
+    /// instrument delete — only the binding-convention name (lane named
+    /// exactly after the instrument) is reset (F2c).
+    #[test]
+    fn test_delete_instrument_preserves_user_renamed_lane() {
+        let path = temp_project_path("unbind_name_custom");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Unbind", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let id = mgr.add_fm_instrument(assign_test_fm());
+        let track = mgr.list_tracks().iter()
+            .find(|t| t.instrument_id == Some(id))
+            .cloned()
+            .expect("instrument bound to a lane");
+        mgr.update_track(
+            track.id, "My Custom Bass".into(), track.channel.clone(), Some(id),
+            track.muted, track.solo, track.volume, track.pan.clone(), track.pitch_offset,
+        ).unwrap();
+
+        mgr.delete_fm_instrument(id).unwrap();
+
+        let after = mgr.list_tracks().iter().find(|t| t.id == track.id).unwrap();
+        assert_eq!(after.instrument_id, None);
+        assert_eq!(after.name, "My Custom Bass", "user rename must survive the unbind");
 
         cleanup(&path);
     }

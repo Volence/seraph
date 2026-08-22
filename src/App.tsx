@@ -10,7 +10,8 @@ import { StatusBar } from "./components/StatusBar";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
 import { LibraryPanel } from "./components/LibraryPanel";
-import { recordPlayStart, recordStop, consumeStopDoubleTap } from "./utils/transportMemory";
+import { recordPlayStart, recordStop, noteSeek, consumeStopDoubleTap, resetTransportMemory } from "./utils/transportMemory";
+import { mostRecentLocation, parentDirectory, rememberLocation } from "./utils/recentLocations";
 import { defaultPreviewLoop, type PreviewLoopRange } from "./utils/previewLoop";
 import styles from "./App.module.css";
 
@@ -73,6 +74,10 @@ export default function App() {
   const handleSeek = useCallback((tick: number) => {
     seekGenRef.current++;
     setSeekTick(tick);
+    // Explicit seek: the next play establishes a new launch point for the
+    // stop double-tap return (owner ruling 2026-08-21). Covers ruler clicks,
+    // Home, and the double-tap return-jump itself — all route through here.
+    noteSeek();
     ipc.transportSeek(tick);
   }, []);
 
@@ -92,6 +97,8 @@ export default function App() {
   const resetSeekCursor = useCallback(() => {
     seekGenRef.current++;
     setSeekTick(0);
+    // Project boundary: don't carry the previous project's launch point.
+    resetTransportMemory();
   }, []);
 
   /** Toggle the preview loop using the last-set range (default: one bar at
@@ -117,8 +124,10 @@ export default function App() {
   }, []);
 
   const startPlayback = useCallback(async () => {
-    // Record where playback starts so a stop double-tap can return there
-    // (G37). Best-effort: a failed tick read must not block playing.
+    // Feed the launch-point memory so a stop double-tap can return there
+    // (G37); transportMemory decides whether this play records (a plain
+    // resume does not). Best-effort: a failed tick read must not block
+    // playing.
     try {
       const s = await ipc.getPlaybackState();
       recordPlayStart(s.tick);
@@ -260,13 +269,20 @@ export default function App() {
   async function handleOpenProject() {
     if (!(await confirmDiscard("Open another project"))) return;
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, title: "Open Project" });
+    const selected = await open({
+      directory: true,
+      title: "Open Project",
+      defaultPath: mostRecentLocation() || undefined,
+    });
     if (!selected) return;
     try {
       if (projectOpen) await ipc.closeProject();
       setPlaying(false);
       resetSeekCursor();
       const song = await ipc.openProject(selected as string);
+      // The chosen directory is the project itself; its parent is the
+      // "location" worth prefilling in future New Project dialogs.
+      rememberLocation(parentDirectory(selected as string));
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
       setSelectedRegions([]);

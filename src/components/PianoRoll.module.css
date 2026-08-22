@@ -19,6 +19,19 @@
   flex-shrink: 0;
 }
 
+/* Silent-lane cue (F2): inline header badge, warning-toned to match the
+   library panel's warning styling. */
+.silentNotice {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: help;
+}
+
 .noteInfo {
   flex: 1;
   font-size: 11px;

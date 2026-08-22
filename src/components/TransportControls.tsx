@@ -49,8 +49,9 @@ export function TransportControls({
       recordStop();
       onPlayingChange(false);
     } else {
-      // Record where playback starts so a stop double-tap can return there
-      // (G37); best-effort, mirrors App.startPlayback.
+      // Feed the launch-point memory so a stop double-tap can return there
+      // (G37); transportMemory decides whether this play records (a plain
+      // resume does not). Best-effort, mirrors App.startPlayback.
       try {
         const s = await ipc.getPlaybackState();
         recordPlayStart(s.tick);

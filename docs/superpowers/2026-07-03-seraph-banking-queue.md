@@ -379,6 +379,87 @@ designs target the banked specs (normative); manifest flags carry the gates.
   marquee preview, loop-armed = static view across wraps, full-volume
   defaults (new track + new note ≈ audition loudness).
 
+- 2026-08-21 (cont.): **OWNER RULINGS BANKED + WAVE 3B DISPATCHED.** Rulings:
+  (1) item 7 APPROVED — Space pauses in place and pause/resume must NEVER
+  move the double-Space return point; the return point updates only on an
+  explicit seek (mouse/ruler/Home/the return-jump itself) followed by play.
+  (2) Voice-per-track: owner approved BOTH shapes — Shape A now (set voice
+  on selected notes, same piano roll) AND, with S4, per-voice viewing;
+  ratified direction: S4's one-grid colored lanes + a per-voice filter
+  toggle ("piano roll per voice" as a lens, not a separate editor), storage
+  truth stays per-note instrument_id. (3) F15 view-state persistence
+  DEPRIORITIZED (owner: current behavior matches how they work); next audit
+  pick after in-flight parcels = F3/#4 live knob-tweak audibility (shares
+  the F1 reload seam — deliberately sequenced after it lands). (4) No
+  migration for old 100-velocity projects (throwaway test data).
+  IN FLIGHT (3 parcels): `fix/live-edit-audibility` (audit F1+F2+stale-lane-
+  name wart), `feat/note-voice-set` (Shape A: set_note_instrument IPC with
+  validate-first kind gate + correct-by-construction different-voice overlap
+  rejection at the mutation site, add_note voice passthrough + paste
+  preservation, drag-voice-onto-selection, per-voice note colors + patch
+  chips, drag-to-track wipe confirm), `fix/play-start-memory` (item 7
+  ruling, transportMemory pure-function redesign).
+
+- 2026-08-21 (cont.): **WAVE 3B PARCEL 1 SHIPPED — live-edit audibility +
+  silent-lane cues (audit F1+F2)** (merged; lanes on merged tree: cargo
+  237/0, vitest 228/228 across 23 files, build clean, no bindings drift).
+  F1: every piano-roll note commit point (draw, delete/cut, transpose,
+  nudge, paste, Ctrl+D, velocity click, move/resize via gesture-end hook)
+  now reloads the running sequence — G30 pattern, unconditional, with a
+  gestureMutatedRef so click-selects don't churn; undo/redo already
+  reloaded (verified). F2: instrument-less lanes get a dimmed name + "no
+  voice" pill on TrackHeader and a "silent — no voice assigned" badge in
+  the piano-roll header (tooltips state the fix); F2c: deleting an
+  instrument resets lanes named exactly after it to the channel-layout
+  default name (`default_lane_name()` derives from the driver's
+  ChannelLayout; user renames preserved via name-inequality heuristic —
+  exact-match renames also reset, accepted edge). RATIFIED: unconditional
+  reload (matches region path); rename heuristic; unknown-driver keeps old
+  name. TAGGED for owner gate + BOOKED BACKEND FOLLOW-UP: reload_snapshot
+  does silence_all+reprogram, so a note commit mid-loop momentarily cuts
+  sustained notes on other channels (same cost region ops already pay) —
+  if objectionable by ear, a targeted per-channel reprogram is the fix.
+  Remaining in flight: `feat/note-voice-set`, `fix/play-start-memory`.
+
+- 2026-08-21 (cont.): **ITEM 7 SHIPPED — pause never moves the double-Space
+  return point** (merged; lanes on merged tree: cargo 237/0, vitest 236/236
+  across 23 files, build clean, no bindings drift). transportMemory owns
+  the record decision: `launchPointStale` flag (starts true; reset at
+  project boundaries via resetSeekCursor→resetTransportMemory);
+  `recordPlayStart` records only when stale; `noteSeek()` re-arms — hooked
+  once in App.handleSeek, which covers ruler/mouse seeks, Home (key +
+  button), and the double-Space return-jump. Resume no-ops on the tick.
+  Double-tap mechanics (400ms, consumed on use) unchanged. Red-first: the
+  exact bug shown failing (resume tick 2400 overwrote launch 960).
+  RATIFIED (3 agent calls): seek-then-quick-Space inside the 400ms window
+  still jumps to the launch point (pre-existing, rare; one-line change in
+  noteSeek if ever wanted); seek-while-playing re-arms literally (next
+  play — usually the following resume — records); project-boundary reset
+  (scope addition, prevents cross-project launch-point leaks).
+  Remaining in flight: `feat/note-voice-set` only.
+
+- 2026-08-22: **LOCATION MEMORY SHIPPED** (owner ask; merged; lanes on
+  merged tree: cargo 237/0, vitest 254/254 across 25 files, build clean, no
+  bindings drift). New `src/utils/recentLocations.ts` — localStorage MRU,
+  key `seraph.recentProjectLocations.v1`, cap 8, trailing-slash-insensitive
+  dedup, corrupt-JSON/storage-failure safe. **This is the app's FIRST
+  localStorage use and the designated persistence seam — audit F15
+  (workspace persistence, deprioritized) should extend this pattern
+  (versioned key + typed module), not scatter raw calls.** NewProjectDialog
+  + ImportDialog prefill from MRU, custom dark suggestions dropdown (chosen
+  over <datalist>: WebKitGTK styles it poorly), Browse gets defaultPath,
+  record on success; App's Open seeds defaultPath and records the PARENT of
+  the opened project dir. RATIFIED: Location input made editable (was
+  readOnly — owner's screenshot showed a typed path); ImportDialog included
+  (same create semantics); parent-dir recording on open.
+  **RULER BUG FOUND BY OWNER (in flight, `fix/pianoroll-ruler-scale`):**
+  PianoRollRuler renders ~1281 bars across ~1280px on a 4-bar region while
+  the note grid below is correctly scaled (~640x off; label-thinning step
+  64 is the symptom, dimmed past-region overlay invisible). Suspect wrong
+  ticksPerPixel/width prop or DPR double-application. Reproduce-first
+  ordered. SECOND DEFECT in scope: the piano-roll header read "Bars 1-3"
+  for a 4-bar region — verify the header's range math independently.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

@@ -59,6 +59,10 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
 
 export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
+  // Silent-lane cue (F2): build_snapshot drops every note on a track with
+  // no instrument, and the click-audition no-ops — the header must say so.
+  // Starts true so the badge never flashes before the first fetch lands.
+  const [hasInstrument, setHasInstrument] = useState(true);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
   const [scrollTop, setScrollTop] = useState(0);
@@ -131,6 +135,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       return;
     }
     setNotes(r.notes);
+    setHasInstrument(track.instrumentId != null);
   }, [region.trackId, region.regionId]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -444,6 +449,14 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
         <span className={styles.label}>
           {region.trackName} | Bars {barStart}-{barEnd}
         </span>
+        {!hasInstrument && (
+          <span
+            className={styles.silentNotice}
+            title="This lane has no instrument — its notes won't sound during playback and clicks won't audition. Drag a voice from the Library onto the track header, or create one with + FM Patch / + PSG Env."
+          >
+            silent — no voice assigned
+          </span>
+        )}
         {selInfo && <span className={styles.noteInfo}>{selInfo}</span>}
         <select
           className={styles.gridSelect}

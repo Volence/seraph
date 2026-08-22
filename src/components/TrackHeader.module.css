@@ -72,6 +72,24 @@
   min-width: 0;
 }
 
+/* Silent-track cue (F2): an unbound lane's name dims and a small warning
+   pill says why it won't sound. */
+.nameUnbound {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.noVoice {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: help;
+}
+
 .renameInput {
   font-size: 12px;
   flex: 1;

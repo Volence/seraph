@@ -26,12 +26,12 @@ function note(tick: number, pitch: number): Note {
   return { tick, pitch, velocity: 100, durationTicks: 240 };
 }
 
-function setupTracks(notes: Note[]): { region: SelectedRegion } {
+function setupTracks(notes: Note[], instrumentId: string | null = null): { region: SelectedRegion } {
   const track: Track = {
     id: "track-1",
     name: "Lead",
     channel: { Fm: 0 },
-    instrumentId: null,
+    instrumentId,
     regions: [{ id: "region-1", startTick: 0, durationTicks: 7680, notes }],
     muted: false,
     solo: false,
@@ -52,8 +52,8 @@ function setupTracks(notes: Note[]): { region: SelectedRegion } {
   };
 }
 
-async function renderRoll(notes: Note[], seekTick = 0) {
-  const { region } = setupTracks(notes);
+async function renderRoll(notes: Note[], seekTick = 0, instrumentId: string | null = null) {
+  const { region } = setupTracks(notes, instrumentId);
   const utils = render(
     <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={seekTick} onSeek={vi.fn()} />,
   );
@@ -392,6 +392,25 @@ describe("PianoRoll refresh on undo/redo", () => {
       window.dispatchEvent(new Event("seraph:song-reverted"));
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
+describe("silent-lane notice (F2)", () => {
+  // A roll opened on an instrument-less track edits notes that playback
+  // silently drops (build_snapshot emits nothing for unbound lanes) — the
+  // header must carry an inline cue, not leave the user guessing.
+
+  it("shows an inline 'silent' badge with a how-to-fix tooltip when the track has no instrument", async () => {
+    const { getByText } = await renderRoll([note(0, 60)]);
+    const badge = getByText(/silent/i);
+    expect(badge).toBeInTheDocument();
+    expect(badge.getAttribute("title")).toMatch(/won't sound/);
+    expect(badge.getAttribute("title")).toMatch(/Library/);
+  });
+
+  it("shows no badge when the track has an instrument", async () => {
+    const { queryByText } = await renderRoll([note(0, 60)], 0, "inst-1");
+    expect(queryByText(/silent/i)).toBeNull();
   });
 });
 

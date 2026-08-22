@@ -11,6 +11,7 @@ import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { recordPlayStart, recordStop, consumeStopDoubleTap } from "./utils/transportMemory";
+import { defaultPreviewLoop, type PreviewLoopRange } from "./utils/previewLoop";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -20,6 +21,10 @@ export default function App() {
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loopEnabled, setLoopEnabled] = useState(false);
+  // The preview loop: transport-scratch state, NOT saved into the project
+  // (S4's SongSettingsPanel will own the persisted song-level loop). Holds
+  // the last range set from the ruler so the L key / loop button re-arm it.
+  const [previewLoop, setPreviewLoop] = useState<PreviewLoopRange | null>(null);
   const [selectedRegions, setSelectedRegions] = useState<SelectedRegion[]>([]);
   const [exportStatus, setExportStatus] = useState<
     | { type: "success"; files: string[] }
@@ -87,6 +92,28 @@ export default function App() {
   const resetSeekCursor = useCallback(() => {
     seekGenRef.current++;
     setSeekTick(0);
+  }, []);
+
+  /** Toggle the preview loop using the last-set range (default: one bar at
+   *  the seek cursor). Shared by the L key and the transport loop button. */
+  const toggleLoop = useCallback(async () => {
+    if (!projectMeta) return;
+    if (loopEnabled) {
+      await ipc.transportClearLoop();
+      setLoopEnabled(false);
+    } else {
+      const range = previewLoop ?? defaultPreviewLoop(seekTick, projectMeta);
+      setPreviewLoop(range);
+      await ipc.transportSetLoop(range.start, range.end);
+      setLoopEnabled(true);
+    }
+  }, [projectMeta, loopEnabled, previewLoop, seekTick]);
+
+  /** Ruler loop-drag commit: remember the range and arm the loop. */
+  const handlePreviewLoopSet = useCallback(async (start: number, end: number) => {
+    setPreviewLoop({ start, end });
+    await ipc.transportSetLoop(start, end);
+    setLoopEnabled(true);
   }, []);
 
   const startPlayback = useCallback(async () => {
@@ -215,14 +242,7 @@ export default function App() {
         }
       }
       if (e.key === "l" && projectMeta && !e.ctrlKey && !e.metaKey) {
-        if (loopEnabled) {
-          ipc.transportClearLoop();
-          setLoopEnabled(false);
-        } else {
-          const ticksPerBar = projectMeta.ticksPerBeat * projectMeta.timeSignature[0];
-          ipc.transportSetLoop(0, ticksPerBar * 4);
-          setLoopEnabled(true);
-        }
+        toggleLoop();
       }
       if (e.key === "Home" && projectMeta) {
         handleSeek(0);
@@ -230,7 +250,7 @@ export default function App() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, handleRevert, handleSeek, startPlayback, playing, loopEnabled, projectMeta]);
+  }, [handleSave, handleRevert, handleSeek, startPlayback, toggleLoop, playing, projectMeta]);
 
   async function handleNewProject() {
     if (!(await confirmDiscard("Create a new project"))) return;
@@ -311,7 +331,7 @@ export default function App() {
         playing={playing}
         loopEnabled={loopEnabled}
         onPlayingChange={setPlaying}
-        onLoopChange={setLoopEnabled}
+        onToggleLoop={toggleLoop}
         onSeek={handleSeek}
       />
       <SpectrumAnalyzer height={100} />
@@ -361,6 +381,9 @@ export default function App() {
           playing={playing}
           seekTick={seekTick}
           onSeek={handleSeek}
+          previewLoop={previewLoop}
+          loopEnabled={loopEnabled}
+          onPreviewLoopSet={handlePreviewLoopSet}
           onNewProject={handleNewProject}
           onOpenProject={handleOpenProject}
           onSelectRegions={(regions) => {

@@ -1,4 +1,5 @@
 import type { SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
+import type { PreviewLoopRange } from "../utils/previewLoop";
 import { ArrangementView } from "./ArrangementView";
 import styles from "./MainArea.module.css";
 
@@ -10,6 +11,10 @@ interface MainAreaProps {
    *  stop-sync (G29) keep it truthful. */
   seekTick: number;
   onSeek: (tick: number) => void;
+  /** Preview loop (transport-scratch, App-owned); drawn on the ruler. */
+  previewLoop: PreviewLoopRange | null;
+  loopEnabled: boolean;
+  onPreviewLoopSet: (startTick: number, endTick: number) => void;
   onNewProject: () => void;
   onOpenProject: () => void;
   onSelectRegions: (regions: SelectedRegion[]) => void;
@@ -24,6 +29,9 @@ export function MainArea({
   playing,
   seekTick,
   onSeek,
+  previewLoop,
+  loopEnabled,
+  onPreviewLoopSet,
   onNewProject,
   onOpenProject,
   onSelectRegions,
@@ -50,6 +58,9 @@ export function MainArea({
       playing={playing}
       seekTick={seekTick}
       onSeek={onSeek}
+      previewLoop={previewLoop}
+      loopEnabled={loopEnabled}
+      onPreviewLoopSet={onPreviewLoopSet}
       onSelectRegions={onSelectRegions}
       selectedRegions={selectedRegions}
       onSelectInstrument={onSelectInstrument}

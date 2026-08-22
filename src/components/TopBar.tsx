@@ -18,7 +18,8 @@ interface TopBarProps {
   playing: boolean;
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
-  onLoopChange: (enabled: boolean) => void;
+  /** Toggle the preview loop; App owns the range + transport calls. */
+  onToggleLoop: () => void;
   /** Seek request (Home button); App owns the cursor + transport call (G29). */
   onSeek: (tick: number) => void;
 }
@@ -35,7 +36,7 @@ export function TopBar({
   playing,
   loopEnabled,
   onPlayingChange,
-  onLoopChange,
+  onToggleLoop,
   onSeek,
 }: TopBarProps) {
   const [masterVol, setMasterVol] = useState(100);
@@ -110,7 +111,7 @@ export function TopBar({
           playing={playing}
           loopEnabled={loopEnabled}
           onPlayingChange={onPlayingChange}
-          onLoopChange={onLoopChange}
+          onToggleLoop={onToggleLoop}
           onSeek={onSeek}
         />
       ) : (

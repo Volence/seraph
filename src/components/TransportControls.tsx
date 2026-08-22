@@ -9,7 +9,9 @@ interface TransportControlsProps {
   playing: boolean;
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
-  onLoopChange: (enabled: boolean) => void;
+  /** Toggle the preview loop using the last-set range; App owns the range
+   *  state and the transport set/clear calls. */
+  onToggleLoop: () => void;
   /** Seek request; App owns the seek cursor + transport call (G29). */
   onSeek: (tick: number) => void;
 }
@@ -31,7 +33,7 @@ export function TransportControls({
   playing,
   loopEnabled,
   onPlayingChange,
-  onLoopChange,
+  onToggleLoop,
   onSeek,
 }: TransportControlsProps) {
   const { currentTick } = usePlaybackPosition(
@@ -60,17 +62,6 @@ export function TransportControls({
     }
   }
 
-  async function handleLoop() {
-    if (loopEnabled) {
-      await ipc.transportClearLoop();
-      onLoopChange(false);
-    } else {
-      const ticksPerBar = projectMeta.ticksPerBeat * projectMeta.timeSignature[0];
-      await ipc.transportSetLoop(0, ticksPerBar * 4);
-      onLoopChange(true);
-    }
-  }
-
   function handleHome() {
     // Routes through App so the seek cursor moves with the transport (G29).
     onSeek(0);
@@ -93,7 +84,7 @@ export function TransportControls({
       </button>
       <button
         className={`${styles.btn} ${loopEnabled ? styles.active : ""}`}
-        onClick={handleLoop}
+        onClick={onToggleLoop}
         title="Loop (L)"
       >
         {"↻"}

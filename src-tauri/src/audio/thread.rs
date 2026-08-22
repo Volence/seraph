@@ -22,6 +22,9 @@ unsafe impl Sync for AudioThread {}
 pub struct AudioThread {
     producer: rtrb::Producer<AudioCommand>,
     _stream: cpal::Stream,
+    /// Kept: the handle side of the callback's live silence switch (`stop`); the
+    /// callback's own clone is read every buffer. No caller flips it yet.
+    #[allow(dead_code)]
     running: Arc<AtomicBool>,
     position_tick: Arc<AtomicU64>,
     channel_levels: Arc<Vec<AtomicU8>>,
@@ -118,6 +121,9 @@ impl AudioThread {
     }
 
     /// Signal the audio callback to stop rendering (output silence instead).
+    // Kept: lifecycle control for the callback's silence branch, which is live
+    // machinery. The app has no shutdown hook that calls it yet.
+    #[allow(dead_code)]
     pub fn stop(&self) {
         self.running.store(false, Ordering::Relaxed);
     }

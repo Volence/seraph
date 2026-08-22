@@ -1692,7 +1692,6 @@ mod tests {
                 channel_type: ChannelType::Fm(0),
                 volume: 127,
                 pan: 0xC0,
-                modulation: None,
                 noise_reg: 0xE4,
                 events: vec![
                     SequencerEvent::NoteOn {

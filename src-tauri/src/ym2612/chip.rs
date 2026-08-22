@@ -44,6 +44,9 @@ impl Ym2612 {
         buf
     }
 
+    // Kept: the YM2612 status register (busy + timer overflow flags) is real
+    // chip surface; exercised by `#[cfg(test)]` tests below.
+    #[allow(dead_code)]
     pub fn read_status(&mut self) -> u8 {
         unsafe { OPN2_Read(self.chip.as_mut(), 0) }
     }

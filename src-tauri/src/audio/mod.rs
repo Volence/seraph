@@ -4,6 +4,8 @@ pub mod frequency;
 #[cfg(test)]
 pub mod live_edit_audibility;
 #[cfg(test)]
+pub mod overlap_audibility;
+#[cfg(test)]
 pub mod rendered_rms;
 pub mod spectrum;
 pub mod thread;

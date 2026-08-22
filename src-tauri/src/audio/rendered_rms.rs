@@ -91,7 +91,7 @@ pub fn one_note_snapshot(
                     modulation: None,
                     pan_override: None,
                 },
-                SequencerEvent::NoteOff { tick: duration_ticks, pitch },
+                SequencerEvent::NoteOff { tick: duration_ticks },
             ],
             overlaps: vec![],
         }],

@@ -255,6 +255,61 @@ designs target the banked specs (normative); manifest flags carry the gates.
   entry plus: loop bracket + audible loop cycling, snap modes, tempo edit,
   rename/delete, clipboard paste anchor, nudge feel).
 
+- 2026-08-21 (cont.): **WAVE 3 OPENED (owner-directed)** — owner stopped the
+  backlog queue with 7 feel/bug items + asked for a deeper feel/use audit.
+  **PARCEL F SHIPPED — loop-wrap follow-scroll + live marquee preview**
+  (merged `2b3ed88`; lanes on merged tree: cargo 231/0, build clean, vitest
+  167/167 ×3 runs, no bindings drift). `followScrollLeft` gains prev-playhead
+  param: backward jump (loop wrap/seek-back) with playhead off-view snaps to
+  the 10% anchor; no-ops when still visible or when the user had scrolled
+  ahead (jitter guard); both views wired via tick refs. Marquee: live preview
+  set drives draw() during drag via `marqueeRectFromView`/
+  `marqueePreviewSelection` (pianoRollEdit.ts) — commit path now shares the
+  same rect helper. RATIFIED: backward-jump rule; preview = WYSIWYG selected
+  style (plain drag live-previews deselection too). FLAKE WATCH: one unnamed
+  vitest failure (1-of-9 agent-side runs, name lost); 3 merged-tree runs + 8
+  agent runs green — unresolved, watch for recurrence.
+  **TRANSPORT DIAGNOSIS BANKED (item 7, no code change):** resume==restart
+  because `recordPlayStart` fires on EVERY `transportPlay` incl. resumes
+  (`src/utils/transportMemory.ts` `lastPlayStartTick`), so the first resume
+  discards the original launch point; backend `current_tick` is the single
+  resume authority; stop double-tap (400ms) is Space-consumed only. RULING
+  PARKED (owner explicitly undecided): proposal = don't re-record play-start
+  on a resume (play after pause with no seek between); double-Space then
+  returns to the launch/seek point as owner suggested.
+  **VOICE-PER-TRACK RESEARCH BANKED (item 5, read-only):** model/playback/
+  both exporters already fully support per-note `instrument_id` (3-level
+  note>region>track cascade in `build_snapshot`, per-event patch reprogram;
+  SMPS emits SetVoice + banks note-level voices; importers stamp it) — the
+  gap is IPC (`add_note` hardcodes None; nothing can set it) + UI (only
+  track-level swap exists). DEFECTS FOUND: (a) library drag-to-track
+  deliberately CLEARS all per-note/region voices (manager.rs
+  `assign_library_instrument_to_track` tail) — silently destroys imported
+  songs' mid-track voice changes; (b) a second track on the same channel is
+  allowed and plays, but SMPS export emits duplicate per-channel labels +
+  wrong header count, uncaught by validate_for_export; (c)
+  `get_channel_overlaps`/OverlapWarning exists backend-side with ZERO UI call
+  sites. Three UX shapes written up (A: set-voice-on-selected-notes, thin,
+  S4-compatible down-payment; B: S4 sub-voice lanes as a view over per-note
+  ids; C: multi-track-per-channel — recommend AGAINST, collides with S4
+  ChannelRack). RECOMMENDATION: Shape A now + drag-wipe confirm; RULING
+  PARKED for owner. Overlap prevention belongs at the mutation site
+  (validate-first in ProjectManager), per correct-by-construction.
+  **AUDITS MERGED:** `docs/superpowers/2026-08-21-daw-comparator-idioms.md`
+  (merged `c74cc3b`; Furnace/Deflemask/FL/Ableton vs seraph, 8 scenarios,
+  10-idiom adopt/adapt/reject shortlist — headline adopts: linked-region
+  reuse + Make Unique, gapless edit-while-looping guarantee, QWERTY musical
+  keyboard, audition-on-every-pitch-gesture) and
+  `docs/superpowers/2026-08-21-daw-feel-audit.md` (merged `da7304f`;
+  scenarios A–G, findings F1–F24, keyboard inventory, ranked top-10,
+  15-minute owner play-test script — CRITICAL: F1 note-level edits are
+  inaudible while transport runs (PianoRoll has zero reloadSequence; region
+  ops got G30 but notes were missed), F2 instrument-less seeded lanes
+  silently drop all notes + audition no-ops, F15 zero view-state persistence
+  on reopen). STILL IN FLIGHT: ruler parcel (piano-roll ruler, drag-zoom,
+  loop handles — items 1/2/6), quiet-voice-151 rendered-audio diagnosis
+  (item 3).
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

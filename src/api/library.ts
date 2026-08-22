@@ -66,9 +66,13 @@ export async function libraryAudition(hash: string, midiNote: number): Promise<v
  * release on FM ch0 (imported patches can carry RR=0 and would ring on
  * KeyOff alone), keys off, and sends `StopPreview` — clearing a looping PSG
  * envelope preview and invalidating the sequencer's ch0 FM patch cache so
- * playback recovers on ch0's next note-on. Do NOT swap in `stop_all_sound`
- * (Panic): it resets both chips without invalidating that cache, killing FM
- * output until the next stop/seek; Panic remains the global panic button.
+ * playback recovers on ch0's next note-on. Still do NOT swap in
+ * `stop_all_sound` (Panic) — it is the global panic button and kills every
+ * channel, not just the audition. (Panic no longer leaves FM dead: since
+ * 2026-08-22 it invalidates the whole patch cache, which it must, because it
+ * resets the chip. That was a real defect — the next note after a Panic
+ * rendered silent; guarded by
+ * `src-tauri/src/audio/live_edit_audibility.rs::a_note_after_panic_reprograms_its_patch`.)
  */
 export async function libraryStopAudition(): Promise<void> {
   unwrap(await commands.libraryStopAudition());

@@ -566,6 +566,79 @@ fn retuning_the_sounding_note_stops_the_old_pitch() {
 }
 
 // --------------------------------------------------------------------------
+// Panic invalidates the FM patch cache.
+// --------------------------------------------------------------------------
+
+/// `AudioCommand::Panic` resets the YM2612. The sequencer caches the last
+/// patch per channel and skips the reprogram when it looks unchanged, so
+/// without invalidating that cache the next note keys on into a blank chip.
+/// (The wart is called out in `src/api/library.ts`; before this parcel a
+/// reload happened to clear the cache as a side effect, which is not a
+/// recovery path worth depending on.)
+#[test]
+fn a_note_after_panic_reprograms_its_patch() {
+    let inst = load_pack_fm(VOICE);
+
+    // Two notes on one channel with the SAME patch: the second is exactly the
+    // case where the cache says "unchanged".
+    let two_notes = || -> SequencerSnapshot {
+        let mut snap = fm_snapshot(&inst, 127);
+        let first_len = (0.4 * crate::audio::rendered_rms::TICKS_PER_SEC) as u64;
+        let second_at = (0.6 * crate::audio::rendered_rms::TICKS_PER_SEC) as u64;
+        let data = fm_instrument_data(&inst);
+        snap.channels[0].events = vec![
+            SequencerEvent::NoteOn {
+                tick: 0,
+                pitch: 60,
+                velocity: 127,
+                detune: 0,
+                duration_ticks: first_len,
+                instrument: data.clone(),
+                modulation: None,
+                pan_override: None,
+            },
+            SequencerEvent::NoteOff { tick: first_len, pitch: 60 },
+            SequencerEvent::NoteOn {
+                tick: second_at,
+                pitch: 60,
+                velocity: 127,
+                detune: 0,
+                duration_ticks: second_at * 10,
+                instrument: data,
+                modulation: None,
+                pan_override: None,
+            },
+        ];
+        snap
+    };
+
+    let control = render_snapshot_with_edits(two_notes(), TOTAL_SECS, &[]);
+    let panicked = render_snapshot_with_edits(
+        two_notes(),
+        TOTAL_SECS,
+        &[(0.5, AudioCommand::Panic)],
+    );
+
+    // Window covers only the SECOND note.
+    let c = stats_window(&control, 0.7, WINDOW_TO);
+    let p = stats_window(&panicked, 0.7, WINDOW_TO);
+    assert!(
+        c.rms > 0.01,
+        "the control's second note is not audible (rms={:.5}) — harness broken",
+        c.rms
+    );
+    let db = db_ratio(p.rms, c.rms);
+    assert!(
+        db.abs() < 1.0,
+        "the note played after a Panic sits {db:+.1} dB from the same note without \
+         one (control rms={:.5}, after panic rms={:.5}) — the patch was not \
+         reprogrammed into the reset chip",
+        c.rms,
+        p.rms
+    );
+}
+
+// --------------------------------------------------------------------------
 // Cross-channel: the banked follow-up's actual complaint.
 // --------------------------------------------------------------------------
 

@@ -581,6 +581,17 @@ designs target the banked specs (normative); manifest flags carry the gates.
   must be completely undisturbed; ride it while a PSG envelope voice sustains —
   no re-attack. Play-test script items 3 and 5 in the feel audit were rewritten
   with the new expected behaviour.
+  **DRIVE-BY DEFECT FOUND AND FIXED (flagged for ratification):**
+  `AudioCommand::Panic` reset both chips without invalidating the sequencer's
+  FM patch cache, so the next note-on saw its patch as "unchanged", skipped the
+  reprogram and keyed on into a blank YM2612 — **the note after a Panic
+  rendered rms 0.00000**. Known-ish (the wart was described in
+  `src/api/library.ts`) but its severity was not: it was called "killing FM
+  output until the next stop/seek", and stop/seek do NOT clear the cache
+  either — only `reload_snapshot` accidentally did, which this parcel removes.
+  Panic now calls the new `Sequencer::invalidate_all_fm_cache()`. Guarded by
+  `a_note_after_panic_reprograms_its_patch` (red-first). Comment in
+  `src/api/library.ts` corrected.
   **ADJACENT, NOT CLAIMED:** F1 (note-level edits mid-loop, branch
   `fix/live-edit-audibility`) is a sibling parcel; this change is what makes
   its reloads gapless, but the PianoRoll call sites are not touched here.

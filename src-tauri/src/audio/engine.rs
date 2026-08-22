@@ -260,6 +260,10 @@ impl AudioEngine {
             AudioCommand::Panic => {
                 self.ym2612.reset();
                 self.sn76489.reset();
+                // Resetting the chip invalidates every cached register, so the
+                // next note-on must reprogram its patch in full rather than
+                // trusting `last_fm_patch` and keying on into a blank YM2612.
+                self.sequencer.invalidate_all_fm_cache();
                 self.ym_clock_accumulator = 0.0;
                 self.psg_clock_accumulator = 0.0;
                 self.dac_samples = None;

@@ -234,6 +234,16 @@ impl Sequencer {
         }
     }
 
+    /// Forget the cached FM patch/pan for EVERY channel. For whoever resets
+    /// the chip itself (`AudioCommand::Panic`): after a reset no cached
+    /// register state is valid, and without this the next note-on sees its
+    /// patch as "unchanged", skips the reprogram and keys on into a blank
+    /// YM2612.
+    pub fn invalidate_all_fm_cache(&mut self) {
+        self.last_fm_patch = [[0xFF; 25]; 6];
+        self.last_fm_pan = [0xFF; 6];
+    }
+
     pub fn set_loop(&mut self, start: u64, end: u64) {
         self.snapshot.loop_start = Some(start);
         self.snapshot.loop_end = Some(end);

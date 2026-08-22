@@ -17,6 +17,8 @@ interface TopBarProps {
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
   onLoopChange: (enabled: boolean) => void;
+  /** Seek request (Home button); App owns the cursor + transport call (G29). */
+  onSeek: (tick: number) => void;
 }
 
 export function TopBar({
@@ -31,6 +33,7 @@ export function TopBar({
   loopEnabled,
   onPlayingChange,
   onLoopChange,
+  onSeek,
 }: TopBarProps) {
   const [masterVol, setMasterVol] = useState(100);
   const [exporting, setExporting] = useState(false);
@@ -98,6 +101,7 @@ export function TopBar({
           loopEnabled={loopEnabled}
           onPlayingChange={onPlayingChange}
           onLoopChange={onLoopChange}
+          onSeek={onSeek}
         />
       ) : (
         <div className={styles.transport}>

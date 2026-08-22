@@ -9,6 +9,8 @@ interface TransportControlsProps {
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
   onLoopChange: (enabled: boolean) => void;
+  /** Seek request; App owns the seek cursor + transport call (G29). */
+  onSeek: (tick: number) => void;
 }
 
 function tickToBarBeatTick(
@@ -29,6 +31,7 @@ export function TransportControls({
   loopEnabled,
   onPlayingChange,
   onLoopChange,
+  onSeek,
 }: TransportControlsProps) {
   const { currentTick } = usePlaybackPosition(
     playing,
@@ -57,8 +60,9 @@ export function TransportControls({
     }
   }
 
-  async function handleHome() {
-    await ipc.transportSeek(0);
+  function handleHome() {
+    // Routes through App so the seek cursor moves with the transport (G29).
+    onSeek(0);
   }
 
   const position = tickToBarBeatTick(

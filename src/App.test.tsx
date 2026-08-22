@@ -104,6 +104,13 @@ beforeEach(() => {
   vi.mocked(ipc.createProject).mockResolvedValue(undefined);
   vi.mocked(ipc.getProjectInfo).mockResolvedValue(meta);
   vi.mocked(ipc.listTracks).mockResolvedValue([makeTrack()]);
+  vi.mocked(ipc.getPlaybackState).mockResolvedValue({
+    playing: false,
+    tick: 0,
+    loopStart: null,
+    loopEnd: null,
+    channelLevels: [],
+  });
   vi.mocked(lib.libraryList).mockResolvedValue([]);
   vi.mocked(lib.libraryGames).mockResolvedValue([]);
   vi.mocked(lib.libraryWarnings).mockResolvedValue([]);

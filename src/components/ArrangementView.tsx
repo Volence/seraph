@@ -17,6 +17,9 @@ import styles from "./ArrangementView.module.css";
 interface ArrangementViewProps {
   projectMeta: SongMetadata;
   playing: boolean;
+  /** Seek cursor position + seek request; owned by App (G29). */
+  seekTick: number;
+  onSeek: (tick: number) => void;
   onSelectRegions: (regions: SelectedRegion[]) => void;
   selectedRegions: SelectedRegion[];
   onSelectInstrument: (inst: SelectedInstrument | null) => void;
@@ -51,6 +54,8 @@ function channelLabel(track: Track): string {
 export function ArrangementView({
   projectMeta,
   playing,
+  seekTick,
+  onSeek,
   onSelectRegions,
   selectedRegions,
   onSelectInstrument,
@@ -62,7 +67,6 @@ export function ArrangementView({
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta);
   const { interpolatedTick, currentTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
-  const [seekTick, setSeekTick] = useState(0);
   const trackHeight = 60;
   // Manual scrolls (wheel, ruler drag) suspend follow-playhead briefly so the
   // user can inspect other bars during playback (G28).
@@ -215,10 +219,8 @@ export function ArrangementView({
     await ipc.reloadSequence();
   }
 
-  async function handleSeek(tick: number) {
-    setSeekTick(tick);
-    await ipc.transportSeek(tick);
-  }
+  // Seeks route through App, which owns the cursor and the transport call.
+  const handleSeek = onSeek;
 
   function handleTrackClick(track: Track) {
     if (!track.instrumentId) return;

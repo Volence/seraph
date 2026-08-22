@@ -49,6 +49,8 @@ function renderView(overrides: Partial<Parameters<typeof ArrangementView>[0]> = 
     <ArrangementView
       projectMeta={meta}
       playing={false}
+      seekTick={0}
+      onSeek={vi.fn()}
       onSelectRegions={vi.fn()}
       selectedRegions={[]}
       onSelectInstrument={vi.fn()}

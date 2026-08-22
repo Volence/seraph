@@ -36,7 +36,7 @@ use ipc::{
     // Track CRUD
     add_track, update_track, delete_track, list_tracks,
     // Region CRUD
-    add_region, update_region, move_region, delete_region,
+    add_region, update_region, move_region, duplicate_region, delete_region,
     // Note CRUD
     add_note, update_note, delete_note,
     // Undo / redo
@@ -111,6 +111,7 @@ fn build_specta() -> Builder<tauri::Wry> {
         add_region,
         update_region,
         move_region,
+        duplicate_region,
         delete_region,
         // Note CRUD
         add_note,

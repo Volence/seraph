@@ -861,6 +861,21 @@ pub fn move_region(
 
 #[tauri::command]
 #[specta::specta]
+pub fn duplicate_region(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+    at_start_tick: u64,
+) -> Result<String, String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let id = mgr.duplicate_region(t_uuid, r_uuid, at_start_tick)?;
+    Ok(id.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn delete_region(
     state: State<'_, ProjectState>,
     track_id: String,

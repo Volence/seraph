@@ -750,6 +750,82 @@ designs target the banked specs (normative); manifest flags carry the gates.
   the first delivery volunteered ("goes live if touch input is added") read as
   a certificate that the one-pointer case had been checked to the same standard;
   it had not. **A flagged weak point vouches for nothing but itself.**
+- 2026-08-22: **LIVE PARAMETER AUDIBILITY SHIPPED — F3 + F13 + the banked
+  `reload_snapshot`/`silence_all` follow-up, all ONE defect** (merged; lanes on
+  the MERGED tree recorded at the end of this entry).
+  **REPRODUCED FIRST, as rendered audio** — new tests in
+  `src-tauri/src/audio/live_edit_audibility.rs` on a harness extension
+  (`rendered_rms::render_snapshot_with_edits` drops an `AudioCommand` into the
+  stream mid-render, exactly as an IPC command lands between two audio-thread
+  `render` calls; plus `stats_window`/`db_ratio`). Every expectation is a
+  CONTROL RENDER of the same note played from the start at the edited value,
+  never a transcribed dB figure.
+  **THE MEASUREMENT CORRECTED THE AUDIT.** All three findings were
+  `Sequencer::reload_snapshot` calling `silence_all`, and the failure was far
+  worse than "stutter"/"inaudible": every mid-note `ReloadSequence` rendered
+  **rms 0.00000** for the rest of the note (key-off on every sounding channel
+  + blanket attenuation `0x0F` on all four PSG channels). A volume ride did not
+  zipper, it muted the mix for the length of the drag. 8 tests red on main.
+  **FIX (backend):** `reload_snapshot` diffs instead of silencing. Each channel
+  with an active note is re-identified in the new snapshot by `ChannelType`
+  (NOT index — indices are `BTreeMap` positions over non-muted tracks and shift
+  on mute/solo/delete) and matched to a NoteOn sounding the same pitch across
+  the current tick. A survivor keeps its key-on and gets a live reprogram from
+  the NEW snapshot (FM patch regs when changed, always the carrier TLs, pan;
+  PSG envelope swapped under the running player keeping its step index) with NO
+  key-off/key-on, so the envelope keeps its phase. An orphan gets a targeted
+  key-off on that channel alone. Untouched channels now receive nothing.
+  `silence_all` stays for stop/seek/loop-wrap. New
+  `SequencerOutput::PsgEnvelopeUpdate`; `ChannelType: PartialEq`; the FM patch
+  and carrier-TL register tables extracted into `write_fm_patch` /
+  `write_fm_carrier_tls` shared by the note-on and live paths (two tables
+  drifting apart is the FM-preview bug); FM patch/pan cache preserved across a
+  reload (it describes hardware state), so a volume-only edit costs 4 TL writes
+  instead of a 27-register reprogram.
+  **FIX (frontend):** `FmEditor` AND `PsgEditor` reload after a successful
+  commit — **PsgEditor had the identical hole; the audit only inspected
+  FmEditor**. New `src/utils/liveReload.ts` coalesces reloads for continuous
+  gestures, self-clocked by the IPC round trip rather than a timer (leading
+  edge immediate + one trailing reload per in-flight window), so a 20-event
+  drag costs 2 snapshot rebuilds. Every input event still commits its value.
+  **RED-FIRST DISCIPLINE:** the 4 "must still go silent" regression tests
+  (delete note, mute track, delete PSG note, retune) were proven red by
+  sabotaging the orphan key-off; the 6 UI wiring tests by reverting each call
+  site; the coalescer tests by degrading it to a naive call and to
+  leading-edge-only.
+  **RATIFIED-PENDING (agent calls, flagged):** channel identity = `ChannelType`
+  equality; survivor test = same pitch, `start < tick < start+duration`;
+  preserve the FM register cache across reload; coalesce by round trip rather
+  than rAF/debounce; keep per-event `updateTrack` and coalesce only the reload.
+  **DELIBERATELY OUT OF SCOPE (documented in the audit, do not re-derive):** a
+  retuned note is not re-articulated (would re-attack during a drag); PSG
+  noise-mode edits apply from the next note-on (re-writing the noise register
+  resets the LFSR); SSG-EG-only edits do not trigger a live reprogram
+  (`last_fm_patch` caches the 25 packed bytes, which exclude SSG-EG — no UI
+  exposes it); DAC has no per-note register state. F4 (audition on ch0) is a
+  separate parcel and was not touched.
+  **OWNER GATE OPEN (by-ear, cannot be checked from an agent):** drag an FM
+  knob hard while looping — timbre must move under your hand with no re-attack
+  and no gap; ride a track volume while a SECOND lane sustains — the other lane
+  must be completely undisturbed; ride it while a PSG envelope voice sustains —
+  no re-attack. Play-test script items 3 and 5 in the feel audit were rewritten
+  with the new expected behaviour.
+  **DRIVE-BY DEFECT FOUND AND FIXED (flagged for ratification):**
+  `AudioCommand::Panic` reset both chips without invalidating the sequencer's
+  FM patch cache, so the next note-on saw its patch as "unchanged", skipped the
+  reprogram and keyed on into a blank YM2612 — **the note after a Panic
+  rendered rms 0.00000**. Known-ish (the wart was described in
+  `src/api/library.ts`) but its severity was not: it was called "killing FM
+  output until the next stop/seek", and stop/seek do NOT clear the cache
+  either — only `reload_snapshot` accidentally did, which this parcel removes.
+  Panic now calls the new `Sequencer::invalidate_all_fm_cache()`. Guarded by
+  `a_note_after_panic_reprograms_its_patch` (red-first). Comment in
+  `src/api/library.ts` corrected.
+  **ADJACENT, NOT CLAIMED:** F1 (note-level edits mid-loop) had ALREADY LANDED
+  when this parcel was written — the agent's brief predated that merge and its
+  report calls the branch in-flight; it is not. This change is what makes those
+  already-shipped PianoRoll reloads gapless, and it touches none of their call
+  sites, so the two compose without rework.
 
 ## EXECUTION HANDOFF (cold start — read this first)
 

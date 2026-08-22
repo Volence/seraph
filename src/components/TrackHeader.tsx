@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Track } from "../types/model";
 import * as ipc from "../api/ipc";
 import * as library from "../api/library";
+import { scheduleReloadSequence } from "../utils/liveReload";
 import styles from "./TrackHeader.module.css";
 
 interface TrackHeaderProps {
@@ -201,7 +202,11 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
       track.muted, track.solo, vol, track.pan, track.pitchOffset,
     );
     onUpdate();
-    ipc.reloadSequence();
+    // One change event per pixel of the drag: coalesce, or a volume ride
+    // queues snapshot rebuilds faster than the backend can do them (audit
+    // F13). The reload itself no longer disturbs sounding notes, so the
+    // volume moves *in* the note it is riding.
+    scheduleReloadSequence();
   }
 
   async function handlePitchOffset(delta: number, e: React.MouseEvent) {

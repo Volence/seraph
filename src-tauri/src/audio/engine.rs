@@ -260,6 +260,10 @@ impl AudioEngine {
             AudioCommand::Panic => {
                 self.ym2612.reset();
                 self.sn76489.reset();
+                // Resetting the chip invalidates every cached register, so the
+                // next note-on must reprogram its patch in full rather than
+                // trusting `last_fm_patch` and keying on into a blank YM2612.
+                self.sequencer.invalidate_all_fm_cache();
                 self.ym_clock_accumulator = 0.0;
                 self.psg_clock_accumulator = 0.0;
                 self.dac_samples = None;
@@ -355,6 +359,33 @@ impl AudioEngine {
                             silence_on_end,
                             delay_ticks: 0,
                         });
+                    }
+                }
+                SequencerOutput::PsgEnvelopeUpdate { hw_ch, envelope, loop_point, volume_atten, silence_on_end } => {
+                    // Live edit under a sounding note: swap the envelope and
+                    // attenuation into the RUNNING player, keeping its step
+                    // index so the note does not re-attack, then apply the
+                    // current step immediately instead of waiting for the next
+                    // 60 Hz envelope tick.
+                    let write = if let Some(player) = self.psg_envelopes.get_mut(hw_ch as usize).and_then(|p| p.as_mut()) {
+                        if envelope.is_empty() {
+                            None
+                        } else {
+                            player.index = player.index.min(envelope.len());
+                            player.envelope = envelope;
+                            player.loop_point = loop_point;
+                            player.volume_atten = volume_atten;
+                            player.silence_on_end = silence_on_end;
+                            let step = player.index.saturating_sub(1).min(player.envelope.len() - 1);
+                            let final_vol = player.envelope[step].saturating_sub(volume_atten);
+                            let attenuation = 15u8.saturating_sub(final_vol);
+                            Some(0x90 | (player.hw_ch << 5) | (attenuation & 0x0F))
+                        }
+                    } else {
+                        None
+                    };
+                    if let Some(data) = write {
+                        self.sn76489.write(data);
                     }
                 }
                 SequencerOutput::PsgEnvelopeStop { hw_ch } => {

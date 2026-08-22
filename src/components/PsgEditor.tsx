@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { PsgInstrument, NoiseMode } from "../types/model";
 import * as ipc from "../api/ipc";
 import { librarySaveFromProject } from "../api/library";
+import { scheduleReloadSequence } from "../utils/liveReload";
 import { StepGraphEditor } from "../widgets/StepGraphEditor";
 import styles from "./PsgEditor.module.css";
 
@@ -28,6 +29,11 @@ export function PsgEditor({ instrumentId, onSavedToLibrary }: PsgEditorProps) {
     setInstrument(updated);
     try {
       await ipc.updatePsgInstrument(instrumentId, updated);
+      // Same seam as FmEditor (audit F3): the envelope is embedded per NoteOn,
+      // so without a reload an edit is only heard after stop/play. A reload
+      // now swaps the envelope under a sounding note without re-attacking it.
+      // Coalesced: the step-graph editor drags.
+      scheduleReloadSequence();
     } catch {
       load();
     }

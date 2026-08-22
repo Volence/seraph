@@ -224,7 +224,7 @@ only (`App.tsx:244`) — dead under CapsLock/Shift. No keymap/help panel (G39 bo
 |----|---------|-------|----------|-------|-------|
 | F1 | Note-level edits inaudible while transport runs (PianoRoll never reloads sequence) | missing | **critical** | PianoRoll.tsx (no reloadSequence); commands.rs:960-971 | G30 fixed regions only — notes missed |
 | F2 | Silent-track trap: instrument-less lanes drop notes with zero feedback; audition no-ops | feedback + discoverability | **critical** | manager.rs:825,1030-1036; PianoRoll.tsx:353-354; TrackHeader.tsx | adjacent to booked "stale lane name" wart |
-| F3 | FM/PSG param edits inaudible during playback (snapshot embeds patches; editors don't reload) | missing | **high** | FmEditor.tsx:30-38; manager.rs:833-842 | — |
+| F3 | FM/PSG param edits inaudible during playback (snapshot embeds patches; editors don't reload) | missing | **high** | FmEditor.tsx:30-38; manager.rs:833-842 | **FIXED** 2026-08-22 (`fix/live-param-audibility`) |
 | F4 | All previews/auditions hardcode ch0 → auditioning fights the playing mix | clunky | **high** | commands.rs:386-401,487-501; engine.rs:248-259 | — |
 | F5 | No QWERTY note input / step record anywhere | missing | **high** | grep; PianoKeys.tsx:18-26 | G36 (booked, owner call open) |
 | F6 | Double-click-per-note placement; no pencil/paint; right-click inert (no erase/menu) | clunky | **high** | PianoRollCanvas.tsx:332-352,590-592 | G13/G14 (booked) |
@@ -234,7 +234,7 @@ only (`App.tsx:244`) — dead under CapsLock/Shift. No keymap/help panel (G39 bo
 | F10 | No section markers / region names / colors — song assembly by bar-number memory | missing | **high** | song.rs:60-67; TimelineRuler.tsx:84-106 | — |
 | F11 | No h-scrollbar/minimap/zoom-to-fit; arrangement zoom not cursor-anchored | clunky | med | ArrangementView.module.css:26-27; useArrangementZoom.ts:40-44 | G31/G32 (booked) |
 | F12 | No song end: playback runs forever past last note; export needs manual duration | missing (design Q) | med | sequencer/mod.rs:137-155; TopBar.tsx:93-109 | booked design Q — noted only |
-| F13 | Volume-slider ride = reload (silence_all+reprogram) per input event during playback | feedback | **high** | TrackHeader.tsx:162-171; sequencer/mod.rs:65-77 | — |
+| F13 | Volume-slider ride = reload (silence_all+reprogram) per input event during playback | feedback | **high** | TrackHeader.tsx:162-171; sequencer/mod.rs:65-77 | **FIXED** 2026-08-22 (`fix/live-param-audibility`) |
 | F14 | No master meter/clip latch; meters dead when stopped; master vol resets per launch | missing | med | TrackHeader.tsx:44-48,184; TopBar.tsx:46 | — |
 | F15 | Zero view-state persistence: reopen loses roll/zoom/scroll/loop/snap/panel/filters | missing | **critical** | manager.rs:308-341; song.rs; grep (no localStorage) | — |
 | F16 | Cold-start ceremony: forced Browse, no default location/scratch project, no recents | clunky | med | NewProjectDialog.tsx:70-82; App.tsx:260-276 | — |
@@ -279,14 +279,19 @@ Confirms/refutes the highest-severity UNVERIFIED findings, in order:
    play. *Expected: total silence, no cue anywhere. Also click the piano-roll keys
    column — expected: nothing.*
 3. **(F3, 2 min)** While the FM1 note loops, open its instrument, drag TL/algorithm
-   hard. *Expected: loop timbre unchanged until stop/play; the editor's preview keys
-   DO reflect the change.*
+   hard. *Was: loop timbre unchanged until stop/play. **Now expected (2026-08-22
+   fix, needs ears): the timbre moves under your hand, inside the sustaining
+   note, with no re-attack and no gap.** Drag fast — nothing should stutter.*
 4. **(F4, 2 min)** While looping with FM1 sounding, hold-audition a library entry, then
    click piano-roll keys. *Expected: FM1's part drops/glitches during audition and
    recovers on its next note-on.*
 5. **(F13, 2 min)** Add notes on two FM lanes, play, then ride one track's volume
-   slider slowly. *Listen for stutter/zipper — every slider event silences and
-   reprograms all channels.*
+   slider slowly, then fast. *Was: every slider event silenced and reprogrammed
+   all channels (measured: the mix went to rms 0 for the length of the drag).
+   **Now expected (2026-08-22 fix, needs ears): the ridden lane's level follows
+   the slider inside its sustaining note, and the OTHER lane is completely
+   undisturbed.** Also ride it while a PSG lane sustains an envelope voice —
+   that lane must not re-attack.*
 6. **(F8, 1 min)** Give a PSG lane a looping envelope voice (loop point set), click a
    note in its piano roll once. *Expected per code: it rings until something else
    stops previews.*
@@ -301,11 +306,48 @@ Confirms/refutes the highest-severity UNVERIFIED findings, in order:
 - **Nothing blocked.** All scenarios were traceable in code.
 - UNVERIFIED (audible/live confirmation needed, covered by the script above):
   F1 (note edits inaudible mid-loop — code-certain, feel-severity needs ears),
-  F3 (patch edits inaudible mid-loop), F4 (ch0 steal audibility), F8 (endless PSG
-  audition), F13 (volume-ride stutter — the reload storm may or may not be audible
-  at 60 ms poll + per-event reloads), and the exact audible cost of `silence_all`
-  on every region-op reload during playback (brief note-cut per commit,
-  `sequencer/mod.rs:70`).
+  ~~F3~~, F4 (ch0 steal audibility), F8 (endless PSG audition), ~~F13~~, and
+  ~~the exact audible cost of `silence_all` on every reload~~.
+
+### F3 / F13 / `silence_all` — VERIFIED then FIXED (2026-08-22)
+
+Reproduced as rendered audio (`src-tauri/src/audio/live_edit_audibility.rs`,
+harness `rendered_rms::render_snapshot_with_edits`), NOT by ear and NOT by
+register inspection. The measurement corrected the audit on two points:
+
+- **All three findings were one defect**, `Sequencer::reload_snapshot` calling
+  `silence_all`.
+- **It was worse than "stutter" or "inaudible".** Every mid-note
+  `ReloadSequence` rendered **rms 0.00000** for the remainder of the note —
+  `silence_all` key-offs every sounding channel *and* blanket-writes
+  attenuation `0x0F` to all four PSG channels. So a volume ride did not zipper,
+  it muted the mix for the length of the drag; a knob turn (once wired) would
+  have done the same. F13's severity was understated, not overstated.
+
+Fixed by making `reload_snapshot` diff instead of silence: sounding notes are
+re-identified in the new snapshot (by `ChannelType`, not index) and carried
+across with a live reprogram; only genuine orphans get a targeted key-off.
+
+Two corrections to the audit's text while here:
+
+- **PsgEditor had the same hole as FmEditor** (the audit only inspected
+  `FmEditor.tsx`) — `update` called `updatePsgInstrument` and nothing else.
+  Both now reload.
+- **F13's "undo-grouped (nice)" still holds**, and the per-event `updateTrack`
+  is deliberately kept — every input event must commit its value. Only the
+  *reload* coalesces now (`src/utils/liveReload.ts`).
+
+Deliberately still out of scope, recorded so nobody re-derives them:
+
+- A **retuned** note (pitch changed while sounding) is not re-articulated — it
+  is keyed off and waits for the next note-on, as before. Re-articulating on
+  every reload would re-attack during a drag.
+- **PSG noise-mode** edits apply from the next note-on only: re-writing the
+  noise register resets the SN76489 LFSR, which is an audible re-attack.
+- **SSG-EG-only** edits do not trigger a live reprogram — `last_fm_patch`
+  caches the 25 packed bytes, which exclude SSG-EG. Pre-existing, and no UI
+  currently exposes SSG-EG.
+- **DAC**: a streaming sample has no per-note register state to refresh.
 - The full G1–G41 enumeration is not present verbatim in the queue doc (only ~25
   G-numbers are named in the Log); cross-refs here cover the named ones. If the full
   list lives elsewhere, a few "no G-ref" rows above (F7, F10, F18) may overlap it.

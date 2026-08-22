@@ -1,6 +1,10 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import type { Note } from "../types/model";
-import { notesIntersectingRect } from "../utils/pianoRollEdit";
+import {
+  notesIntersectingRect,
+  marqueeRectFromView,
+  marqueePreviewSelection,
+} from "../utils/pianoRollEdit";
 import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
 import styles from "./PianoRollCanvas.module.css";
 
@@ -85,6 +89,10 @@ export function PianoRollCanvas({
   // Marquee (rubber-band) selection; x in view px, y in canvas/content px.
   const marqueeRef = useRef<{ startX: number; startY: number; currentX: number; currentY: number; additive: boolean } | null>(null);
   const [isMarquee, setIsMarquee] = useState(false);
+  // Live preview of what the in-flight marquee will select on mouseup:
+  // while non-null, draw() highlights these indices instead of
+  // selectedNotes. The actual selection still commits on mouseup.
+  const marqueePreviewRef = useRef<Set<number> | null>(null);
 
   const totalNotes = maxPitch - minPitch + 1;
   const canvasHeight = totalNotes * rowHeight;
@@ -164,6 +172,10 @@ export function PianoRollCanvas({
       }
     }
 
+    // During a marquee drag the preview set drives the highlight so the
+    // user sees what mouseup will select; otherwise the committed selection.
+    const highlight = marqueePreviewRef.current ?? selectedNotes;
+
     for (let i = 0; i < notes.length; i++) {
       const note = notes[i];
       if (note.pitch < minPitch || note.pitch > maxPitch) continue;
@@ -176,7 +188,7 @@ export function PianoRollCanvas({
       const y = row * rowHeight + 1;
       const h = rowHeight - 2;
 
-      const selected = selectedNotes.has(i);
+      const selected = highlight.has(i);
       ctx.fillStyle = selected ? channelColor : channelColor + "cc";
       ctx.fillRect(drawX, y, w, h);
       ctx.strokeStyle = selected ? "#ffffff" : channelColor;
@@ -339,6 +351,9 @@ export function PianoRollCanvas({
     }
 
     marqueeRef.current = { startX: x, startY: y, currentX: x, currentY: y, additive: e.shiftKey };
+    // Seed the live preview: an empty rect hits nothing, so a plain press
+    // previews the clear and Shift keeps the selection until notes hit.
+    marqueePreviewRef.current = marqueePreviewSelection(selectedNotes, [], e.shiftKey);
     setIsMarquee(true);
   }
 
@@ -403,29 +418,34 @@ export function PianoRollCanvas({
       const rect = canvas.getBoundingClientRect();
       mq.currentX = e.clientX - rect.left;
       mq.currentY = e.clientY - rect.top;
+      // Live preview: highlight what this rect would select on mouseup.
+      const hits = notesIntersectingRect(
+        notes,
+        marqueeRectFromView(
+          mq.startX, mq.startY, mq.currentX, mq.currentY,
+          scrollLeft, ticksPerPixel, maxPitch, rowHeight,
+        ),
+      );
+      marqueePreviewRef.current = marqueePreviewSelection(selectedNotes, hits, mq.additive);
       draw();
     }
 
     function handleMouseUp() {
       const mq = marqueeRef.current;
       marqueeRef.current = null;
+      marqueePreviewRef.current = null;
       setIsMarquee(false);
       if (!mq) return;
       const movedEnough =
         Math.abs(mq.currentX - mq.startX) > CLICK_SLOP || Math.abs(mq.currentY - mq.startY) > CLICK_SLOP;
       if (movedEnough) {
-        const x1 = Math.min(mq.startX, mq.currentX);
-        const x2 = Math.max(mq.startX, mq.currentX);
-        const y1 = Math.min(mq.startY, mq.currentY);
-        const y2 = Math.max(mq.startY, mq.currentY);
-        const hits = notesIntersectingRect(notes, {
-          tickMin: pixelToTick(x1),
-          tickMax: pixelToTick(x2),
-          // Rows are drawn top-down from maxPitch, so the top edge is the
-          // high pitch; every row the rect touches is included.
-          pitchMin: maxPitch - Math.floor(y2 / rowHeight),
-          pitchMax: maxPitch - Math.floor(y1 / rowHeight),
-        });
+        const hits = notesIntersectingRect(
+          notes,
+          marqueeRectFromView(
+            mq.startX, mq.startY, mq.currentX, mq.currentY,
+            scrollLeft, ticksPerPixel, maxPitch, rowHeight,
+          ),
+        );
         onMarqueeSelect(hits, mq.additive);
       } else if (!mq.additive) {
         // Plain click on empty grid: clear the selection.
@@ -440,7 +460,7 @@ export function PianoRollCanvas({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isMarquee, notes, maxPitch, rowHeight, ticksPerPixel, scrollLeft, onMarqueeSelect, onClearSelection, draw]);
+  }, [isMarquee, notes, maxPitch, rowHeight, ticksPerPixel, scrollLeft, selectedNotes, onMarqueeSelect, onClearSelection, draw]);
 
   useEffect(() => {
     if (!isDrawing) return;

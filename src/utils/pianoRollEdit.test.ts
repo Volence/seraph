@@ -4,6 +4,8 @@ import {
   OCTAVE_SEMITONES,
   PITCH_RANGES,
   notesIntersectingRect,
+  marqueeRectFromView,
+  marqueePreviewSelection,
   transposeNotes,
   nudgeNotes,
   type MarqueeRect,
@@ -152,5 +154,59 @@ describe("nudgeNotes", () => {
 
   it("returns null for a stale index", () => {
     expect(nudgeNotes([note(0, 60)], new Set([5]), 120, REGION)).toBeNull();
+  });
+});
+
+describe("marqueeRectFromView", () => {
+  // View geometry: scrollLeft 200 view-px, 2 ticks per px, rows drawn
+  // top-down from pitch 95, 16 px per row.
+  const scrollLeft = 200;
+  const tpp = 2;
+  const maxPitch = 95;
+  const rowHeight = 16;
+
+  it("maps view px to ticks and rows to an inclusive pitch band", () => {
+    const r = marqueeRectFromView(50, 0, 150, 40, scrollLeft, tpp, maxPitch, rowHeight);
+    // Ticks: (viewX + scrollLeft) * ticksPerPixel.
+    expect(r.tickMin).toBe((50 + scrollLeft) * tpp);
+    expect(r.tickMax).toBe((150 + scrollLeft) * tpp);
+    // y 0..40 touches rows 0..2 => pitches maxPitch-2 .. maxPitch.
+    expect(r.pitchMax).toBe(maxPitch);
+    expect(r.pitchMin).toBe(maxPitch - Math.floor(40 / rowHeight));
+  });
+
+  it("normalizes drags in any direction (start below/right of end)", () => {
+    const fwd = marqueeRectFromView(50, 0, 150, 40, scrollLeft, tpp, maxPitch, rowHeight);
+    const rev = marqueeRectFromView(150, 40, 50, 0, scrollLeft, tpp, maxPitch, rowHeight);
+    expect(rev).toEqual(fwd);
+  });
+
+  it("agrees with notesIntersectingRect for a mid-drag rect", () => {
+    // The live-preview path: the rect from an in-flight drag must hit the
+    // same notes the mouseup commit would.
+    const notes = [note(500, 95, 100), note(700, 94, 100), note(5000, 95, 100)];
+    const r = marqueeRectFromView(50, 0, 150, 40, scrollLeft, tpp, maxPitch, rowHeight);
+    // Rect covers ticks 500..700, pitches 93..95: note 0 overlaps in time,
+    // note 1 only touches the boundary (tick 700 == tickMax, excluded),
+    // note 2 is far right.
+    expect(notesIntersectingRect(notes, r)).toEqual([0]);
+  });
+});
+
+describe("marqueePreviewSelection", () => {
+  it("previews a plain marquee as a replacement (hits only)", () => {
+    expect(marqueePreviewSelection(new Set([0, 3]), [1, 2], false)).toEqual(new Set([1, 2]));
+  });
+
+  it("keeps already-selected notes highlighted in additive (Shift) mode", () => {
+    expect(marqueePreviewSelection(new Set([0, 3]), [1, 2], true)).toEqual(new Set([0, 1, 2, 3]));
+  });
+
+  it("previews the clear for a plain drag over nothing", () => {
+    expect(marqueePreviewSelection(new Set([0, 3]), [], false)).toEqual(new Set());
+  });
+
+  it("leaves the selection alone for an additive drag over nothing", () => {
+    expect(marqueePreviewSelection(new Set([0, 3]), [], true)).toEqual(new Set([0, 3]));
   });
 });

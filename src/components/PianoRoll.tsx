@@ -59,6 +59,10 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
 
 export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
+  // The voice a note WITHOUT a per-note override inherits (region default,
+  // else track default) — the baseline the canvas compares per-note voices
+  // against when deciding to draw a distinct voice color.
+  const [defaultVoiceId, setDefaultVoiceId] = useState<string | null>(null);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
   const [scrollTop, setScrollTop] = useState(0);
@@ -131,6 +135,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       return;
     }
     setNotes(r.notes);
+    setDefaultVoiceId(r.instrumentId ?? track?.instrumentId ?? null);
   }, [region.trackId, region.regionId]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -479,6 +484,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           playheadTick={playheadTick}
           playing={playing}
           suppressFollow={loopEnabled}
+          defaultVoiceId={defaultVoiceId}
         />
       </div>
       <VelocityLane

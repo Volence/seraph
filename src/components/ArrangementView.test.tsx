@@ -260,7 +260,7 @@ describe("ArrangementView", () => {
         expect(ipc.addRegion).toHaveBeenCalledWith(fmTrack.id, 0, oneBar),
       );
       await waitFor(() =>
-        expect(ipc.addNote).toHaveBeenCalledWith(fmTrack.id, "region-new", 0, 60, 100, 240),
+        expect(ipc.addNote).toHaveBeenCalledWith(fmTrack.id, "region-new", 0, 60, 100, 240, null),
       );
     });
   });

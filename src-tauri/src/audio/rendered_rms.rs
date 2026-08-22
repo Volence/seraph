@@ -79,7 +79,6 @@ pub fn one_note_snapshot(
             channel_type,
             volume: track_volume,
             pan: 0xC0,
-            modulation: None,
             noise_reg: 0xE4,
             events: vec![
                 SequencerEvent::NoteOn {

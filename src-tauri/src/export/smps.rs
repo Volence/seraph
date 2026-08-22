@@ -148,6 +148,9 @@ pub enum SmpsEvent {
 
 /// Encode notes into SmpsEvents. Notes must be sorted by tick.
 /// Gaps between notes become rests. Long durations split with ties.
+// Kept: the no-voice-map entry point, referenced only from `#[cfg(test)]`
+// tests in this module; production goes through `_with_voices` directly.
+#[allow(dead_code)]
 pub fn encode_channel_events(
     notes: &[(u64, u8, u64)],
     region_duration: u64,

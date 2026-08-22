@@ -339,7 +339,6 @@ fn psg_snapshot(envelope: Vec<u8>, track_volume: u8) -> SequencerSnapshot {
     one_note_snapshot(
         ChannelType::Psg(0),
         InstrumentData::PsgEnvelope {
-            period: 0,
             envelope: Arc::new(envelope),
             // Loop so the envelope holds a steady level for the whole render.
             loop_point: Some(0),

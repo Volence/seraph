@@ -412,6 +412,9 @@ impl ProjectManager {
         self.reset_edit_state();
     }
 
+    // Kept: project-lifecycle predicate, referenced only from `#[cfg(test)]`
+    // tests in this module.
+    #[allow(dead_code)]
     pub fn is_open(&self) -> bool {
         self.project_path.is_some()
     }
@@ -984,11 +987,6 @@ impl ProjectManager {
                 crate::model::song::Pan::Right => 0x40,
                 crate::model::song::Pan::Center => 0xC0,
             };
-            let modulation = tracks[0].modulation.as_ref().map(|m| {
-                crate::sequencer::snapshot::ModulationParams {
-                    wait: m.wait, speed: m.speed, delta: m.delta, steps: m.steps,
-                }
-            });
             let noise_reg = if matches!(channel_type, ChannelType::PsgNoise) {
                 if let Some(ref inst_id) = tracks[0].instrument_id {
                     self.instruments.psg.iter()
@@ -1005,7 +1003,6 @@ impl ProjectManager {
                 channel_type,
                 volume,
                 pan: pan_byte,
-                modulation,
                 noise_reg,
                 events,
                 overlaps,
@@ -1051,7 +1048,6 @@ impl ProjectManager {
             ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
                 let inst = self.instruments.psg.iter().find(|i| &i.id == inst_id)?;
                 Some(InstrumentData::PsgEnvelope {
-                    period: 0,
                     envelope: Arc::new(inst.volume_sequence.clone()),
                     loop_point: inst.loop_point,
                     silence_on_end: inst.silence_on_end,
@@ -1097,7 +1093,6 @@ impl ProjectManager {
             ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
                 let inst = self.instruments.psg.iter().find(|i| i.id == inst_id)?;
                 Some(InstrumentData::PsgEnvelope {
-                    period: 0,
                     envelope: Arc::new(inst.volume_sequence.clone()),
                     loop_point: inst.loop_point,
                     silence_on_end: inst.silence_on_end,
@@ -1143,7 +1138,6 @@ impl ProjectManager {
             ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => {
                 let inst = self.instruments.psg.iter().find(|i| &i.id == inst_id)?;
                 Some(InstrumentData::PsgEnvelope {
-                    period: 0,
                     envelope: Arc::new(inst.volume_sequence.clone()),
                     loop_point: inst.loop_point,
                     silence_on_end: inst.silence_on_end,

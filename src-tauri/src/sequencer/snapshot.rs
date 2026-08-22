@@ -16,14 +16,17 @@ pub enum ChannelType {
 #[derive(Debug, Clone)]
 pub enum InstrumentData {
     FmPatch { bytes: [u8; 25], ssg_eg: [u8; 4] },
-    PsgEnvelope { period: u16, envelope: Arc<Vec<u8>>, loop_point: Option<usize>, silence_on_end: bool },
+    PsgEnvelope { envelope: Arc<Vec<u8>>, loop_point: Option<usize>, silence_on_end: bool },
     DacSample { samples: Arc<Vec<u8>>, sample_rate: u32 },
 }
 
 #[derive(Debug, Clone)]
 pub enum SequencerEvent {
     NoteOn { tick: u64, pitch: u8, velocity: u8, detune: i8, duration_ticks: u64, instrument: InstrumentData, modulation: Option<ModulationParams>, pan_override: Option<u8> },
-    NoteOff { tick: u64, pitch: u8 },
+    // FINDING: `pitch` carries the correct (transposed) pitch but `process_event`
+    // keys off unconditionally, so a stale NoteOff truncates a later overlapping
+    // note on the same channel. Kept as the evidence for that gap.
+    NoteOff { tick: u64, #[allow(dead_code)] pitch: u8 },
 }
 
 impl SequencerEvent {
@@ -57,7 +60,6 @@ pub struct ChannelSequence {
     pub channel_type: ChannelType,
     pub volume: u8,
     pub pan: u8,
-    pub modulation: Option<ModulationParams>,
     pub noise_reg: u8,
     pub events: Vec<SequencerEvent>,
     pub overlaps: Vec<OverlapWarning>,

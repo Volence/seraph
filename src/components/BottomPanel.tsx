@@ -14,6 +14,8 @@ interface BottomPanelProps {
   projectMeta: SongMetadata;
   /** Seek cursor (absolute ticks); the piano roll's paste anchor. */
   seekTick: number;
+  /** Seek request from the piano-roll ruler (absolute ticks); App owns the cursor. */
+  onSeek: (tick: number) => void;
   /** Forwarded to the editors' "Save to library" buttons. */
   onSavedToLibrary?: () => void;
 }
@@ -21,7 +23,7 @@ interface BottomPanelProps {
 const MIN_HEIGHT = 120;
 const MAX_HEIGHT_RATIO = 0.8;
 
-export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion, playing, projectMeta, seekTick, onSavedToLibrary }: BottomPanelProps) {
+export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion, playing, projectMeta, seekTick, onSeek, onSavedToLibrary }: BottomPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [height, setHeight] = useState(300);
   const dragging = useRef(false);
@@ -74,7 +76,7 @@ export function BottomPanel({ selectedInstrument, selectedRegion, onCloseRegion,
       {!collapsed && (
         <div className={styles.editor}>
           {showPianoRoll ? (
-            <PianoRoll region={selectedRegion} onClose={onCloseRegion} playing={playing} projectMeta={projectMeta} seekTick={seekTick} />
+            <PianoRoll region={selectedRegion} onClose={onCloseRegion} playing={playing} projectMeta={projectMeta} seekTick={seekTick} onSeek={onSeek} />
           ) : (
             <>
               {!selectedInstrument && (

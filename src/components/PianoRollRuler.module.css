@@ -1,0 +1,11 @@
+.rulerContainer {
+  flex: 1;
+  overflow: hidden;
+  height: 20px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.ruler {
+  display: block;
+}

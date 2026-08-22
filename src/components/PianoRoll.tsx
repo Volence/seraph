@@ -3,6 +3,8 @@ import type { Note, SelectedRegion, SongMetadata } from "../types/model";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { PianoRollKeys, MELODIC_KEYS_WIDTH, DAC_KEYS_WIDTH } from "./PianoRollKeys";
 import { PianoRollCanvas } from "./PianoRollCanvas";
+import { PianoRollRuler } from "./PianoRollRuler";
+import { zoomAroundPixel } from "../utils/zoomDrag";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
@@ -20,6 +22,8 @@ interface PianoRollProps {
   projectMeta: SongMetadata;
   /** The white seek cursor (absolute song ticks); anchors Ctrl+V paste. */
   seekTick: number;
+  /** Ruler click: seek to this absolute song tick (App owns the cursor). */
+  onSeek: (tick: number) => void;
 }
 
 const GRID_OPTIONS: { label: string; divisor: number }[] = [
@@ -50,7 +54,7 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
   64: "Power Kick",
 };
 
-export function PianoRoll({ region, onClose, playing, projectMeta, seekTick }: PianoRollProps) {
+export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
@@ -86,17 +90,24 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick }: P
   const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
 
-  function handleZoom(deltaY: number, centerX: number) {
-    const zoomFactor = deltaY > 0 ? 1.15 : 0.87;
+  // Shared zoom seam: clamp, then keep the tick under `centerX` fixed.
+  // Used by wheel zoom (fixed steps) and the ruler's vertical drag
+  // (continuous factors).
+  function applyZoomFactor(centerX: number, factor: number) {
     setTicksPerPixel((prev) => {
-      const next = prev * zoomFactor;
       const minTpp = ticksPerBeat / 480;
-      const clamped = Math.max(minTpp, Math.min(next, ticksPerBar * 2));
-      const tickAtCenter = (centerX + pianoScrollLeft) * prev;
-      const newScrollLeft = tickAtCenter / clamped - centerX;
-      setPianoScrollLeft(Math.max(0, newScrollLeft));
+      const clamped = Math.max(minTpp, Math.min(prev * factor, ticksPerBar * 2));
+      // Plain-value inner set: StrictMode double-invokes updaters, and a
+      // plain value stays idempotent where a functional update would
+      // double-apply the scroll shift.
+      const view = zoomAroundPixel({ ticksPerPixel: prev, scrollLeft: pianoScrollLeft }, centerX, clamped);
+      setPianoScrollLeft(view.scrollLeft);
       return clamped;
     });
+  }
+
+  function handleZoom(deltaY: number, centerX: number) {
+    applyZoomFactor(centerX, deltaY > 0 ? 1.15 : 0.87);
   }
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const playheadTick = playing ? interpolatedTick - region.startTick : -1;
@@ -403,6 +414,20 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick }: P
           ))}
         </select>
         <button className={styles.closeBtn} onClick={onClose}>x</button>
+      </div>
+      <div className={styles.rulerRow}>
+        <div className={styles.rulerSpacer} style={{ width: keysWidth }} />
+        <PianoRollRuler
+          regionStartTick={region.startTick}
+          regionDurationTicks={region.durationTicks}
+          ticksPerPixel={ticksPerPixel}
+          scrollLeft={pianoScrollLeft}
+          ticksPerBeat={ticksPerBeat}
+          beatsPerBar={projectMeta.timeSignature[0]}
+          onSeek={onSeek}
+          onZoom={applyZoomFactor}
+          onScrollChange={setPianoScrollLeft}
+        />
       </div>
       <div className={styles.body}>
         <PianoRollKeys

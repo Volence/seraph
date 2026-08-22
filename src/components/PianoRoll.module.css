@@ -54,6 +54,17 @@
   background: var(--bg-surface);
 }
 
+.rulerRow {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.rulerSpacer {
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
 .body {
   display: flex;
   flex: 1;

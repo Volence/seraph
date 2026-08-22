@@ -58,12 +58,36 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
   64: "Power Kick",
 };
 
+/** Stable identity for "no notes loaded" — `notes` feeds the canvas draw
+ *  callback's dependency list, so a fresh [] each render would re-draw
+ *  forever. */
+const NO_NOTES: Note[] = [];
+
 export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  // The voice a note WITHOUT a per-note override inherits (region default,
-  // else track default) — the baseline the canvas compares per-note voices
-  // against when deciding to draw a distinct voice color.
-  const [defaultVoiceId, setDefaultVoiceId] = useState<string | null>(null);
+  // Everything fetched for the open region, TAGGED with the region it came
+  // from. This component is not remounted when a different region opens
+  // (BottomPanel renders one persistent PianoRoll, no `key`), so untagged
+  // state would let region A's notes render — and be EDITED through — while
+  // every IPC call already carries region B's ids. Anything not produced by
+  // the current region is simply not the document: it does not render and
+  // cannot be operated on.
+  const [loaded, setLoaded] = useState<{
+    regionId: string;
+    notes: Note[];
+    /** The voice a note WITHOUT a per-note override inherits (region
+     *  default, else track default) — the baseline the canvas compares
+     *  per-note voices against when deciding to draw a distinct color. */
+    defaultVoiceId: string | null;
+    /** Silent-lane cue (F2): build_snapshot drops every note on a track
+     *  with no instrument, and the click-audition no-ops. */
+    hasInstrument: boolean;
+  } | null>(null);
+  const current = loaded?.regionId === region.regionId ? loaded : null;
+  const notes = current?.notes ?? NO_NOTES;
+  const defaultVoiceId = current?.defaultVoiceId ?? null;
+  // Defaults to true so the "silent" badge never flashes before the first
+  // fetch lands — including the fetch after a region switch.
+  const hasInstrument = current?.hasInstrument ?? true;
   // Library-entry drag over the note canvas (kind-compatible only): cues
   // the drop target like TrackHeader's dropTarget outline.
   const [voiceDropOver, setVoiceDropOver] = useState(false);
@@ -78,10 +102,6 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
     hintTimer.current = setTimeout(() => setVoiceHint(null), 5000);
   }
   useEffect(() => () => { if (hintTimer.current) clearTimeout(hintTimer.current); }, []);
-  // Silent-lane cue (F2): build_snapshot drops every note on a track with
-  // no instrument, and the click-audition no-ops — the header must say so.
-  // Starts true so the badge never flashes before the first fetch lands.
-  const [hasInstrument, setHasInstrument] = useState(true);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
   const [scrollTop, setScrollTop] = useState(0);
@@ -117,15 +137,30 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
 
   // The PianoRoll instance persists across region switches (BottomPanel
-  // renders it in place), so zoom/scroll state would otherwise go stale:
-  // opening a small region after a zoomed-out large one left ticksPerPixel
-  // near a bar per pixel — the ruler drew hundreds of one-pixel bars while
-  // the note grid silently hid the broken scale. A different region is a
-  // different document: refit the view to it.
+  // renders it in place), so every piece of REGION-SCOPED state here would
+  // otherwise go stale. A different region is a different document: reset
+  // the state that describes the old one, and only that — the grid-size
+  // selector, the key-column width and the module clipboard are tool/app
+  // state and deliberately survive.
   useEffect(() => {
+    // Zoom/scroll: opening a small region after a zoomed-out large one left
+    // ticksPerPixel near a bar per pixel — the ruler drew hundreds of
+    // one-pixel bars while the note grid silently hid the broken scale.
     setTicksPerPixel(defaultTpp);
     setPianoScrollLeft(0);
-    // defaultTpp is derived from the region each render; refit only on
+    // Selection is a set of INDICES into the previous region's note array.
+    // Carried over, the next Delete / transpose / nudge / cut / voice-drop
+    // silently rewrites arbitrary notes of the region just opened — a live
+    // data-corruption path, not a cosmetic wart. (Clearing it also drops
+    // the cross-tree note-selection signal, so arrangement Delete stops
+    // deferring to a selection that no longer means anything — G1.)
+    setSelectedNotes(new Set());
+    // The inline notice describes the region that produced it ("Only PSG
+    // voices can be dropped on this lane", a backend overlap rejection):
+    // over a different region it is actively misleading.
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setVoiceHint(null);
+    // defaultTpp is derived from the region each render; reset only on
     // region identity change, never on incidental prop churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region.regionId]);
@@ -162,8 +197,19 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  // Which region is open RIGHT NOW, readable from inside an in-flight
+  // fetch's continuation (where the closure only knows the region it was
+  // issued for).
+  const openRegionIdRef = useRef(region.regionId);
+  openRegionIdRef.current = region.regionId;
+
   const refresh = useCallback(async () => {
     const tracks = await ipc.listTracks();
+    // Replies can land out of order across a region switch. A reply for the
+    // region the user already left must not (a) overwrite the open region's
+    // notes, nor (b) reach the close-on-missing path below — that would
+    // close the region just opened because a DIFFERENT one had vanished.
+    if (openRegionIdRef.current !== region.regionId) return;
     const track = tracks.find((t) => t.id === region.trackId);
     const r = track?.regions.find((r) => r.id === region.regionId);
     if (!r) {
@@ -172,10 +218,13 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       onCloseRef.current();
       return;
     }
-    setNotes(r.notes);
-    setDefaultVoiceId(r.instrumentId ?? track?.instrumentId ?? null);
-    // (`r` existing implies `track` exists; optional chain keeps tsc happy.)
-    setHasInstrument(track?.instrumentId != null);
+    setLoaded({
+      regionId: region.regionId,
+      notes: r.notes,
+      defaultVoiceId: r.instrumentId ?? track?.instrumentId ?? null,
+      // (`r` existing implies `track` exists; optional chain keeps tsc happy.)
+      hasInstrument: track?.instrumentId != null,
+    });
   }, [region.trackId, region.regionId]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -603,6 +652,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           onDrop={handleVoiceDrop}
         >
         <PianoRollCanvas
+          regionId={region.regionId}
           notes={notes}
           minPitch={minPitch}
           maxPitch={maxPitch}

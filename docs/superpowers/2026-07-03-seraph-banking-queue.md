@@ -520,6 +520,198 @@ designs target the banked specs (normative); manifest flags carry the gates.
   staleness family, out of scope):** note SELECTION also survives region
   switches — indices point into another region's notes.
 
+- 2026-08-22: **REGION-SWITCH STALENESS CLASS SWEPT** (branch
+  `fix/region-switch-staleness`, commits `4a8c535` + this doc; lanes:
+  cargo 241/0, vitest 286/286 across 28 files, build clean, no bindings
+  drift). Closes the booked selection deferral above AND sweeps its
+  siblings. New `src/components/PianoRoll.regionSwitch.test.tsx` (8 tests,
+  6 red-first).
+
+  **THREE REAL DEFECTS, all fixed in `src/components/PianoRoll.tsx`:**
+  1. *Note selection survives the switch* (the booked item). `selectedNotes`
+     is a Set of INDICES; carried across a switch the next Delete /
+     transpose / nudge / cut / voice-drop rewrites arbitrary notes of the
+     region just opened. Repro pins region B with MORE notes than A so
+     every stale index is IN RANGE — with a smaller B the range guards
+     refuse the edit and the test passes for the wrong reason (this
+     actually happened on the first draft: the transpose case went green
+     until B was enlarged, then showed `updateNote` called 3x on B's
+     notes). Fix: `setSelectedNotes(new Set())` in the existing
+     `region.regionId` effect. Transitively releases the G1 cross-tree
+     note-selection signal (`noteSelection.ts`), which otherwise kept
+     ArrangementView's Delete deferring to a meaningless selection.
+  2. *Stale `notes` during the fetch window.* `notes`/`defaultVoiceId`/
+     `hasInstrument` arrive asynchronously, so between the switch and the
+     reply the component held region A's notes while every IPC call it
+     made already carried region B's ids (Ctrl+A then Delete in that
+     window deleted B's notes by A's count). Fix: the fetched payload is
+     now ONE state object TAGGED with its `regionId`; a mismatch renders
+     as no-notes and cannot be edited.
+  3. *Out-of-order replies.* A `listTracks` reply for the region the user
+     left could overwrite the open region's notes, or reach the
+     close-on-missing path and CLOSE THE REGION JUST OPENED because a
+     different one had vanished. Fix: `openRegionIdRef` guard drops
+     replies whose region is no longer open. (Pre-existing bug, not
+     introduced by the ruler fix.)
+  Also cleared on switch: the inline voice hint (+ its timer) — it names
+  the previous region's channel kind ("Only PSG voices can be dropped on
+  this lane"), so over another region it is actively misleading. Judgment
+  call, flagged for ratification.
+
+  **DESIGN CALL — RESET, NOT KEYED REMOUNT (flagged for ratification).**
+  Keying `<PianoRoll key={regionId}>` in BottomPanel would drop everything
+  wholesale, but the enumeration below shows the subtree holds state that
+  MUST survive: the grid-size selector, the DAC key-column width, and
+  BottomPanel's own height/collapsed. It would also re-init two canvases
+  and re-run the ResizeObserver on every region open. The reset path also
+  matches the ratified zoom fix. Two new tests PIN the survivors
+  (clipboard across a same-instance switch, grid selector across a switch)
+  so a future remount cannot silently throw them away.
+
+  **FULL ENUMERATION (method: enumerated every `useState`/`useRef` in the
+  non-remounted subtree — PianoRoll, PianoRollCanvas, PianoRollRuler,
+  PianoRollKeys, VelocityLane, BottomPanel — plus every module-level
+  `let` in `src/utils/`, then grepped each name for CONSUMERS and COPIERS,
+  not just its declaration site.)**
+  - WRONG (fixed): `selectedNotes`; the fetched `notes` / `defaultVoiceId`
+    / `hasInstrument` trio; out-of-order refresh replies; `voiceHint` +
+    `hintTimer`.
+  - CORRECT to survive: `ticksPerPixel`/`pianoScrollLeft` (already reset,
+    d518c33); `gridIdx` (tool setting); `keysWidth` (already keyed on the
+    DAC/melodic flip, and a user-resized DAC width SHOULD carry between
+    DAC regions); `clipboard.ts` note+region slots and `lastCopied`
+    (cross-region paste is the entire point — documented at the top of the
+    module); `transportMemory.ts` (transport-scoped, region-agnostic);
+    `seekTick` (App-owned, absolute song ticks, and the paste anchor
+    already tests `cursorInRegion`); BottomPanel `collapsed`/`height` and
+    its resize refs (panel chrome, above the region); `onCloseRef`,
+    `canvasRef`/`containerRef`/`animRef` (identity plumbing).
+  - HARMLESS, banked not changed: `voiceDropOver` (a dragover cue; a
+    region switch cannot interleave with a drag on one pointer);
+    `fmPreviewTimer` (a pending preview STOP — firing late is correct);
+    `gestureMutatedRef` (reset by the next `handleGestureStart`; a stray
+    late reload is region-agnostic and cheap); PianoRollRuler's
+    `gestureRef`/`dragging`/`dragAxis` (zoom/scroll/seek only, no note
+    indices); and — see the CORRECTION below — PianoRollCanvas's marquee
+    and pan state.
+    **CORRECTED 2026-08-22 (overseer review), see the follow-up entry:**
+    this bucket originally also held PianoRollCanvas's `drag`,
+    `moveDrag.targets` and `drawingRef`, justified by "switching regions
+    requires a double-click in the arrangement, so the arrangement's own
+    mousedown→mouseup tears the gesture down first — unreachable with a
+    single pointer". **That frame is wrong and must not be reused: a
+    region switch needs no pointer event at all.** Those three were real
+    defects and are fixed.
+  - NOT IN THE SUBTREE: TimelineRuler's `hoverZone`/`gestureRef` (loop
+    handles) live in the ARRANGEMENT, which is not affected by a piano-roll
+    region switch; the zone is recomputed from pointer position on every
+    mousemove anyway.
+
+  **DEFERRED (recorded, not fixed):**
+  - *Vertical view is not refit on switch.* `scrollTop` (PianoRoll state
+    mirroring `PianoRollCanvas`'s `.container` DOM scrollTop) survives,
+    while the horizontal view now refits — an asymmetry. Self-corrects
+    downward (the browser clamps on content shrink and fires `scroll`,
+    which syncs the state and the key-column offset), but switching to a
+    TALLER region keeps the old vertical position. Not fixed because
+    neither surviving NOR resetting to 0 is right: the correct behavior is
+    scroll-to-the-region's-notes, which is a feature, not a bug fix.
+  - *Clipboard is stale across a PROJECT switch, not a region switch.*
+    `noteClipboard` entries carry `instrumentId`s from the old project and
+    `regionClipboard` carries old `trackId`/`regionId`s; App's open/new/
+    import paths clear `selectedRegions` but never the module clipboard.
+    Paste then fails LOUDLY (backend `add_note` validates an explicit
+    voice strictly; the region path's `duplicateRegion` throws and its
+    `addRegion` fallback throws too — as an unhandled rejection, which is
+    the real wart). Different axis from this parcel; the fix is a
+    `resetClipboard()` call on the three project-change paths.
+  - *Doc-claim check:* `PianoRoll.test.tsx`'s existing "clipboard survives
+    switching regions (module state, not component state)" test UNMOUNTS
+    and re-renders, so it never exercised the real no-remount path it
+    describes. The new file's pin does.
+
+  **TAGGED for foreground confirmation (no emulator/app launched here):**
+  open a region, select notes, open a different region — the header
+  selection readout must clear and Delete must do nothing until you
+  re-select; and switching regions must no longer flash the previous
+  region's notes.
+
+- 2026-08-22 (cont.): **IN-FLIGHT GESTURES TAGGED WITH THEIR REGION**
+  (same branch, commit `5fd8988`; lanes: cargo 241/0, vitest 290/290
+  across 28 files, build clean, no bindings drift). Overseer review
+  overturned one verdict in the enumeration above — recorded here in full
+  because the WRONG FRAME is the reusable part.
+
+  **What the frame got wrong.** The HARMLESS verdict on PianoRollCanvas's
+  index-bearing gesture state rested on: *"switching regions requires a
+  double-click in the arrangement, and those gestures' mouseup listeners
+  are on `window`, so the arrangement's own mousedown→mouseup tears the
+  gesture down before `onSelectRegions` fires."* The window-listener half
+  is true. The premise is false: **a region switch needs no pointer event
+  at all.** Grepping every caller of `onSelectRegions` (which is what the
+  standing "enumerate by what TOUCHES the state, not what declares it" bar
+  demanded, and which I applied to declarations and then dropped for the
+  reachability argument) finds two KEYBOARD paths in ArrangementView's
+  window keydown effect: **Ctrl+D duplicate** ("the duplicates become the
+  selection") and **Ctrl+V region paste** ("the pasted regions become the
+  selection"). Neither involves the mouse, so a held drag survives.
+  Method lesson: I reasoned from ONE entry path instead of enumerating the
+  callers. A hedge on a hypothetical ("goes live if touch input is added")
+  reads as a certificate that the live case was checked to the same
+  standard — it was not, and it steered scrutiny away from the real path.
+
+  **Reachability, per gesture (derived from the guards, which differ):**
+  - Ctrl+D carries the G1 guard `if (pianoRollNoteSelectionActive()) return`.
+  - Ctrl+V carries NO G1 guard — only the clipboard arbitration
+    `lastCopiedKind() === "regions"`. **That is the documented design**
+    (you paste whatever you copied last, and the two window-level paste
+    handlers are mutually exclusive), so the fix does NOT belong in a new
+    guard there.
+  - note MOVE drag: mousedown selects the pressed note ⇒ G1 true ⇒ Ctrl+D
+    blocked, **Ctrl+V reachable**.
+  - RESIZE drag: near-edge mousedown does NOT select ⇒ with an empty
+    selection G1 is false ⇒ **both keys reachable**. (Not in the review's
+    reading; found on re-derivation.)
+  - DRAW (double-click): never touches the selection ⇒ **both reachable**.
+  - MARQUEE: commits only on mouseup, so from an empty selection G1 is
+    false ⇒ **both reachable**.
+  - ArrangementView Delete also switches, but to `[]` ⇒ the roll unmounts
+    and the gesture's window listeners go with it ⇒ safe.
+
+  **THREE REAL DEFECTS (red-first, each assertion showing the actual
+  cross-region write, with region B sized LARGER than A so every stale
+  index is in range):**
+  - move: `updateNote("track-1","region-2", 0, 960, 60, 100, 240)` —
+    region A's pitch 60 onto region B's note 0, which lives at tick 1920
+    pitch 72. Fires ONCE PER MOUSEMOVE.
+  - resize: `updateNote("track-1","region-2", 0, 1920, 72, 100, 1200)` —
+    B's note 0 resized to a duration derived from A's note.
+  - draw: `addNote("track-1","region-2", 0, 62, 127, 120)` — a note
+    created in B by a gesture aimed at A. **This one reads no notes, so
+    the `loaded` tag never masked it at all**; the other two were masked
+    only until B's fetch landed.
+
+  **FIX:** `PianoRollCanvas` takes `regionId` as a REQUIRED prop and tags
+  `drag` / `moveDrag` / `drawingRef` with it at mousedown, refusing to
+  commit once it no longer matches (compared through a ref at event time,
+  the same event-time-read pattern `noteSelection.ts` documents). Chosen
+  over resetting the gesture on switch, which would leave the canvas
+  mid-gesture with the button still down. Move/resize refuse only the
+  WRITE and keep the gesture alive so mouseup still closes the undo group
+  its mousedown opened; draw drops its preview so the user is not shown a
+  note that will never commit. The prop is required rather than defaulted
+  because a default silently disables the guard for a caller that forgets
+  it — it immediately caught two fixtures in `PianoRollCanvas.test.tsx`.
+
+  **MARQUEE and PAN stay HARMLESS, with the reasoning replaced.** Not
+  "unreachable" (they are reachable) but "they write nothing". `draw()`
+  renders the band from the very same view pixels `marqueeRectFromView`
+  converts, so what the user sees over the new region is exactly what it
+  selects — refusing it would leave a visible rubber band that does
+  nothing. Pan only offsets `scrollLeft`, is visible, and is corrected by
+  the next scroll. The marquee's continue-to-commit behavior is PINNED by
+  a test so the choice is deliberate rather than incidental.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

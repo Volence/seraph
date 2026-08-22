@@ -492,6 +492,34 @@ designs target the banked specs (normative); manifest flags carry the gates.
   (`fix/pianoroll-ruler-scale`, in flight).** Next audit pick per owner:
   F3/#4 live knob-tweak audibility (shares the F1 reload seam).
 
+- 2026-08-22: **RULER SCALE BUG FIXED — root cause was the SHARED zoom, not
+  the ruler** (merged `d518c33`, one import conflict with the voice parcel
+  unioned by hand; lanes on merged tree: cargo 241/0, vitest 278/278 across
+  27 files, build clean, no bindings drift). The ruler was the only HONEST
+  surface: PianoRollCanvas masks a broken scale (gridlines skipped when
+  denser than 4px, note widths floor at 2px), so the grid looked fine while
+  the ruler correctly drew ~1281 one-pixel bars. Two real paths, both
+  reproduced: (1) stale zoom across region switches — BottomPanel renders
+  ONE persistent PianoRoll (no key), so useState(defaultTpp) never refit
+  when opening a small region after a zoomed-out large one; (2) the
+  zoom-out clamp was a flat `ticksPerBar * 2` = half-pixel bars. FIX: refit
+  ticksPerPixel+scroll on `region.regionId` change; new derived helper
+  `maxPianoRollTicksPerPixel(durationTicks, barTicks)` =
+  max(duration,bar)/MIN_REGION_VIEW_PX (400px floor) replaces the flat
+  clamp. HEADER CHECK: no defect — `floor(start/bar)+1 .. ceil(end/bar)`
+  agrees with the true overlapped-bar span in every constructible case
+  (3 new pinning tests); "Bars 1-3" on an owner-counted 4-bar region is
+  consistent with a region spanning ≤3 bar-slots of current metadata
+  (mid-bar start, or meter/content mismatch) — flagged, unresolved,
+  re-check at the owner gate. RATIFIED: MIN_REGION_VIEW_PX=400;
+  refit-on-switch drops per-region zoom memory (Cubase-style persistence
+  would need a keyed store). **TEST BLIND SPOT CLOSED:** jsdom has no
+  canvas 2D context so `draw()` never ran under test — the new
+  `PianoRollRuler.scale.test.tsx` recording-context harness is the pattern
+  to reuse (TimelineRuler is a candidate). **BOOKED DEFERRED (same
+  staleness family, out of scope):** note SELECTION also survives region
+  switches — indices point into another region's notes.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

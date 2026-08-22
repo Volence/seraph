@@ -55,6 +55,15 @@ beforeEach(() => {
     canRedo: false,
     dirty: false,
   });
+  // The transport/playhead features (merged alongside undo) query playback
+  // state on render — an unmocked call crashes the App under test.
+  vi.mocked(ipc.getPlaybackState).mockResolvedValue({
+    playing: false,
+    tick: 0,
+    loopStart: null,
+    loopEnd: null,
+    channelLevels: [],
+  });
   vi.mocked(library.libraryGames).mockResolvedValue([]);
   vi.mocked(library.libraryList).mockResolvedValue([]);
   vi.mocked(library.libraryWarnings).mockResolvedValue([]);

@@ -101,6 +101,13 @@ beforeEach(() => {
     loopEnd: null,
     channelLevels: [],
   }));
+  // The undo/dirty feature (merged alongside) polls undo state on render —
+  // an unmocked call crashes the App under test.
+  vi.mocked(ipc.getUndoState).mockResolvedValue({
+    canUndo: false,
+    canRedo: false,
+    dirty: false,
+  });
   vi.mocked(lib.libraryList).mockResolvedValue([]);
   vi.mocked(lib.libraryGames).mockResolvedValue([]);
   vi.mocked(lib.libraryWarnings).mockResolvedValue([]);

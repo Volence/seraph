@@ -90,14 +90,27 @@ export function PianoRollCanvas({
   const canvasHeight = totalNotes * rowHeight;
   // Manual scrolls (wheel, pan) suspend follow-playhead briefly (G28).
   const lastManualScrollRef = useRef(-Infinity);
+  // Previous playhead tick, so follow can tell a loop wrap (backward jump)
+  // from the user having scrolled ahead. Ticks, not px: zoom-invariant.
+  const prevPlayheadTickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!playing || playheadTick < 0) return;
+    if (!playing || playheadTick < 0) {
+      prevPlayheadTickRef.current = null;
+      return;
+    }
+    const prevTick = prevPlayheadTickRef.current;
+    prevPlayheadTickRef.current = playheadTick;
     if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;
     const container = containerRef.current;
     if (!container) return;
     const viewWidth = container.getBoundingClientRect().width;
-    const next = followScrollLeft(playheadTick / ticksPerPixel, scrollLeft, viewWidth);
+    const next = followScrollLeft(
+      playheadTick / ticksPerPixel,
+      scrollLeft,
+      viewWidth,
+      prevTick !== null ? prevTick / ticksPerPixel : null,
+    );
     if (next !== null) onScrollLeftChange(next);
   }, [playheadTick, playing, ticksPerPixel, scrollLeft, onScrollLeftChange]);
 

@@ -7,7 +7,29 @@
 > may not be running — check `ListAgents`; coordinate if present, proceed solo if not.
 
 The shared protocol (role, delegation discipline, review bars, landing-lane rules,
-peer protocol) is `empyrean/docs/OVERSEER-PROTOCOL.md`. This file adds only what is
+peer protocol) is `empyrean/docs/OVERSEER-PROTOCOL.md`. **Read it at a committed
+revision, never through the sibling directory path:**
+
+```sh
+git -C ../empyrean fetch origin main -q && git -C ../empyrean show origin/main:docs/OVERSEER-PROTOCOL.md
+```
+
+`../empyrean/` is the empyrean overseer's **live working tree** on this shared
+machine, so the plain path serves whatever is on disk mid-edit — including
+uncommitted or unpushed rules no other lane can see. This is not hypothetical: on
+2026-08-22 this session booted from that path while empyrean held sixteen unpushed
+commits, and spent the morning enforcing bars that existed nowhere but one peer's
+directory. It looked identical to a correct boot, because nothing fetches, nothing
+fails, and a lane that booted on a mid-edit tree goes on to cite it *correctly* —
+sound citation discipline over a bad source yields a more convincing artifact, not
+a less convincing one. Reading at `origin/main` makes a peer's mid-edit tree
+unreachable by construction rather than by their happening to be at a quiet point,
+and makes "which revision am I running on" answerable, which the path form does not.
+Known cost, accepted: `origin/main` can lag a peer's legitimately pushed work — that
+trades an invisible failure for a visible one. This is the **recovery** direction
+(reach a known artifact), so it wants freshly-fetched tip, never a pinning revision.
+
+This file adds only what is
 seraph-specific. **Seraph is usually the least-concurrent repo in the suite — assume
 solo. Everything below is executable by a lone session with no peers up.**
 

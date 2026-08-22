@@ -360,6 +360,25 @@ designs target the banked specs (normative); manifest flags carry the gates.
   (c) zyrinx song import places notes at vel 100 (−20 dB) and drops
   channel-volume events — possibly intentional headroom, untouched.
 
+- 2026-08-21 (cont.): **ITEM-4 REVISION LANDED — loop never moves the view**
+  (merged; lanes on merged tree: cargo 235/0, vitest 213/213 across 23
+  files, build clean, no bindings drift). `followScrollLeft` reverted to
+  forward-only (all wrap-snap machinery deleted); new shared gate
+  `followAllowed(playing, loopActive, lastManualScrollAt, now)` in
+  followPlayhead.ts — false while a preview loop is armed, absorbing the 2s
+  manual-scroll suspend for both views; `loopEnabled` threaded App →
+  BottomPanel → PianoRoll → PianoRollCanvas `suppressFollow` (optional
+  props, wiring regression-tested). Behavior: loop armed = follow fully off
+  in both views; loop off = forward paging as before, backward jumps never
+  scroll. RATIFIED: optional-prop threading (wiring test mitigates
+  silent un-wire); suppression trigger = loop ARMED (not playhead-inside-
+  range) — flagged as the plain reading of the ruling. **ALL WAVE 3
+  DISPATCHES NOW LANDED** (items 1,2,3,4,6 merged; 5,7 parked on owner
+  rulings; audits merged). Cumulative owner gate additions: bar ruler +
+  drag-zoom feel (~1%/px, 4px slop, 6px handles), loop handles, live
+  marquee preview, loop-armed = static view across wraps, full-volume
+  defaults (new track + new note ≈ audition loudness).
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

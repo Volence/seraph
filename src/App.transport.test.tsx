@@ -5,6 +5,7 @@ import App from "./App";
 import * as ipc from "./api/ipc";
 import * as lib from "./api/library";
 import type { SongMetadata, Track } from "./types/model";
+import { resetTransportMemory } from "./utils/transportMemory";
 
 // Transport-focused App tests: the TimelineCanvas is stubbed to capture its
 // props so the seek cursor (seekTick) is observable without canvas layout.
@@ -86,6 +87,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   captured.props.length = 0;
   transportTick = 0;
+  resetTransportMemory();
   vi.mocked(ipc.listDrivers).mockResolvedValue([
     { id: "flamedriver", name: "Flamedriver (S3K)" },
   ]);
@@ -106,6 +108,69 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("Space stop semantics (G37 owner ruling)", () => {
+  // Space = pause in place; Space again while stopped within
+  // STOP_DOUBLE_TAP_MS returns the playhead to where the last playback
+  // started (without playing); otherwise Space plays from current position.
+
+  let nowValue = 0;
+  function setNow(t: number) {
+    nowValue = t;
+  }
+
+  async function playFromTick(startTick: number) {
+    transportTick = startTick;
+    fireEvent.keyDown(window, { key: " " }); // play (captures start tick)
+    await waitFor(() => expect(ipc.transportPlay).toHaveBeenCalled());
+    await act(async () => {});
+  }
+
+  beforeEach(() => {
+    vi.spyOn(performance, "now").mockImplementation(() => nowValue);
+    setNow(0);
+  });
+
+  it("double-tap Space after stop returns the playhead to the play start without playing", async () => {
+    const { unmount } = await openProject();
+
+    await playFromTick(960);
+    transportTick = 2000; // playback advanced
+    setNow(10_000);
+    fireEvent.keyDown(window, { key: " " }); // stop (pauses in place)
+    await waitFor(() => expect(ipc.transportStop).toHaveBeenCalled());
+    await waitFor(() => expect(lastSeekTick()).toBe(2000)); // G29 sync landed
+
+    setNow(10_200); // within the 400ms window
+    fireEvent.keyDown(window, { key: " " });
+    await waitFor(() => expect(ipc.transportSeek).toHaveBeenCalledWith(960));
+    await waitFor(() => expect(lastSeekTick()).toBe(960));
+    expect(ipc.transportPlay).toHaveBeenCalledTimes(1); // did NOT restart
+
+    // The window is consumed: the next Space plays from the current position.
+    setNow(10_300);
+    transportTick = 960;
+    fireEvent.keyDown(window, { key: " " });
+    await waitFor(() => expect(ipc.transportPlay).toHaveBeenCalledTimes(2));
+    unmount();
+  });
+
+  it("Space beyond the double-tap window plays from the current position", async () => {
+    const { unmount } = await openProject();
+
+    await playFromTick(960);
+    transportTick = 2000;
+    setNow(10_000);
+    fireEvent.keyDown(window, { key: " " }); // stop
+    await waitFor(() => expect(ipc.transportStop).toHaveBeenCalled());
+
+    setNow(10_000 + 401); // just past the window
+    fireEvent.keyDown(window, { key: " " });
+    await waitFor(() => expect(ipc.transportPlay).toHaveBeenCalledTimes(2));
+    expect(ipc.transportSeek).not.toHaveBeenCalledWith(960);
+    unmount();
+  });
 });
 
 describe("seek cursor sync on stop (G29)", () => {

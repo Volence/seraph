@@ -10,6 +10,7 @@ import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { isEditableTarget } from "./utils/keyboard";
+import { recordPlayStart, recordStop, consumeStopDoubleTap } from "./utils/transportMemory";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -63,6 +64,18 @@ export default function App() {
     setSeekTick(0);
   }, []);
 
+  const startPlayback = useCallback(async () => {
+    // Record where playback starts so a stop double-tap can return there
+    // (G37). Best-effort: a failed tick read must not block playing.
+    try {
+      const s = await ipc.getPlaybackState();
+      recordPlayStart(s.tick);
+    } catch {
+      // keep the previous play-start tick
+    }
+    await ipc.transportPlay();
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!projectMeta) return;
     try {
@@ -87,11 +100,20 @@ export default function App() {
       if (e.key === " " && projectMeta) {
         e.preventDefault();
         if (playing) {
+          // Space = pause in place (G37 owner ruling).
           ipc.transportStop();
           setPlaying(false);
+          recordStop();
         } else {
-          ipc.transportPlay();
-          setPlaying(true);
+          const returnTick = consumeStopDoubleTap();
+          if (returnTick !== null) {
+            // Stop double-tap: return the playhead to where the last
+            // playback started, WITHOUT starting playback.
+            handleSeek(returnTick);
+          } else {
+            startPlayback();
+            setPlaying(true);
+          }
         }
       }
       if (e.key === "l" && projectMeta && !e.ctrlKey && !e.metaKey) {
@@ -110,7 +132,7 @@ export default function App() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, handleSeek, playing, loopEnabled, projectMeta]);
+  }, [handleSave, handleSeek, startPlayback, playing, loopEnabled, projectMeta]);
 
   async function handleOpenProject() {
     const { open } = await import("@tauri-apps/plugin-dialog");

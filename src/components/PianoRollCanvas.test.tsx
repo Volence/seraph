@@ -39,6 +39,8 @@ const handlers = {
   onMarqueeSelect: vi.fn(),
   onClearSelection: vi.fn(),
   onNoteAdd: vi.fn(),
+  onNotesPaint: vi.fn(),
+  onNoteErase: vi.fn(),
   onAudition: vi.fn(),
   onNoteResize: vi.fn(),
   onNotesMove: vi.fn(),
@@ -47,11 +49,12 @@ const handlers = {
   onZoom: vi.fn(),
 };
 
-function renderCanvas(selected: Set<number> = new Set()) {
+function renderCanvas(selected: Set<number> = new Set(), drawMode = false, notes: Note[] = NOTES) {
   const { container } = render(
     <PianoRollCanvas
       regionId={REGION_ID}
-      notes={NOTES}
+      drawMode={drawMode}
+      notes={notes}
       minPitch={FM_MIN}
       maxPitch={FM_MAX}
       durationTicks={4000}
@@ -169,6 +172,188 @@ describe("PianoRollCanvas note clicks and drags", () => {
   });
 });
 
+describe("PianoRollCanvas Draw Mode paint (F6)", () => {
+  // Grid cells are GRID ticks wide (= GRID/TPP = 10px here) and one row
+  // tall. Pitch 95 is empty in NOTES, so a run there is unobstructed.
+  const EMPTY_PITCH = 95;
+  const cell = (tick: number, pitch: number) => ({ tick, pitch, durationTicks: GRID });
+
+  it("a plain click paints exactly one grid-length note", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseUp(window, { clientX: 5, clientY: rowY(EMPTY_PITCH) });
+    // x=5 → tick 50 → floors to cell 0, one grid unit long.
+    expect(handlers.onNotesPaint).toHaveBeenCalledTimes(1);
+    expect(handlers.onNotesPaint).toHaveBeenCalledWith([cell(0, EMPTY_PITCH)]);
+    // Painting must not also marquee-select or clear the selection.
+    expect(handlers.onMarqueeSelect).not.toHaveBeenCalled();
+    expect(handlers.onClearSelection).not.toHaveBeenCalled();
+  });
+
+  it("a drag paints a run of grid-snapped notes in ONE commit", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 15, clientY: rowY(EMPTY_PITCH) });
+    fireEvent.mouseMove(window, { clientX: 25, clientY: rowY(EMPTY_PITCH) });
+    fireEvent.mouseUp(window, { clientX: 25, clientY: rowY(EMPTY_PITCH) });
+    // One call, not three: the parent wraps it in ONE undo group.
+    expect(handlers.onNotesPaint).toHaveBeenCalledTimes(1);
+    expect(handlers.onNotesPaint).toHaveBeenCalledWith([
+      cell(0, EMPTY_PITCH), cell(GRID, EMPTY_PITCH), cell(GRID * 2, EMPTY_PITCH),
+    ]);
+  });
+
+  it("a drag inside one cell paints one note, not one per mousemove", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 6, clientY: rowY(EMPTY_PITCH) });
+    fireEvent.mouseMove(window, { clientX: 9, clientY: rowY(EMPTY_PITCH) });
+    fireEvent.mouseUp(window, { clientX: 9, clientY: rowY(EMPTY_PITCH) });
+    expect(handlers.onNotesPaint).toHaveBeenCalledWith([cell(0, EMPTY_PITCH)]);
+  });
+
+  it("follows the pointer's row, so a diagonal drag paints a melodic run", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 15, clientY: rowY(EMPTY_PITCH + 1) });
+    fireEvent.mouseUp(window, { clientX: 15, clientY: rowY(EMPTY_PITCH + 1) });
+    expect(handlers.onNotesPaint).toHaveBeenCalledWith([
+      cell(0, EMPTY_PITCH), cell(GRID, EMPTY_PITCH + 1),
+    ]);
+  });
+
+  it("Shift locks the run to the row it started on (Ableton Pitch Lock)", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 15, clientY: rowY(EMPTY_PITCH + 3), shiftKey: true });
+    fireEvent.mouseUp(window, { clientX: 15, clientY: rowY(EMPTY_PITCH + 3) });
+    expect(handlers.onNotesPaint).toHaveBeenCalledWith([
+      cell(0, EMPTY_PITCH), cell(GRID, EMPTY_PITCH),
+    ]);
+  });
+
+  it("skips cells an existing note already occupies", () => {
+    // Row of NOTES[0] (ticks 100..300). Cells 100 and 200 are taken; cell 0
+    // ends exactly where it starts and cell 300 starts exactly where it
+    // ends, so both are free (touching is not overlapping).
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(100), button: 0 });
+    for (const x of [15, 25, 35]) {
+      fireEvent.mouseMove(window, { clientX: x, clientY: rowY(100) });
+    }
+    fireEvent.mouseUp(window, { clientX: 35, clientY: rowY(100) });
+    expect(handlers.onNotesPaint).toHaveBeenCalledWith([cell(0, 100), cell(300, 100)]);
+  });
+
+  it("paints nothing past the region end", () => {
+    // durationTicks 4000 → x=450 is tick 4500, outside the document.
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 450, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseUp(window, { clientX: 450, clientY: rowY(EMPTY_PITCH) });
+    expect(handlers.onNotesPaint).not.toHaveBeenCalled();
+  });
+
+  it("a second click in the same cell adds nothing before the re-fetch lands", () => {
+    // `notes` is refreshed asynchronously, so a double-click in Draw Mode is
+    // two gestures inside one IPC round trip. A stacked duplicate would be
+    // inaudible under last-note-priority — silent corruption.
+    const canvas = renderCanvas(new Set(), true);
+    for (let i = 0; i < 2; i++) {
+      fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+      fireEvent.mouseUp(window, { clientX: 5, clientY: rowY(EMPTY_PITCH) });
+    }
+    expect(handlers.onNotesPaint).toHaveBeenCalledTimes(1);
+  });
+
+  it("auditions once per pitch, not once per painted cell", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 15, clientY: rowY(EMPTY_PITCH) });
+    fireEvent.mouseMove(window, { clientX: 25, clientY: rowY(EMPTY_PITCH + 1) });
+    fireEvent.mouseUp(window, { clientX: 25, clientY: rowY(EMPTY_PITCH + 1) });
+    expect(handlers.onAudition.mock.calls).toEqual([[EMPTY_PITCH], [EMPTY_PITCH + 1]]);
+  });
+
+  it("still moves and resizes notes in Draw Mode (erase is right-click, not left)", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 15, clientY: rowY(100), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 35, clientY: rowY(100) });
+    expect(handlers.onNotesMove).toHaveBeenLastCalledWith([{ index: 0, tick: 300, pitch: 100 }]);
+    expect(handlers.onNotesPaint).not.toHaveBeenCalled();
+    fireEvent.mouseUp(window);
+  });
+
+  it("Alt+drag still pans in Draw Mode", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH), button: 0, altKey: true });
+    fireEvent.mouseMove(window, { clientX: 50, clientY: rowY(EMPTY_PITCH), altKey: true });
+    fireEvent.mouseUp(window, { clientX: 50, clientY: rowY(EMPTY_PITCH) });
+    expect(handlers.onScrollLeftChange).toHaveBeenCalled();
+    expect(handlers.onNotesPaint).not.toHaveBeenCalled();
+  });
+
+  it("suppresses the no-mode double-click draw while Draw Mode is on", () => {
+    // The two clicks already painted their cell; the draw path on top would
+    // add another note there.
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.doubleClick(canvas, { clientX: 5, clientY: rowY(EMPTY_PITCH) });
+    fireEvent.mouseUp(window, { clientX: 5, clientY: rowY(EMPTY_PITCH) });
+    expect(handlers.onNoteAdd).not.toHaveBeenCalled();
+  });
+
+  it("does not paint with Draw Mode off — empty-space drag still marquees", () => {
+    const canvas = renderCanvas();
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: 5, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 60, clientY: rowY(90) + ROW_H });
+    fireEvent.mouseUp(window, { clientX: 60, clientY: rowY(90) + ROW_H });
+    expect(handlers.onNotesPaint).not.toHaveBeenCalled();
+    expect(handlers.onMarqueeSelect).toHaveBeenCalledWith([0, 1], false);
+  });
+});
+
+describe("PianoRollCanvas right-click erase (F6)", () => {
+  it("erases the note under the cursor with Draw Mode off", () => {
+    const canvas = renderCanvas();
+    fireEvent.mouseDown(canvas, { clientX: 15, clientY: rowY(100), button: 2 });
+    fireEvent.mouseUp(window, { clientX: 15, clientY: rowY(100) });
+    expect(handlers.onNoteErase).toHaveBeenCalledWith(0);
+    // A right-press is not a select and not a drag.
+    expect(handlers.onNoteClick).not.toHaveBeenCalled();
+    expect(handlers.onNotesMove).not.toHaveBeenCalled();
+  });
+
+  it("erases in Draw Mode too (no tool switch for the commonest correction)", () => {
+    const canvas = renderCanvas(new Set(), true);
+    fireEvent.mouseDown(canvas, { clientX: 55, clientY: rowY(90), button: 2 });
+    fireEvent.mouseUp(window, { clientX: 55, clientY: rowY(90) });
+    expect(handlers.onNoteErase).toHaveBeenCalledWith(1);
+    expect(handlers.onNotesPaint).not.toHaveBeenCalled();
+  });
+
+  it("erases the note near its right edge too (no resize-zone dead spot)", () => {
+    // x=29 is inside NOTES[0] (px 10..30) and within EDGE_THRESHOLD of the
+    // edge — the zone a left-press would resize in.
+    const canvas = renderCanvas();
+    fireEvent.mouseDown(canvas, { clientX: 29, clientY: rowY(100), button: 2 });
+    fireEvent.mouseUp(window, { clientX: 29, clientY: rowY(100) });
+    expect(handlers.onNoteErase).toHaveBeenCalledWith(0);
+    expect(handlers.onNoteResize).not.toHaveBeenCalled();
+  });
+
+  it("does nothing on empty space, in either mode", () => {
+    for (const mode of [false, true]) {
+      vi.clearAllMocks();
+      const canvas = renderCanvas(new Set(), mode);
+      fireEvent.mouseDown(canvas, { clientX: 200, clientY: rowY(95), button: 2 });
+      fireEvent.mouseUp(window, { clientX: 200, clientY: rowY(95) });
+      expect(handlers.onNoteErase).not.toHaveBeenCalled();
+      expect(handlers.onNotesPaint).not.toHaveBeenCalled();
+      expect(handlers.onClearSelection).not.toHaveBeenCalled();
+      expect(handlers.onMarqueeSelect).not.toHaveBeenCalled();
+    }
+  });
+});
+
 describe("PianoRollCanvas follow-playhead suppression", () => {
   // jsdom rects are all zeros, which disables follow (viewWidth 0), so give
   // every element a real width for this describe only.
@@ -191,6 +376,7 @@ describe("PianoRollCanvas follow-playhead suppression", () => {
     render(
       <PianoRollCanvas
         regionId={REGION_ID}
+        drawMode={false}
         notes={NOTES}
         minPitch={FM_MIN}
         maxPitch={FM_MAX}

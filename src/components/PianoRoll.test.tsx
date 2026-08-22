@@ -4,7 +4,7 @@ import { fireEvent } from "@testing-library/dom";
 import { PianoRoll } from "./PianoRoll";
 import * as ipc from "../api/ipc";
 import * as library from "../api/library";
-import { OCTAVE_SEMITONES, PITCH_RANGES } from "../utils/pianoRollEdit";
+import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_NOTE_VELOCITY } from "../utils/pianoRollEdit";
 import { resetClipboardForTest } from "../utils/clipboard";
 import type { Note, SelectedRegion, SongMetadata, Track } from "../types/model";
 
@@ -628,5 +628,94 @@ describe("library voice drop on the note canvas", () => {
     selectAll();
     fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm") });
     expect(await findByText(/voice-overlap/)).toBeInTheDocument();
+  });
+});
+
+describe("Draw Mode note entry (F6)", () => {
+  // Everything DERIVED from the component's own defaults, not pinned:
+  // melodic rowHeight, the FM ceiling that fixes row 0, the default zoom,
+  // and the default grid snap (GRID_OPTIONS[4] = 1/16 bar).
+  const ROW_H = 14;
+  const BAR = meta.ticksPerBeat * meta.timeSignature[0];
+  const SNAP = BAR / 16;
+  const TPP = Math.min(7680 / 800, (BAR * 8) / 800);
+  const CELL_PX = SNAP / TPP;
+  const rowY = (pitch: number) => (FM_MAX - pitch) * ROW_H + ROW_H / 2;
+  /** DOM order: [0] bar ruler, [1] key column, [2] note grid, [3] velocity. */
+  const noteCanvas = (c: HTMLElement) => c.querySelectorAll("canvas")[2];
+
+  it("shows a Draw toggle in the header, so the mode is not a hidden keystroke (F17)", async () => {
+    const { getByRole } = await renderRoll([]);
+    const btn = getByRole("button", { name: "Draw" });
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btn);
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("B toggles Draw Mode (Ableton's Draw key; FL's Paint key)", async () => {
+    const { getByRole } = await renderRoll([]);
+    fireEvent.keyDown(window, { key: "b" });
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(window, { key: "b" });
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("B does not toggle while the user is typing in a field (G2)", async () => {
+    const { getByRole, container } = await renderRoll([]);
+    const select = container.querySelector("select") as HTMLSelectElement;
+    fireEvent.keyDown(select, { key: "b" });
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("Ctrl+B is left alone (the toggle is the plain key only)", async () => {
+    const { getByRole } = await renderRoll([]);
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("a paint drag adds every note at full TL-denominated velocity", async () => {
+    const { container, getByRole } = await renderRoll([]);
+    fireEvent.click(getByRole("button", { name: "Draw" }));
+    const canvas = noteCanvas(container);
+    fireEvent.mouseDown(canvas, { clientX: 1, clientY: rowY(60), button: 0 });
+    fireEvent.mouseMove(window, { clientX: CELL_PX + 1, clientY: rowY(60) });
+    fireEvent.mouseUp(window, { clientX: CELL_PX + 1, clientY: rowY(60) });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, DEFAULT_NOTE_VELOCITY, SNAP);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", SNAP, 60, DEFAULT_NOTE_VELOCITY, SNAP);
+  });
+
+  it("a paint drag is ONE undo step and ONE sequence reload (F1)", async () => {
+    const { container, getByRole } = await renderRoll([]);
+    fireEvent.click(getByRole("button", { name: "Draw" }));
+    const canvas = noteCanvas(container);
+    fireEvent.mouseDown(canvas, { clientX: 1, clientY: rowY(60), button: 0 });
+    fireEvent.mouseMove(window, { clientX: CELL_PX + 1, clientY: rowY(60) });
+    fireEvent.mouseMove(window, { clientX: CELL_PX * 2 + 1, clientY: rowY(60) });
+    fireEvent.mouseUp(window, { clientX: CELL_PX * 2 + 1, clientY: rowY(60) });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expect(ipc.addNote).toHaveBeenCalledTimes(3);
+    // Three notes, one Ctrl+Z.
+    expectGroupWraps(vi.mocked(ipc.addNote));
+    // Notes painted while the transport runs must be audible next pass.
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("right-click erases the note under the cursor and reloads the sequence", async () => {
+    const { container } = await renderRoll([note(0, 60)]);
+    fireEvent.mouseDown(noteCanvas(container), { clientX: 5, clientY: rowY(60), button: 2 });
+    await waitFor(() => expect(ipc.deleteNote).toHaveBeenCalledWith("track-1", "region-1", 0));
+    expect(ipc.deleteNote).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("right-click erase remaps the surviving selection instead of dropping it", async () => {
+    // Indices shift down when a note is deleted: a selection of {0,1,2} that
+    // loses note 0 must become {0,1}, not stay {0,1,2} pointing one note off.
+    const { container, getByText } = await renderRoll([note(0, 60), note(480, 64), note(960, 67)]);
+    selectAll();
+    await waitFor(() => expect(getByText("3 notes")).toBeInTheDocument());
+    fireEvent.mouseDown(noteCanvas(container), { clientX: 5, clientY: rowY(60), button: 2 });
+    await waitFor(() => expect(getByText("2 notes")).toBeInTheDocument());
   });
 });

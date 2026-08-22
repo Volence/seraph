@@ -10,7 +10,7 @@ import * as ipc from "../api/ipc";
 import * as library from "../api/library";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
-import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes, maxPianoRollTicksPerPixel } from "../utils/pianoRollEdit";
+import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, DEFAULT_NOTE_VELOCITY, transposeNotes, nudgeNotes, maxPianoRollTicksPerPixel } from "../utils/pianoRollEdit";
 import { copyNotes, getNoteClipboard, getNoteClipboardChannelType, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
@@ -103,6 +103,10 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   }
   useEffect(() => () => { if (hintTimer.current) clearTimeout(hintTimer.current); }, []);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
+  // Draw Mode (F6): a TOOL setting, not a property of the document — like the
+  // grid selector it deliberately survives a region switch (Ableton's Draw
+  // Mode is likewise global, not per-clip).
+  const [drawMode, setDrawMode] = useState(false);
   const [gridIdx, setGridIdx] = useState(4);
   const [scrollTop, setScrollTop] = useState(0);
   const ticksPerBeat = projectMeta.ticksPerBeat;
@@ -247,11 +251,50 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   async function handleNoteAdd(tick: number, pitch: number, duration: number) {
     // Velocity is TL-denominated in the engine (127 = no attenuation,
     // 0.75 dB per step down) — place at full so new notes match audition.
-    await ipc.addNote(region.trackId, region.regionId, tick, pitch, 127, duration);
+    await ipc.addNote(region.trackId, region.regionId, tick, pitch, DEFAULT_NOTE_VELOCITY, duration);
     refresh();
     // Playback consumes a play-time snapshot: without a reload the running
     // transport never hears this edit (F1). Commit-granularity only, same
     // unconditional call as the region path (G30).
+    await ipc.reloadSequence();
+  }
+
+  /** One Draw-Mode paint gesture: N notes, ONE undo step, ONE reload. */
+  async function handleNotesPaint(cells: { tick: number; pitch: number; durationTicks: number }[]) {
+    if (cells.length === 0) return;
+    await ipc.beginUndoGroup();
+    try {
+      for (const c of cells) {
+        await ipc.addNote(
+          region.trackId, region.regionId, c.tick, c.pitch, DEFAULT_NOTE_VELOCITY, c.durationTicks,
+        );
+      }
+    } finally {
+      await ipc.endUndoGroup();
+    }
+    await refresh();
+    // The whole run is one commit, so it is one reload — the running
+    // transport hears every painted note on the next pass (F1).
+    await ipc.reloadSequence();
+  }
+
+  /** Right-click erase. One note, one undo step (a bare delete already is). */
+  async function handleNoteErase(index: number) {
+    if (!notes[index]) return;
+    await ipc.deleteNote(region.trackId, region.regionId, index);
+    // Deleting shifts every LATER index down by one: remap rather than keep
+    // a selection that would now point at the wrong notes (the index-staleness
+    // bug class this surface has already been bitten by).
+    setSelectedNotes((prev) => {
+      const next = new Set<number>();
+      for (const i of prev) {
+        if (i === index) continue;
+        next.add(i > index ? i - 1 : i);
+      }
+      return next;
+    });
+    await refresh();
+    // The erased note must stop sounding on the next loop pass (F1).
     await ipc.reloadSequence();
   }
 
@@ -332,6 +375,15 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       // grid-size <select>, where arrows change the value) or any other
       // editable target (G2).
       if (isEditableTarget(e.target)) return;
+
+      // Draw Mode toggle. `B` is Ableton's Draw Mode key (the banked mouse
+      // grammar is Ableton's) and FL's Paint key — the same letter in both
+      // comparators for the gesture this mode adds. Plain key only: Ctrl+B /
+      // Alt+B stay free.
+      if ((e.key === "b" || e.key === "B") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setDrawMode((v) => !v);
+      }
 
       if ((e.key === "ArrowUp" || e.key === "ArrowDown") && selectedNotes.size > 0) {
         e.preventDefault();
@@ -609,6 +661,14 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
         )}
         {selInfo && <span className={styles.noteInfo}>{selInfo}</span>}
         {voiceHint && <span className={styles.voiceHint}>{voiceHint}</span>}
+        <button
+          className={`${styles.drawBtn} ${drawMode ? styles.drawBtnActive : ""}`}
+          onClick={() => setDrawMode((v) => !v)}
+          aria-pressed={drawMode}
+          title="Draw mode (B) — click paints a note, drag paints a run (Shift locks the pitch). Right-click erases a note in either mode."
+        >
+          Draw
+        </button>
         <select
           className={styles.gridSelect}
           value={gridIdx}
@@ -667,6 +727,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           onMarqueeSelect={handleMarqueeSelect}
           onClearSelection={handleClearSelection}
           onNoteAdd={handleNoteAdd}
+          drawMode={drawMode}
+          onNotesPaint={handleNotesPaint}
+          onNoteErase={handleNoteErase}
           onAudition={handleAudition}
           onNoteResize={handleNoteResize}
           onNotesMove={handleNotesMove}

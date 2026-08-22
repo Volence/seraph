@@ -6,6 +6,65 @@ import type { Note } from "../types/model";
 export const OCTAVE_SEMITONES = 12;
 
 /**
+ * Top of the velocity scale. Velocity is TL-DENOMINATED engine-wide: the
+ * sequencer adds `(127 - volume) + (127 - velocity)` to every FM carrier TL
+ * at ~0.75 dB/step (`src-tauri/src/sequencer/mod.rs`), so this value — and
+ * only this value — means "no attenuation".
+ */
+export const MAX_VELOCITY = 127;
+
+/**
+ * Velocity every hand-placed note gets. DERIVED from `MAX_VELOCITY`, never
+ * typed: a MIDI-convention 100 here once put every hand-placed FM note ~35 dB
+ * under the audition the instrument was chosen with (fixed in `5e3b309`).
+ * Every note-creating path in the piano roll must use this.
+ */
+export const DEFAULT_NOTE_VELOCITY = MAX_VELOCITY;
+
+/** One grid-snapped cell of a paint gesture: a note-to-be. */
+export interface PaintCell {
+  tick: number;
+  pitch: number;
+}
+
+/**
+ * The grid cell a pointer position falls in: the tick floors to the grid
+ * (same rule the double-click draw path uses), the pitch is already a row.
+ */
+export function paintCellAt(tick: number, pitch: number, gridSnapTicks: number): PaintCell {
+  return { tick: Math.floor(tick / gridSnapTicks) * gridSnapTicks, pitch };
+}
+
+/**
+ * True when a paint cell must NOT become a note. A cell is refused when it
+ * starts at/after the region end, when an existing note on that pitch
+ * overlaps its `[tick, tick + gridSnapTicks)` span, or when this gesture
+ * already painted it (a fast drag re-enters the same cell constantly).
+ *
+ * Overlapping an existing note is refused rather than stacked because
+ * one-channel overlaps resolve as last-note-priority in the driver: a
+ * stacked duplicate would be inaudible but real, i.e. silent corruption.
+ */
+export function paintCellBlocked(
+  cell: PaintCell,
+  painted: readonly PaintCell[],
+  notes: readonly Note[],
+  gridSnapTicks: number,
+  regionDurationTicks: number,
+): boolean {
+  if (cell.tick < 0 || cell.tick >= regionDurationTicks) return true;
+  const end = cell.tick + gridSnapTicks;
+  for (const p of painted) {
+    if (p.pitch === cell.pitch && p.tick === cell.tick) return true;
+  }
+  for (const n of notes) {
+    if (n.pitch !== cell.pitch) continue;
+    if (n.tick < end && n.tick + n.durationTicks > cell.tick) return true;
+  }
+  return false;
+}
+
+/**
  * Playable pitch range per channel type. The piano roll's visible range (and
  * therefore its move/transpose clamp) starts from these and expands to cover
  * any out-of-range notes that arrive via import.

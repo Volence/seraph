@@ -162,6 +162,25 @@ designs target the banked specs (normative); manifest flags carry the gates.
   step entry (G36, owner call pending). S4-deferred: per-note detune UI (G20),
   track reorder (G27-reorder), velocity mapping changes.
 
+- 2026-08-21 (cont.): **UNDO/REDO + DIRTY FLAG SHIPPED** (Wave 1 parcel B; merged
+  `0fc06d6`; lanes on merged tree: cargo 226/0, vitest 59/59, build clean,
+  bindings regenerated + committed). Snapshot-stack in ProjectManager
+  (Vec<Track>, MAX_UNDO_DEPTH=100, validate-first so failed mutations push
+  nothing), begin/end_undo_group coalescing (one drag/batch = one undo step),
+  new IPC: undo/redo/begin_undo_group/end_undo_group/get_undo_state; Ctrl+Z /
+  Ctrl+Shift+Z / Ctrl+Y (input-guarded via new src/utils/keyboard.ts), dirty
+  dot on Save, confirm before New/Open when dirty, onCloseRequested guard
+  (needs live-app confirm — `core:window:allow-destroy` added). Scope per
+  owner ruling: song edits only; instrument ops stay out of the stack but do
+  mark dirty. DRIVE-BY FIX (ratified): move_region validated destination only
+  AFTER removing the region — a bad destination silently lost it; now
+  validate-first. Known v1 flags: undo/redo always mark dirty even landing on
+  the saved state; a final in-flight drag update can theoretically land after
+  end_undo_group (one extra step; flagged, not hidden). Wave 1 parcel A
+  (safety/transport/playhead, branch fix/ux-safety-transport) still in flight
+  — both Wave 1 agents were killed mid-flight by a session usage limit and
+  resumed in their worktrees; parcel B completed post-resume.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

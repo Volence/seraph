@@ -30,6 +30,12 @@ pub enum SequencerOutput {
     PsgWrite(u8),
     DacPlayback { samples: Arc<Vec<u8>>, sample_rate: u32 },
     PsgEnvelopeStart { hw_ch: u8, envelope: Arc<Vec<u8>>, loop_point: Option<usize>, volume_atten: u8, silence_on_end: bool },
+    /// Swap the envelope/attenuation of an ALREADY RUNNING envelope player
+    /// without restarting it (the step index is kept). Emitted when a
+    /// parameter edit commits while the note is sounding — restarting would
+    /// be a re-attack on every input event of a slider drag. A no-op when no
+    /// player is running on `hw_ch`.
+    PsgEnvelopeUpdate { hw_ch: u8, envelope: Arc<Vec<u8>>, loop_point: Option<usize>, volume_atten: u8, silence_on_end: bool },
     PsgEnvelopeStop { hw_ch: u8 },
     FmModulationStart { hw_ch: u8, wait: u8, speed: u8, delta: i8, steps: u8, base_freq: u16 },
     FmModulationStop { hw_ch: u8 },
@@ -62,18 +68,136 @@ impl Sequencer {
         self.snapshot = snapshot;
     }
 
+    /// Swap in a rebuilt snapshot while the transport keeps running.
+    ///
+    /// Notes that are still sounding are CARRIED ACROSS rather than silenced:
+    /// for each channel with an active note, the new snapshot is searched for
+    /// the same channel sounding the same pitch at the current tick. A match
+    /// keeps its key-on and gets a live reprogram from the new snapshot (new
+    /// patch bytes, new track volume, new pan, new PSG envelope), so a
+    /// parameter edit is heard *in* the note instead of after it. A non-match
+    /// — the note was deleted, moved, retuned, or its track muted — gets a
+    /// targeted key-off on that channel alone.
+    ///
+    /// This is deliberately not `silence_all`: a global silence made every
+    /// commit mid-playback cut every sounding channel (audit F13, and the
+    /// booked 2026-08-21 follow-up), which is why parameter edits could only
+    /// be auditioned by stopping and restarting.
     pub fn reload_snapshot(&mut self, snapshot: SequencerSnapshot, output: &mut Vec<SequencerOutput>) {
         let was_playing = self.playing;
         let saved_tick = self.current_tick;
         let loop_start = self.snapshot.loop_start;
         let loop_end = self.snapshot.loop_end;
-        self.silence_all(output);
+        let tick = saved_tick as u64;
+
+        // (new channel index, event index, pitch) for every note that survives.
+        let mut survivors: Vec<(usize, usize, u8)> = Vec::new();
+        let mut orphans: Vec<ChannelType> = Vec::new();
+        for old_idx in 0..self.active_notes.len() {
+            let Some(pitch) = self.active_notes[old_idx] else { continue };
+            let ct = self.snapshot.channels[old_idx].channel_type.clone();
+            let found = snapshot.channels.iter().enumerate().find_map(|(new_idx, ch)| {
+                if ch.channel_type != ct {
+                    return None;
+                }
+                sustaining_note_index(ch, tick, pitch).map(|ev| (new_idx, ev))
+            });
+            match found {
+                Some((new_idx, ev)) => survivors.push((new_idx, ev, pitch)),
+                None => orphans.push(ct),
+            }
+        }
+        for ct in &orphans {
+            self.key_off_channel(ct, output);
+        }
+
+        // The FM patch/pan cache describes HARDWARE state, which a reload does
+        // not touch. Preserving it across the swap means a survivor only gets
+        // the register writes that actually changed — a volume-only edit costs
+        // four TL writes, not a full 27-register reprogram.
+        let patch_cache = self.last_fm_patch;
+        let pan_cache = self.last_fm_pan;
+
         self.load_snapshot(snapshot);
+        self.last_fm_patch = patch_cache;
+        self.last_fm_pan = pan_cache;
         self.snapshot.loop_start = loop_start;
         self.snapshot.loop_end = loop_end;
         self.current_tick = saved_tick;
         self.seek_cursors();
         self.playing = was_playing;
+
+        for (ch_idx, ev_idx, pitch) in survivors {
+            self.active_notes[ch_idx] = Some(pitch);
+            self.reprogram_live(ch_idx, ev_idx, output);
+        }
+    }
+
+    /// Re-emit the parameter state of a note that is already keyed on, from
+    /// the freshly loaded snapshot. No key-off and no key-on: the envelope
+    /// generator keeps its phase, so the edit reads as a timbre/level change
+    /// rather than a re-attack (which, at one event per pointer move, would be
+    /// the machine-gun this fix exists to remove).
+    fn reprogram_live(&mut self, ch_idx: usize, ev_idx: usize, output: &mut Vec<SequencerOutput>) {
+        let channel_type = self.snapshot.channels[ch_idx].channel_type.clone();
+        let volume = self.snapshot.channels[ch_idx].volume;
+        let channel_pan = self.snapshot.channels[ch_idx].pan;
+        let (velocity, pan_override, instrument) =
+            match &self.snapshot.channels[ch_idx].events[ev_idx] {
+                SequencerEvent::NoteOn { velocity, pan_override, instrument, .. } => {
+                    (*velocity, *pan_override, instrument.clone())
+                }
+                SequencerEvent::NoteOff { .. } => return,
+            };
+
+        match channel_type {
+            ChannelType::Fm(hw_ch) => {
+                if let InstrumentData::FmPatch { bytes, ssg_eg } = &instrument {
+                    let pan = pan_override.unwrap_or(channel_pan);
+                    self.reprogram_fm_live(hw_ch, bytes, ssg_eg, pan, volume, velocity, output);
+                }
+            }
+            ChannelType::Psg(hw_ch) => {
+                reprogram_psg_live(hw_ch, volume, velocity, &instrument, output)
+            }
+            ChannelType::PsgNoise => {
+                // The noise register is deliberately NOT re-emitted: writing it
+                // resets the SN76489 LFSR (see `program_psg_noise`), which is an
+                // audible re-attack. A noise-mode edit applies from the next
+                // note-on; level edits apply live.
+                reprogram_psg_live(3, volume, velocity, &instrument, output)
+            }
+            // The sample is already streaming through the DAC; there is no
+            // per-note register state to refresh.
+            ChannelType::Dac(_) => {}
+        }
+    }
+
+    /// Live FM reprogram for a keyed-on channel: patch registers only when the
+    /// patch actually changed, then the carrier total levels (which carry the
+    /// track volume and note velocity). Unlike the note-on path this emits no
+    /// key-off and no forced release — the YM2612 applies $30–$B4 writes to a
+    /// sounding channel immediately, and that is the live tweak.
+    fn reprogram_fm_live(
+        &mut self,
+        hw_ch: u8,
+        patch: &[u8; 25],
+        ssg_eg: &[u8; 4],
+        pan: u8,
+        volume: u8,
+        velocity: u8,
+        output: &mut Vec<SequencerOutput>,
+    ) {
+        let (port_base, ch_offset) = fm_port_and_offset(hw_ch);
+        if self.last_fm_patch[hw_ch as usize] != *patch {
+            self.write_fm_patch(port_base, ch_offset, patch, ssg_eg, pan, output);
+            self.last_fm_patch[hw_ch as usize] = *patch;
+            self.last_fm_pan[hw_ch as usize] = pan;
+        } else if self.last_fm_pan[hw_ch as usize] != pan {
+            self.fm_write(port_base, 0xB4 + ch_offset, pan, output);
+            self.last_fm_pan[hw_ch as usize] = pan;
+        }
+        self.write_fm_carrier_tls(port_base, ch_offset, patch, volume, velocity, output);
     }
 
     pub fn play(&mut self) {
@@ -196,7 +320,7 @@ impl Sequencer {
         match event {
             SequencerEvent::NoteOn { pitch, velocity, detune, instrument, modulation, pan_override, .. } => {
                 if self.active_notes[ch_idx].is_some() {
-                    self.key_off_channel(ch_idx, channel_type, output);
+                    self.key_off_channel(channel_type, output);
                 }
 
                 match channel_type {
@@ -252,14 +376,70 @@ impl Sequencer {
                 self.active_notes[ch_idx] = Some(*pitch);
             }
             SequencerEvent::NoteOff { .. } => {
-                self.key_off_channel(ch_idx, channel_type, output);
+                self.key_off_channel(channel_type, output);
                 self.active_notes[ch_idx] = None;
             }
         }
     }
 
+    /// Emit the packed patch (+ SSG-EG and pan) for one FM channel. Pure
+    /// register emission: the caller owns key-on/key-off, the forced release
+    /// and the patch cache. Shared by the note-on path and the live-edit path
+    /// so the two can never drift onto different register tables — the exact
+    /// failure mode that made the FM preview play every voice wrong.
+    fn write_fm_patch(
+        &self,
+        port_base: u32,
+        ch_offset: u8,
+        patch: &[u8; 25],
+        ssg_eg: &[u8; 4],
+        pan: u8,
+        output: &mut Vec<SequencerOutput>,
+    ) {
+        for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
+            let slot = slot_off + ch_offset;
+            self.fm_write(port_base, 0x30 + slot, patch[i], output);
+            self.fm_write(port_base, 0x50 + slot, patch[4 + i], output);
+            self.fm_write(port_base, 0x60 + slot, patch[8 + i], output);
+            self.fm_write(port_base, 0x70 + slot, patch[12 + i], output);
+            self.fm_write(port_base, 0x80 + slot, patch[16 + i], output);
+            self.fm_write(port_base, 0x90 + slot, ssg_eg[i], output);
+        }
+        self.fm_write(port_base, 0xB0 + ch_offset, patch[24], output);
+        self.fm_write(port_base, 0xB4 + ch_offset, pan, output);
+    }
+
+    /// Emit the four total-level registers, applying the track volume and note
+    /// velocity as attenuation on carriers only. Shared by the note-on and
+    /// live-edit paths.
+    fn write_fm_carrier_tls(
+        &self,
+        port_base: u32,
+        ch_offset: u8,
+        patch: &[u8; 25],
+        volume: u8,
+        velocity: u8,
+        output: &mut Vec<SequencerOutput>,
+    ) {
+        let vol_offset = (127u16.saturating_sub(volume as u16)
+            + 127u16.saturating_sub(velocity as u16))
+        .min(127);
+
+        for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
+            let slot = slot_off + ch_offset;
+            let raw_tl = (patch[20 + i] & 0x7F) as u16;
+            let is_carrier = patch[20 + i] & 0x80 != 0;
+            let tl = if is_carrier {
+                (raw_tl + vol_offset).min(127) as u8
+            } else {
+                raw_tl as u8
+            };
+            self.fm_write(port_base, 0x40 + slot, tl, output);
+        }
+    }
+
     fn program_fm(&mut self, hw_ch: u8, pitch: u8, volume: u8, velocity: u8, detune: i8, pan: u8, instrument: &InstrumentData, output: &mut Vec<SequencerOutput>) {
-        let (port_base, ch_offset) = if hw_ch < 3 { (0u32, hw_ch) } else { (2u32, hw_ch - 3) };
+        let (port_base, ch_offset) = fm_port_and_offset(hw_ch);
 
         if let InstrumentData::FmPatch { bytes: patch, ssg_eg } = instrument {
             let patch_changed = self.last_fm_patch[hw_ch as usize] != *patch;
@@ -274,17 +454,7 @@ impl Sequencer {
                     self.fm_write(port_base, 0x80 + slot_off + ch_offset, 0xFF, output);
                 }
 
-                for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
-                    let slot = slot_off + ch_offset;
-                    self.fm_write(port_base, 0x30 + slot, patch[i], output);
-                    self.fm_write(port_base, 0x50 + slot, patch[4 + i], output);
-                    self.fm_write(port_base, 0x60 + slot, patch[8 + i], output);
-                    self.fm_write(port_base, 0x70 + slot, patch[12 + i], output);
-                    self.fm_write(port_base, 0x80 + slot, patch[16 + i], output);
-                    self.fm_write(port_base, 0x90 + slot, ssg_eg[i], output);
-                }
-                self.fm_write(port_base, 0xB0 + ch_offset, patch[24], output);
-                self.fm_write(port_base, 0xB4 + ch_offset, pan, output);
+                self.write_fm_patch(port_base, ch_offset, patch, ssg_eg, pan, output);
                 self.last_fm_patch[hw_ch as usize] = *patch;
                 self.last_fm_pan[hw_ch as usize] = pan;
             } else if self.last_fm_pan[hw_ch as usize] != pan {
@@ -292,21 +462,7 @@ impl Sequencer {
                 self.last_fm_pan[hw_ch as usize] = pan;
             }
 
-            let vol_offset = 127u16.saturating_sub(volume as u16)
-                + 127u16.saturating_sub(velocity as u16);
-            let vol_offset = vol_offset.min(127);
-
-            for (i, &slot_off) in PACKED_OP_SLOTS.iter().enumerate() {
-                let slot = slot_off + ch_offset;
-                let raw_tl = (patch[20 + i] & 0x7F) as u16;
-                let is_carrier = patch[20 + i] & 0x80 != 0;
-                let tl = if is_carrier {
-                    (raw_tl + vol_offset).min(127) as u8
-                } else {
-                    raw_tl as u8
-                };
-                self.fm_write(port_base, 0x40 + slot, tl, output);
-            }
+            self.write_fm_carrier_tls(port_base, ch_offset, patch, volume, velocity, output);
         }
 
         let (block, fnum) = midi_to_fm_freq(pitch);
@@ -330,8 +486,7 @@ impl Sequencer {
         output.push(SequencerOutput::PsgWrite(0x80 | (hw_ch << 5) | low_nibble));
         output.push(SequencerOutput::PsgWrite(high_bits));
 
-        let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127
-            + (127u16.saturating_sub(velocity as u16)) * 15 / 127).min(15) as u8;
+        let vol_atten = psg_vol_atten(volume, velocity);
 
         if let InstrumentData::PsgEnvelope { envelope, loop_point, silence_on_end, .. } = instrument {
             if !envelope.is_empty() {
@@ -354,8 +509,7 @@ impl Sequencer {
         // between consecutive noise notes.
         output.push(SequencerOutput::PsgWrite(noise_reg));
 
-        let vol_atten = ((127u16.saturating_sub(volume as u16)) * 15 / 127
-            + (127u16.saturating_sub(velocity as u16)) * 15 / 127).min(15) as u8;
+        let vol_atten = psg_vol_atten(volume, velocity);
 
         if let InstrumentData::PsgEnvelope { envelope, loop_point, silence_on_end, .. } = instrument {
             if !envelope.is_empty() {
@@ -372,7 +526,7 @@ impl Sequencer {
         output.push(SequencerOutput::PsgWrite(0x90 | (3 << 5) | (vol_atten & 0x0F)));
     }
 
-    fn key_off_channel(&self, _ch_idx: usize, channel_type: &ChannelType, output: &mut Vec<SequencerOutput>) {
+    fn key_off_channel(&self, channel_type: &ChannelType, output: &mut Vec<SequencerOutput>) {
         match channel_type {
             ChannelType::Fm(hw_ch) => {
                 let ch_encoded = if *hw_ch < 3 { *hw_ch } else { *hw_ch + 1 };
@@ -394,11 +548,14 @@ impl Sequencer {
         }
     }
 
+    /// Hard silence for the transport boundaries only (`stop`, `seek`, loop
+    /// wrap). Blanket-writes attenuation to every PSG channel, so it must NOT
+    /// be used for a mid-playback commit — see `reload_snapshot`.
     fn silence_all(&mut self, output: &mut Vec<SequencerOutput>) {
         for ch_idx in 0..self.active_notes.len() {
             if self.active_notes[ch_idx].is_some() {
                 let ct = self.snapshot.channels[ch_idx].channel_type.clone();
-                self.key_off_channel(ch_idx, &ct, output);
+                self.key_off_channel(&ct, output);
                 self.active_notes[ch_idx] = None;
             }
         }
@@ -423,6 +580,65 @@ impl Sequencer {
         output.push(SequencerOutput::FmWrite(FmRegisterWrite { port: port_base, data: addr }));
         output.push(SequencerOutput::FmWrite(FmRegisterWrite { port: port_base + 1, data }));
     }
+}
+
+/// YM2612 port pair and per-channel register offset for hardware channel
+/// `hw_ch` (0-2 on port 0, 3-5 on port 2).
+fn fm_port_and_offset(hw_ch: u8) -> (u32, u8) {
+    if hw_ch < 3 { (0u32, hw_ch) } else { (2u32, hw_ch - 3) }
+}
+
+/// PSG attenuation (0 = loudest, 15 = silent) derived from the track volume
+/// and note velocity, both 0-127. Single definition shared by the note-on and
+/// live-edit paths.
+fn psg_vol_atten(volume: u8, velocity: u8) -> u8 {
+    ((127u16.saturating_sub(volume as u16)) * 15 / 127
+        + (127u16.saturating_sub(velocity as u16)) * 15 / 127)
+        .min(15) as u8
+}
+
+/// Index of the NoteOn on `ch` that is sounding `pitch` across `tick` — it
+/// started strictly before `tick` and has not run out its duration.
+///
+/// A snapshot channel is monophonic (the sequencer tracks exactly one active
+/// note per channel), so only the LAST NoteOn before `tick` can still be
+/// sounding; if that one does not match, nothing on this channel does.
+fn sustaining_note_index(ch: &ChannelSequence, tick: u64, pitch: u8) -> Option<usize> {
+    let before_cursor = ch.events.partition_point(|e| e.tick() < tick);
+    for i in (0..before_cursor).rev() {
+        if let SequencerEvent::NoteOn { tick: t, pitch: p, duration_ticks, .. } = &ch.events[i] {
+            return if *p == pitch && tick < t + duration_ticks { Some(i) } else { None };
+        }
+    }
+    None
+}
+
+/// Live level/envelope refresh for a PSG channel whose note is already
+/// sounding. An envelope instrument gets its envelope swapped under the
+/// running player (no re-attack); a bare instrument gets a plain attenuation
+/// write, stopping any player the previous instrument had left running.
+fn reprogram_psg_live(
+    hw_ch: u8,
+    volume: u8,
+    velocity: u8,
+    instrument: &InstrumentData,
+    output: &mut Vec<SequencerOutput>,
+) {
+    let vol_atten = psg_vol_atten(volume, velocity);
+    if let InstrumentData::PsgEnvelope { envelope, loop_point, silence_on_end, .. } = instrument {
+        if !envelope.is_empty() {
+            output.push(SequencerOutput::PsgEnvelopeUpdate {
+                hw_ch,
+                envelope: envelope.clone(),
+                loop_point: *loop_point,
+                volume_atten: vol_atten,
+                silence_on_end: *silence_on_end,
+            });
+            return;
+        }
+    }
+    output.push(SequencerOutput::PsgEnvelopeStop { hw_ch });
+    output.push(SequencerOutput::PsgWrite(0x90 | (hw_ch << 5) | (vol_atten & 0x0F)));
 }
 
 #[cfg(test)]

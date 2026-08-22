@@ -1,7 +1,11 @@
 use std::sync::Arc;
 use serde::Serialize;
 
-#[derive(Debug, Clone)]
+/// Identifies a hardware channel. `PartialEq` matters: `reload_snapshot`
+/// re-identifies a sounding channel across a snapshot swap by channel type,
+/// not by index — the index is a position in a `BTreeMap` of non-muted tracks
+/// and shifts whenever a track is muted, soloed or deleted.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChannelType {
     Fm(u8),
     Psg(u8),

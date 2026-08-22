@@ -357,6 +357,33 @@ impl AudioEngine {
                         });
                     }
                 }
+                SequencerOutput::PsgEnvelopeUpdate { hw_ch, envelope, loop_point, volume_atten, silence_on_end } => {
+                    // Live edit under a sounding note: swap the envelope and
+                    // attenuation into the RUNNING player, keeping its step
+                    // index so the note does not re-attack, then apply the
+                    // current step immediately instead of waiting for the next
+                    // 60 Hz envelope tick.
+                    let write = if let Some(player) = self.psg_envelopes.get_mut(hw_ch as usize).and_then(|p| p.as_mut()) {
+                        if envelope.is_empty() {
+                            None
+                        } else {
+                            player.index = player.index.min(envelope.len());
+                            player.envelope = envelope;
+                            player.loop_point = loop_point;
+                            player.volume_atten = volume_atten;
+                            player.silence_on_end = silence_on_end;
+                            let step = player.index.saturating_sub(1).min(player.envelope.len() - 1);
+                            let final_vol = player.envelope[step].saturating_sub(volume_atten);
+                            let attenuation = 15u8.saturating_sub(final_vol);
+                            Some(0x90 | (player.hw_ch << 5) | (attenuation & 0x0F))
+                        }
+                    } else {
+                        None
+                    };
+                    if let Some(data) = write {
+                        self.sn76489.write(data);
+                    }
+                }
                 SequencerOutput::PsgEnvelopeStop { hw_ch } => {
                     if (hw_ch as usize) < 4 {
                         self.psg_envelopes[hw_ch as usize] = None;

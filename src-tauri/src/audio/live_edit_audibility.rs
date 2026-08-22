@@ -439,6 +439,133 @@ fn psg_envelope_edit_is_audible_in_the_sustained_note() {
 }
 
 // --------------------------------------------------------------------------
+// The safety net `silence_all` used to provide. Dropping the global silence
+// must NOT leave notes ringing when the edit removed them.
+// --------------------------------------------------------------------------
+
+/// The RMS of the whole render's tail, used by the "must go silent" tests.
+/// A key-off is a release, not an instant cut, so the window starts well
+/// after the edit.
+const RELEASE_FROM: f64 = 0.8;
+
+/// Deleting the sounding note (the reloaded snapshot has no events at all)
+/// must key the channel off. Without a global silence this is the orphan
+/// path: no matching note in the new snapshot -> targeted key-off.
+#[test]
+fn deleting_the_sounding_note_still_silences_it() {
+    let inst = load_pack_fm(VOICE);
+    let mut emptied = fm_snapshot(&inst, 127);
+    emptied.channels[0].events.clear();
+
+    let control = render_snapshot_with_edits(fm_snapshot(&inst, 127), TOTAL_SECS, &[]);
+    let deleted = render_snapshot_with_edits(
+        fm_snapshot(&inst, 127),
+        TOTAL_SECS,
+        &[(EDIT_AT, AudioCommand::ReloadSequence { snapshot: emptied })],
+    );
+
+    let c = stats_window(&control, RELEASE_FROM, WINDOW_TO);
+    let d = stats_window(&deleted, RELEASE_FROM, WINDOW_TO);
+    let db = db_ratio(d.rms, c.rms);
+    assert!(
+        db < -40.0,
+        "after deleting the sounding note the channel is still ringing at {db:+.1} dB \
+         relative to the note that was left in place (control rms={:.5}, after delete \
+         rms={:.5})",
+        c.rms,
+        d.rms
+    );
+}
+
+/// Muting the track removes its channel from the snapshot entirely (the
+/// snapshot only carries non-muted tracks). The sounding note must be keyed
+/// off through the OLD channel type — nothing in the new snapshot names it.
+#[test]
+fn muting_the_track_still_silences_the_sounding_note() {
+    let inst = load_pack_fm(VOICE);
+    let mut muted = fm_snapshot(&inst, 127);
+    muted.channels.clear();
+
+    let control = render_snapshot_with_edits(fm_snapshot(&inst, 127), TOTAL_SECS, &[]);
+    let after = render_snapshot_with_edits(
+        fm_snapshot(&inst, 127),
+        TOTAL_SECS,
+        &[(EDIT_AT, AudioCommand::ReloadSequence { snapshot: muted })],
+    );
+
+    let c = stats_window(&control, RELEASE_FROM, WINDOW_TO);
+    let m = stats_window(&after, RELEASE_FROM, WINDOW_TO);
+    let db = db_ratio(m.rms, c.rms);
+    assert!(
+        db < -40.0,
+        "after muting the track the note is still ringing at {db:+.1} dB relative to \
+         the unmuted control (control rms={:.5}, after mute rms={:.5})",
+        c.rms,
+        m.rms
+    );
+}
+
+/// Same for PSG: a removed note must not be left holding its envelope, which
+/// is what the blanket per-channel attenuation writes in `silence_all` used
+/// to guarantee.
+#[test]
+fn deleting_a_sounding_psg_note_still_silences_it() {
+    let mut emptied = psg_snapshot(vec![15, 15], 127);
+    emptied.channels[0].events.clear();
+
+    let control = render_snapshot_with_edits(psg_snapshot(vec![15, 15], 127), TOTAL_SECS, &[]);
+    let deleted = render_snapshot_with_edits(
+        psg_snapshot(vec![15, 15], 127),
+        TOTAL_SECS,
+        &[(EDIT_AT, AudioCommand::ReloadSequence { snapshot: emptied })],
+    );
+
+    let c = stats_window(&control, RELEASE_FROM, WINDOW_TO);
+    let d = stats_window(&deleted, RELEASE_FROM, WINDOW_TO);
+    let db = db_ratio(d.rms, c.rms);
+    assert!(
+        db < -40.0,
+        "after deleting the sounding PSG note the channel is still ringing at \
+         {db:+.1} dB (control rms={:.5}, after delete rms={:.5})",
+        c.rms,
+        d.rms
+    );
+}
+
+/// Transposing the sounding note (its pitch no longer matches) is not a
+/// survivor: the old pitch must stop rather than keep ringing at the wrong
+/// frequency until the next event.
+#[test]
+fn retuning_the_sounding_note_stops_the_old_pitch() {
+    let inst = load_pack_fm(VOICE);
+    let mut retuned = fm_snapshot(&inst, 127);
+    for ev in retuned.channels[0].events.iter_mut() {
+        match ev {
+            SequencerEvent::NoteOn { pitch, .. } => *pitch = 67,
+            SequencerEvent::NoteOff { pitch, .. } => *pitch = 67,
+        }
+    }
+
+    let control = render_snapshot_with_edits(fm_snapshot(&inst, 127), TOTAL_SECS, &[]);
+    let after = render_snapshot_with_edits(
+        fm_snapshot(&inst, 127),
+        TOTAL_SECS,
+        &[(EDIT_AT, AudioCommand::ReloadSequence { snapshot: retuned })],
+    );
+
+    let c = stats_window(&control, RELEASE_FROM, WINDOW_TO);
+    let a = stats_window(&after, RELEASE_FROM, WINDOW_TO);
+    let db = db_ratio(a.rms, c.rms);
+    assert!(
+        db < -40.0,
+        "after retuning the sounding note the old pitch is still ringing at {db:+.1} dB \
+         (control rms={:.5}, after retune rms={:.5})",
+        c.rms,
+        a.rms
+    );
+}
+
+// --------------------------------------------------------------------------
 // Cross-channel: the banked follow-up's actual complaint.
 // --------------------------------------------------------------------------
 

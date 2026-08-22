@@ -751,8 +751,10 @@ designs target the banked specs (normative); manifest flags carry the gates.
   a certificate that the one-pointer case had been checked to the same standard;
   it had not. **A flagged weak point vouches for nothing but itself.**
 - 2026-08-22: **LIVE PARAMETER AUDIBILITY SHIPPED — F3 + F13 + the banked
-  `reload_snapshot`/`silence_all` follow-up, all ONE defect** (merged; lanes on
-  the MERGED tree recorded at the end of this entry).
+  `reload_snapshot`/`silence_all` follow-up, all ONE defect** (merged `7f59c18`;
+  lanes on the MERGED tree — the numbers that count, since this parcel and the
+  region-switch one landed the same day: cargo **254/0**, vitest **304/304**
+  across 30 files, build clean, no bindings drift).
   **REPRODUCED FIRST, as rendered audio** — new tests in
   `src-tauri/src/audio/live_edit_audibility.rs` on a harness extension
   (`rendered_rms::render_snapshot_with_edits` drops an `AudioCommand` into the
@@ -793,10 +795,25 @@ designs target the banked specs (normative); manifest flags carry the gates.
   sabotaging the orphan key-off; the 6 UI wiring tests by reverting each call
   site; the coalescer tests by degrading it to a naive call and to
   leading-edge-only.
-  **RATIFIED-PENDING (agent calls, flagged):** channel identity = `ChannelType`
-  equality; survivor test = same pitch, `start < tick < start+duration`;
-  preserve the FM register cache across reload; coalesce by round trip rather
-  than rAF/debounce; keep per-event `updateTrack` and coalesce only the reload.
+  **RATIFIED (all 7 agent calls, overseer review):** channel identity =
+  `ChannelType` equality; survivor test = same pitch, `start < tick <
+  start+duration`; preserve the FM register cache across reload; coalesce by
+  round trip rather than rAF/debounce; keep per-event `updateTrack` and
+  coalesce only the reload; PSG noise-mode edits deferred to the next note-on;
+  and the `Panic` cache fix taken as adjacent scope (leaving it would have been
+  a known-silent path with a test proving it silent — correct call).
+  **OVERSEER VERIFICATION (firsthand, before landing):** `db_ratio` asserts on
+  a zero reference and returns `-inf` rather than a floor, so the repeated
+  `-869.1 dB` across red messages is a real denormal residue, not a sentinel
+  standing in for "unmeasurable" — the reason a gate gives is checkable
+  separately from its verdict, and here both hold. The four "must still go
+  silent" tests compare against a CONTROL RENDER at a −40 dB threshold, not a
+  transcribed figure. Orphan key-off correctly runs BEFORE `load_snapshot`,
+  while the old channel table is still addressable.
+  **OBSERVED, NOT FIXED (overseer, low priority):** a surviving DAC note whose
+  SAMPLE changed keeps streaming the old sample to its end — `Dac(_)` has no
+  live reprogram arm. This is F3's shape for DAC and is invisible today because
+  no UI edits a DAC sample mid-note; it becomes real when one does.
   **DELIBERATELY OUT OF SCOPE (documented in the audit, do not re-derive):** a
   retuned note is not re-articulated (would re-attack during a drag); PSG
   noise-mode edits apply from the next note-on (re-writing the noise register

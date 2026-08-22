@@ -124,3 +124,70 @@ describe("PianoRoll keyboard transpose", () => {
     expect(ipc.updateNote).not.toHaveBeenCalled();
   });
 });
+
+/** All calls to `inner` landed between the group's begin and its end. */
+function expectGroupWraps(inner: ReturnType<typeof vi.mocked<any>>) {
+  expect(ipc.beginUndoGroup).toHaveBeenCalledTimes(1);
+  expect(ipc.endUndoGroup).toHaveBeenCalledTimes(1);
+  const begin = vi.mocked(ipc.beginUndoGroup).mock.invocationCallOrder[0];
+  const end = vi.mocked(ipc.endUndoGroup).mock.invocationCallOrder[0];
+  for (const order of inner.mock.invocationCallOrder) {
+    expect(order).toBeGreaterThan(begin);
+    expect(order).toBeLessThan(end);
+  }
+}
+
+describe("PianoRoll batch edits coalesce into one undo group", () => {
+  it("keyboard transpose wraps its updateNote loop in a single undo group", async () => {
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expect(ipc.updateNote).toHaveBeenCalledTimes(2);
+    expectGroupWraps(vi.mocked(ipc.updateNote));
+  });
+
+  it("multi-note Delete wraps its deleteNote loop in a single undo group", async () => {
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "Delete" });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expect(ipc.deleteNote).toHaveBeenCalledTimes(2);
+    expectGroupWraps(vi.mocked(ipc.deleteNote));
+  });
+
+  it("Ctrl+D duplicate wraps its addNote loop in a single undo group", async () => {
+    vi.mocked(ipc.addNote).mockResolvedValue(2);
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "d", ctrlKey: true });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expect(ipc.addNote).toHaveBeenCalledTimes(2);
+    expectGroupWraps(vi.mocked(ipc.addNote));
+  });
+});
+
+describe("PianoRoll refresh on undo/redo", () => {
+  it("re-fetches notes when the song is reverted", async () => {
+    await renderRoll([note(0, 60)]);
+    vi.mocked(ipc.listTracks).mockClear();
+    act(() => {
+      window.dispatchEvent(new Event("seraph:song-reverted"));
+    });
+    await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
+  });
+
+  it("closes when the open region no longer exists after a revert", async () => {
+    const { region } = setupTracks([note(0, 60)]);
+    const onClose = vi.fn();
+    render(<PianoRoll region={region} onClose={onClose} playing={false} projectMeta={meta} />);
+    await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
+    await act(async () => {});
+    // The revert removed the region (e.g. undo of add_region).
+    vi.mocked(ipc.listTracks).mockResolvedValue([]);
+    act(() => {
+      window.dispatchEvent(new Event("seraph:song-reverted"));
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});

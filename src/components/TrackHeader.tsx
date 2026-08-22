@@ -108,6 +108,19 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
     ipc.reloadSequence();
   }
 
+  // The slider fires one updateTrack per change event during a drag;
+  // bracket pointerdown→pointerup in an undo group so one drag = one undo
+  // step. The pointerup listener is window-level and one-shot: it fires
+  // even when the pointer is released outside the slider.
+  function handleVolumePointerDown() {
+    ipc.beginUndoGroup();
+    const end = () => {
+      window.removeEventListener("pointerup", end);
+      ipc.endUndoGroup();
+    };
+    window.addEventListener("pointerup", end);
+  }
+
   async function handleVolume(e: React.ChangeEvent<HTMLInputElement>) {
     e.stopPropagation();
     const vol = parseInt(e.target.value);
@@ -174,6 +187,7 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
           max={127}
           value={track.volume}
           onChange={handleVolume}
+          onPointerDown={handleVolumePointerDown}
           onClick={(e) => e.stopPropagation()}
           title={`Vol: ${track.volume}`}
         />

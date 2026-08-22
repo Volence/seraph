@@ -6,6 +6,7 @@ import { PianoRollCanvas } from "./PianoRollCanvas";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
+import { SONG_REVERTED_EVENT } from "../utils/keyboard";
 import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes } from "../utils/pianoRollEdit";
 import styles from "./PianoRoll.module.css";
 
@@ -88,16 +89,32 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const playheadTick = playing ? interpolatedTick - region.startTick : -1;
 
+  // Ref so refresh()'s identity doesn't churn with the parent's inline
+  // onClose prop (refresh re-runs on identity change).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const refresh = useCallback(async () => {
     const tracks = await ipc.listTracks();
     const track = tracks.find((t) => t.id === region.trackId);
-    if (!track) return;
-    const r = track.regions.find((r) => r.id === region.regionId);
-    if (!r) return;
+    const r = track?.regions.find((r) => r.id === region.regionId);
+    if (!r) {
+      // The open region no longer exists (e.g. undo of its creation, or a
+      // reverted move) — close rather than editing a stale view.
+      onCloseRef.current();
+      return;
+    }
     setNotes(r.notes);
   }, [region.trackId, region.regionId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Undo/redo replaced the tracks server-side — re-fetch immediately.
+  useEffect(() => {
+    const onReverted = () => { refresh(); };
+    window.addEventListener(SONG_REVERTED_EVENT, onReverted);
+    return () => window.removeEventListener(SONG_REVERTED_EVENT, onReverted);
+  }, [refresh]);
 
   async function handleNoteAdd(tick: number, pitch: number, duration: number) {
     await ipc.addNote(region.trackId, region.regionId, tick, pitch, 100, duration);
@@ -142,6 +159,12 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     refresh();
   }
 
+  // Drag gestures (note move/resize) fire one updateNote per mousemove;
+  // bracketing mousedown→mouseup in an undo group coalesces the whole drag
+  // into a single undo step.
+  const handleGestureStart = useCallback(() => { ipc.beginUndoGroup(); }, []);
+  const handleGestureEnd = useCallback(() => { ipc.endUndoGroup(); }, []);
+
   async function handleVelocityChange(index: number, velocity: number) {
     const note = notes[index];
     if (!note) return;
@@ -165,9 +188,15 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
         const moves = transposeNotes(notes, selectedNotes, direction * step, minPitch, maxPitch);
         if (moves) {
           (async () => {
-            for (const m of moves) {
-              const n = notes[m.index];
-              await ipc.updateNote(region.trackId, region.regionId, m.index, n.tick, m.pitch, n.velocity, n.durationTicks);
+            // One transpose = one undo step: group the batch.
+            await ipc.beginUndoGroup();
+            try {
+              for (const m of moves) {
+                const n = notes[m.index];
+                await ipc.updateNote(region.trackId, region.regionId, m.index, n.tick, m.pitch, n.velocity, n.durationTicks);
+              }
+            } finally {
+              await ipc.endUndoGroup();
             }
             refresh();
           })();
@@ -176,8 +205,14 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
       if (e.key === "Delete" && selectedNotes.size > 0) {
         const sorted = Array.from(selectedNotes).sort((a, b) => b - a);
         (async () => {
-          for (const idx of sorted) {
-            await ipc.deleteNote(region.trackId, region.regionId, idx);
+          // One multi-delete = one undo step: group the batch.
+          await ipc.beginUndoGroup();
+          try {
+            for (const idx of sorted) {
+              await ipc.deleteNote(region.trackId, region.regionId, idx);
+            }
+          } finally {
+            await ipc.endUndoGroup();
           }
           setSelectedNotes(new Set());
           refresh();
@@ -198,10 +233,16 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           const minStart = sorted.reduce((m, idx) => Math.min(m, notes[idx].tick), Infinity);
           const offset = maxEnd - minStart;
           const newIndices: number[] = [];
-          for (const idx of sorted) {
-            const n = notes[idx];
-            const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks);
-            newIndices.push(newIdx);
+          // One duplicate = one undo step: group the addNote batch.
+          await ipc.beginUndoGroup();
+          try {
+            for (const idx of sorted) {
+              const n = notes[idx];
+              const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks);
+              newIndices.push(newIdx);
+            }
+          } finally {
+            await ipc.endUndoGroup();
           }
           await refresh();
           setSelectedNotes(new Set(newIndices));
@@ -297,6 +338,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           onAudition={handleAudition}
           onNoteResize={handleNoteResize}
           onNotesMove={handleNotesMove}
+          onGestureStart={handleGestureStart}
+          onGestureEnd={handleGestureEnd}
           onScrollTopChange={setScrollTop}
           onScrollLeftChange={setPianoScrollLeft}
           onZoom={handleZoom}

@@ -125,3 +125,10 @@
   min-width: 32px;
   text-align: right;
 }
+
+.dirtyDot {
+  margin-left: 5px;
+  font-size: 8px;
+  color: var(--accent-warning, #e8a33d);
+  vertical-align: middle;
+}

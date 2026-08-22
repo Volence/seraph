@@ -19,6 +19,7 @@ import type {
   Pan,
   PlaybackState,
   OverlapWarning,
+  UndoState,
   Result,
   ExportResult,
   ImportResult,
@@ -33,6 +34,7 @@ export type {
   ImportResult,
   ImportWarning,
   FmFileImportResponse,
+  UndoState,
 } from "../bindings";
 
 /** Unwrap a generated `Result<T, E>`: return `T` or throw the error payload. */
@@ -259,6 +261,30 @@ export async function deleteNote(
   noteIndex: number,
 ): Promise<void> {
   unwrap(await commands.deleteNote(trackId, regionId, noteIndex));
+}
+
+// --- Undo / Redo ---
+
+/** Undo the last song edit; resolves with the restored tracks. */
+export async function undo(): Promise<Track[]> {
+  return unwrap(await commands.undo());
+}
+
+export async function redo(): Promise<Track[]> {
+  return unwrap(await commands.redo());
+}
+
+/** Open a coalescing undo group (drag gesture / batch loop). */
+export async function beginUndoGroup(): Promise<void> {
+  unwrap(await commands.beginUndoGroup());
+}
+
+export async function endUndoGroup(): Promise<void> {
+  unwrap(await commands.endUndoGroup());
+}
+
+export async function getUndoState(): Promise<UndoState> {
+  return unwrap(await commands.getUndoState());
 }
 
 // --- Transport ---

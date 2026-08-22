@@ -244,8 +244,21 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
-    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240);
-    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240, null);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240, null);
+  });
+
+  it("paste preserves per-note voices into a same-kind region", async () => {
+    // One note carries a per-note voice override, one inherits the track's.
+    await renderRoll([{ ...note(0, 60), instrumentId: "voice-b" }, note(480, 64)], 960);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
+    // Copied from an "fm" region into the same "fm" region: the override
+    // travels with the paste; the plain note stays plain.
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240, "voice-b");
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240, null);
   });
 
   it("Ctrl+V anchors at tick 0 when the seek cursor is outside the region", async () => {
@@ -253,7 +266,7 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     selectAll();
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
-    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240));
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240, null));
   });
 
   it("paste wraps its addNote loop in one undo group and selects the pasted notes", async () => {
@@ -278,7 +291,7 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(1));
-    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 7440, 60, 100, 240);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 7440, 60, 100, 240, null);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("1"));
     warn.mockRestore();
   });
@@ -303,7 +316,7 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     // A different region, freshly mounted.
     await renderRoll([]);
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
-    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240));
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240, null));
   });
 
   it("Ctrl+C with no selection copies nothing", async () => {

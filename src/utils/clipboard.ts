@@ -20,7 +20,14 @@ export interface RegionClipboardEntry {
   };
 }
 
+/** Channel kind ("fm" | "psg" | "dac") of the region notes were copied
+ *  from — lets paste preserve per-note voices only into a same-kind region
+ *  (a voice id is meaningless on another chip, and the backend kind gate
+ *  would reject it). */
+export type NoteChannelKind = "fm" | "psg" | "dac";
+
 let noteClipboard: Note[] = [];
+let noteClipboardChannelType: NoteChannelKind | null = null;
 let regionClipboard: RegionClipboardEntry[] = [];
 let lastCopied: ClipboardKind | null = null;
 
@@ -29,8 +36,14 @@ let lastCopied: ClipboardKind | null = null;
  * to the source must not leak in). Notes are stored sorted by tick so the
  * earliest note is the paste anchor. An empty selection is a no-op (the
  * previous clipboard survives, like every other DAW). Returns the count.
+ * `sourceChannelType` records the copied region's channel kind so paste can
+ * keep per-note voices when (and only when) the target kind matches.
  */
-export function copyNotes(notes: Note[], selected: Iterable<number>): number {
+export function copyNotes(
+  notes: Note[],
+  selected: Iterable<number>,
+  sourceChannelType?: NoteChannelKind,
+): number {
   const picked: Note[] = [];
   for (const index of selected) {
     const n = notes[index];
@@ -39,12 +52,17 @@ export function copyNotes(notes: Note[], selected: Iterable<number>): number {
   if (picked.length === 0) return 0;
   picked.sort((a, b) => a.tick - b.tick);
   noteClipboard = picked;
+  noteClipboardChannelType = sourceChannelType ?? null;
   lastCopied = "notes";
   return picked.length;
 }
 
 export function getNoteClipboard(): Note[] {
   return noteClipboard;
+}
+
+export function getNoteClipboardChannelType(): NoteChannelKind | null {
+  return noteClipboardChannelType;
 }
 
 /** Snapshot copied regions. Empty input is a no-op, matching copyNotes. */
@@ -74,12 +92,22 @@ export function lastCopiedKind(): ClipboardKind | null {
 /** Test seam: clear all module state between test cases. */
 export function resetClipboardForTest(): void {
   noteClipboard = [];
+  noteClipboardChannelType = null;
   regionClipboard = [];
   lastCopied = null;
 }
 
 export interface NotePastePlan {
-  placements: { tick: number; pitch: number; velocity: number; durationTicks: number }[];
+  placements: {
+    tick: number;
+    pitch: number;
+    velocity: number;
+    durationTicks: number;
+    /** Per-note voice override carried from the copied note (null = none).
+     *  Callers pass it to addNote only when the target region's channel
+     *  kind matches the clipboard's recorded kind. */
+    instrumentId: string | null;
+  }[];
   /** Notes dropped because they would start at/past the region end. */
   skipped: number;
 }
@@ -110,6 +138,7 @@ export function planNotePaste(
       pitch: n.pitch,
       velocity: n.velocity,
       durationTicks: Math.min(n.durationTicks, regionDurationTicks - tick),
+      instrumentId: n.instrumentId ?? null,
     });
   }
   return { placements, skipped };

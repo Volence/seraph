@@ -10,7 +10,7 @@ import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
 import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes } from "../utils/pianoRollEdit";
-import { copyNotes, getNoteClipboard, lastCopiedKind, planNotePaste } from "../utils/clipboard";
+import { copyNotes, getNoteClipboard, getNoteClipboardChannelType, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
 import styles from "./PianoRoll.module.css";
@@ -283,12 +283,12 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedNotes.size > 0) {
         e.preventDefault();
-        copyNotes(notes, selectedNotes);
+        copyNotes(notes, selectedNotes, region.channelType);
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "x" && selectedNotes.size > 0) {
         e.preventDefault();
         // Cut = copy + grouped multi-delete.
-        copyNotes(notes, selectedNotes);
+        copyNotes(notes, selectedNotes, region.channelType);
         deleteSelection();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "v" && lastCopiedKind() === "notes") {
@@ -308,13 +308,20 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
             console.warn(`paste: skipped ${plan.skipped} note(s) past the region end`);
           }
           if (plan.placements.length > 0) {
+            // Per-note voices travel with the paste only into a same-kind
+            // region (a voice id is meaningless on another chip and the
+            // backend kind gate would reject the whole paste).
+            const keepVoices = getNoteClipboardChannelType() === region.channelType;
             (async () => {
               const newIndices: number[] = [];
               // One paste = one undo step: group the addNote batch.
               await ipc.beginUndoGroup();
               try {
                 for (const p of plan.placements) {
-                  const newIdx = await ipc.addNote(region.trackId, region.regionId, p.tick, p.pitch, p.velocity, p.durationTicks);
+                  const newIdx = await ipc.addNote(
+                    region.trackId, region.regionId, p.tick, p.pitch, p.velocity, p.durationTicks,
+                    keepVoices ? p.instrumentId : null,
+                  );
                   newIndices.push(newIdx);
                 }
               } finally {
@@ -347,7 +354,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           try {
             for (const idx of sorted) {
               const n = notes[idx];
-              const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks);
+              // Same region, same kind: duplication keeps per-note voices.
+              const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks, n.instrumentId ?? null);
               newIndices.push(newIdx);
             }
           } finally {

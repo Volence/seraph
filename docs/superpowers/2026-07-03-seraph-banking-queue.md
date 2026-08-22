@@ -844,6 +844,52 @@ designs target the banked specs (normative); manifest flags carry the gates.
   already-shipped PianoRoll reloads gapless, and it touches none of their call
   sites, so the two compose without rework.
 
+- 2026-08-22 (cont.): **DEAD-CODE WARNING TRIAGE LANDED** (merged `bff898d`;
+  lanes on the merged tree: cargo **254/0**, vitest **304/304** across 30 files,
+  build clean, no bindings drift, **0 build warnings** — down from 8).
+  Dispatched as triage rather than deletion precisely because a never-read field
+  in this repo has historically been a dropped-wiring bug; that framing paid for
+  itself once (see the parked finding below).
+  **REMOVED as genuinely dead (2):** `InstrumentData::PsgEnvelope::period` — all
+  four constructors hardcode `period: 0` and all three readers `..`-skip it; the
+  real period is derived from note pitch in `program_psg`, and
+  `PsgEnvelopePlayer` has no period field at all. `ChannelSequence::modulation` —
+  redundant, not dropped: it was sourced from **`tracks[0]` only**
+  (`manager.rs:987`), while the per-note fold at `manager.rs:928-934` already
+  carries each note's own track params into every `NoteOn`, which the sequencer
+  consumes. On a multi-track channel the removed path was an arbitrary track's
+  params, i.e. strictly worse than what remains.
+  **KEPT with narrow item-scoped `#[allow(dead_code)]` + reason (6):**
+  `encode_channel_events`, `ProjectManager::is_open`, `Ym2612::read_status` are
+  each referenced only from `#[cfg(test)]` modules (boundary spot-checked
+  overseer-side: chip.rs mod at 52 / call at 60, smps.rs 810 / 877, manager.rs
+  1537 / 1570) — deleting any would break tests. `read_status` is additionally
+  real YM2612 surface. `AudioThread::running` + `stop` are **live machinery
+  missing a caller**: the `running_cb` clone is read every buffer at
+  `thread.rs:136` and its silence branch works; what is absent is any
+  `RunEvent::Exit`/`on_window_event` handler in `lib.rs`. Deleting would have
+  taken the working silence branch with it.
+  **PARKED FINDING — `SequencerEvent::NoteOff::pitch` (owner ruling needed).**
+  The field holds the correct **transposed** pitch (`manager.rs:946-949`) and no
+  reader ever consults it: `process_event` matches `NoteOff { .. }` and keys off
+  unconditionally (`sequencer/mod.rs:388-391`). Meanwhile `build_snapshot` merges
+  **multiple tracks onto one channel** into a single sorted list
+  (`manager.rs:903`, `for track in tracks`) and knows it — it emits
+  `OverlapWarning`s for exactly this (`:971-979`). So for A(tick 0, dur 480) and
+  B(tick 240, dur 480) on one channel the list is On(A,0), On(B,240), Off(A,480),
+  Off(B,720), and the **stale Off(A) keys off B at 480**, truncating it 240 ticks
+  early. Verified firsthand overseer-side; the guard is already available, since
+  `self.active_notes[ch_idx]` is maintained on note-on at `mod.rs:386`.
+  **The open question is semantic, not mechanical:** the channel is documented
+  monophonic and overlaps are surfaced as warnings, so last-note-priority
+  truncation may be intended. Note a pitch guard is only a partial fix — two
+  overlapping notes at the SAME pitch still cut each other off. Do not
+  "fix" this without a ruling; the field and its FINDING comment stay put so the
+  evidence is not erased. Agent correctly declined to fix or to add a gate.
+  **PRE-EXISTING, untouched, out of scope:** `unused variable: track_idx` at
+  `import/smps_mapper.rs:1062` (+2 `unused_assignments` in the same unit) —
+  visible only in the `cfg(test)` build, not in `cargo build`.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

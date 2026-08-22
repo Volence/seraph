@@ -7,10 +7,11 @@ import { PianoRollRuler } from "./PianoRollRuler";
 import { zoomAroundPixel } from "../utils/zoomDrag";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
+import * as library from "../api/library";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
 import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes } from "../utils/pianoRollEdit";
-import { copyNotes, getNoteClipboard, lastCopiedKind, planNotePaste } from "../utils/clipboard";
+import { copyNotes, getNoteClipboard, getNoteClipboardChannelType, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
 import styles from "./PianoRoll.module.css";
@@ -59,6 +60,24 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
 
 export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
+  // The voice a note WITHOUT a per-note override inherits (region default,
+  // else track default) — the baseline the canvas compares per-note voices
+  // against when deciding to draw a distinct voice color.
+  const [defaultVoiceId, setDefaultVoiceId] = useState<string | null>(null);
+  // Library-entry drag over the note canvas (kind-compatible only): cues
+  // the drop target like TrackHeader's dropTarget outline.
+  const [voiceDropOver, setVoiceDropOver] = useState(false);
+  // Non-modal inline notice in the piano-roll header (the app has no toast
+  // system): drop hints and backend rejections (e.g. the voice-overlap
+  // rule) land here and clear after a few seconds.
+  const [voiceHint, setVoiceHint] = useState<string | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showVoiceHint(msg: string) {
+    setVoiceHint(msg);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setVoiceHint(null), 5000);
+  }
+  useEffect(() => () => { if (hintTimer.current) clearTimeout(hintTimer.current); }, []);
   // Silent-lane cue (F2): build_snapshot drops every note on a track with
   // no instrument, and the click-audition no-ops — the header must say so.
   // Starts true so the badge never flashes before the first fetch lands.
@@ -135,6 +154,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       return;
     }
     setNotes(r.notes);
+    setDefaultVoiceId(r.instrumentId ?? track?.instrumentId ?? null);
     // (`r` existing implies `track` exists; optional chain keeps tsc happy.)
     setHasInstrument(track?.instrumentId != null);
   }, [region.trackId, region.regionId]);
@@ -321,12 +341,12 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedNotes.size > 0) {
         e.preventDefault();
-        copyNotes(notes, selectedNotes);
+        copyNotes(notes, selectedNotes, region.channelType);
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "x" && selectedNotes.size > 0) {
         e.preventDefault();
         // Cut = copy + grouped multi-delete.
-        copyNotes(notes, selectedNotes);
+        copyNotes(notes, selectedNotes, region.channelType);
         deleteSelection();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "v" && lastCopiedKind() === "notes") {
@@ -346,13 +366,20 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
             console.warn(`paste: skipped ${plan.skipped} note(s) past the region end`);
           }
           if (plan.placements.length > 0) {
+            // Per-note voices travel with the paste only into a same-kind
+            // region (a voice id is meaningless on another chip and the
+            // backend kind gate would reject the whole paste).
+            const keepVoices = getNoteClipboardChannelType() === region.channelType;
             (async () => {
               const newIndices: number[] = [];
               // One paste = one undo step: group the addNote batch.
               await ipc.beginUndoGroup();
               try {
                 for (const p of plan.placements) {
-                  const newIdx = await ipc.addNote(region.trackId, region.regionId, p.tick, p.pitch, p.velocity, p.durationTicks);
+                  const newIdx = await ipc.addNote(
+                    region.trackId, region.regionId, p.tick, p.pitch, p.velocity, p.durationTicks,
+                    keepVoices ? p.instrumentId : null,
+                  );
                   newIndices.push(newIdx);
                 }
               } finally {
@@ -387,7 +414,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           try {
             for (const idx of sorted) {
               const n = notes[idx];
-              const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks);
+              // Same region, same kind: duplication keeps per-note voices.
+              const newIdx = await ipc.addNote(region.trackId, region.regionId, n.tick + offset, n.pitch, n.velocity, n.durationTicks, n.instrumentId ?? null);
               newIndices.push(newIdx);
             }
           } finally {
@@ -420,6 +448,59 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       const dacNote = notes.find(n => n.pitch === pitch && n.instrumentId);
       const dacInstId = dacNote?.instrumentId ?? track.instrumentId;
       if (dacInstId) await ipc.previewDac(dacInstId);
+    }
+  }
+
+  // --- Library voice drop (set voice on the selected notes) ---
+  // Kind-gated like TrackHeader's drop handler: only the kind-suffixed drag
+  // type is readable during dragover, so the cue lights only for a
+  // compatible voice; the drop itself re-checks the payload's kind before
+  // touching the backend (which remains the source of truth).
+  function handleVoiceDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(library.LIBRARY_DRAG_TYPE)) return;
+    e.preventDefault();
+    const compatible = e.dataTransfer.types.includes(
+      `${library.LIBRARY_DRAG_TYPE}-${region.channelType}`,
+    );
+    e.dataTransfer.dropEffect = compatible ? "copy" : "none";
+    setVoiceDropOver(compatible);
+  }
+
+  async function handleVoiceDrop(e: React.DragEvent) {
+    setVoiceDropOver(false);
+    const raw = e.dataTransfer.getData(library.LIBRARY_DRAG_TYPE);
+    if (!raw) return;
+    e.preventDefault();
+    let hash: string, kind: string;
+    try {
+      ({ hash, kind } = JSON.parse(raw) as { hash: string; kind: string });
+    } catch {
+      return;
+    }
+    if (kind !== region.channelType) {
+      showVoiceHint(`Only ${region.channelType.toUpperCase()} voices can be dropped on this lane`);
+      return;
+    }
+    if (selectedNotes.size === 0) {
+      // Deliberately NOT retargeting the whole track: an unselected drop on
+      // the canvas does nothing but hint.
+      showVoiceHint("Select notes first — dropping a voice sets it on the selected notes");
+      return;
+    }
+    try {
+      const instId = await library.libraryEnsureProjectInstrument(hash);
+      await ipc.setNoteInstrument(
+        region.trackId,
+        region.regionId,
+        Array.from(selectedNotes).sort((a, b) => a - b),
+        instId,
+      );
+      await refresh();
+      await ipc.reloadSequence();
+    } catch (err) {
+      // Backend gate rejection (kind / voice-overlap) — non-modal notice.
+      showVoiceHint(String(err));
+      console.error("Set note voice failed:", err);
     }
   }
 
@@ -459,6 +540,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           </span>
         )}
         {selInfo && <span className={styles.noteInfo}>{selInfo}</span>}
+        {voiceHint && <span className={styles.voiceHint}>{voiceHint}</span>}
         <select
           className={styles.gridSelect}
           value={gridIdx}
@@ -495,6 +577,12 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           onAudition={handleAudition}
           drumLabels={drumLabels}
         />
+        <div
+          className={`${styles.noteDropZone} ${voiceDropOver ? styles.voiceDropActive : ""}`}
+          onDragOver={handleVoiceDragOver}
+          onDragLeave={() => setVoiceDropOver(false)}
+          onDrop={handleVoiceDrop}
+        >
         <PianoRollCanvas
           notes={notes}
           minPitch={minPitch}
@@ -521,7 +609,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           playheadTick={playheadTick}
           playing={playing}
           suppressFollow={loopEnabled}
+          defaultVoiceId={defaultVoiceId}
         />
+        </div>
       </div>
       <VelocityLane
         notes={notes}

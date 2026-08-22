@@ -3,11 +3,19 @@ import { render, waitFor, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/dom";
 import { PianoRoll } from "./PianoRoll";
 import * as ipc from "../api/ipc";
+import * as library from "../api/library";
 import { OCTAVE_SEMITONES, PITCH_RANGES } from "../utils/pianoRollEdit";
 import { resetClipboardForTest } from "../utils/clipboard";
 import type { Note, SelectedRegion, SongMetadata, Track } from "../types/model";
 
 vi.mock("../api/ipc");
+// Keep the real LIBRARY_DRAG_TYPE constant (the drop handlers key off it);
+// mock only the async API surface.
+vi.mock("../api/library", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/library")>()),
+  libraryEnsureProjectInstrument: vi.fn(),
+  libraryAssignToTrack: vi.fn(),
+}));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }));
@@ -244,8 +252,21 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
-    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240);
-    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240, null);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240, null);
+  });
+
+  it("paste preserves per-note voices into a same-kind region", async () => {
+    // One note carries a per-note voice override, one inherits the track's.
+    await renderRoll([{ ...note(0, 60), instrumentId: "voice-b" }, note(480, 64)], 960);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
+    // Copied from an "fm" region into the same "fm" region: the override
+    // travels with the paste; the plain note stays plain.
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240, "voice-b");
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240, null);
   });
 
   it("Ctrl+V anchors at tick 0 when the seek cursor is outside the region", async () => {
@@ -253,7 +274,7 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     selectAll();
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
-    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240));
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240, null));
   });
 
   it("paste wraps its addNote loop in one undo group and selects the pasted notes", async () => {
@@ -278,7 +299,7 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(1));
-    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 7440, 60, 100, 240);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 7440, 60, 100, 240, null);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("1"));
     warn.mockRestore();
   });
@@ -303,7 +324,7 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     // A different region, freshly mounted.
     await renderRoll([]);
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
-    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240));
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240, null));
   });
 
   it("Ctrl+C with no selection copies nothing", async () => {
@@ -546,5 +567,66 @@ describe("note placement velocity", () => {
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalled());
     const call = vi.mocked(ipc.addNote).mock.calls[0];
     expect(call[4]).toBe(127);
+  });
+});
+
+describe("library voice drop on the note canvas", () => {
+  // DOM order: ruler canvas, keys canvas, note canvas, velocity lane canvas.
+  function noteCanvas(container: HTMLElement): Element {
+    return container.querySelectorAll("canvas")[2];
+  }
+
+  /** DataTransfer stub matching LibraryPanel's drag source: JSON payload
+   *  under LIBRARY_DRAG_TYPE plus the kind-suffixed compatibility type. */
+  function libraryDrag(kind: string, hash = "hash-1") {
+    return {
+      types: [library.LIBRARY_DRAG_TYPE, `${library.LIBRARY_DRAG_TYPE}-${kind}`],
+      getData: (t: string) =>
+        t === library.LIBRARY_DRAG_TYPE ? JSON.stringify({ hash, kind }) : "",
+      dropEffect: "none",
+      effectAllowed: "copy",
+    };
+  }
+
+  it("drop with NO selection sets nothing and shows a hint", async () => {
+    const { container, findByText } = await renderRoll([note(0, 60)]);
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm") });
+    expect(await findByText(/select notes/i)).toBeInTheDocument();
+    expect(library.libraryEnsureProjectInstrument).not.toHaveBeenCalled();
+    expect(ipc.setNoteInstrument).not.toHaveBeenCalled();
+  });
+
+  it("drop with a selection resolves the hash and sets the voice on the selected notes", async () => {
+    vi.mocked(library.libraryEnsureProjectInstrument).mockResolvedValue("inst-9");
+    vi.mocked(ipc.setNoteInstrument).mockResolvedValue(undefined);
+    const { container } = await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm", "hash-7") });
+    await waitFor(() =>
+      expect(ipc.setNoteInstrument).toHaveBeenCalledWith("track-1", "region-1", [0, 1], "inst-9"),
+    );
+    expect(library.libraryEnsureProjectInstrument).toHaveBeenCalledWith("hash-7");
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+  });
+
+  it("a wrong-kind drop is rejected without touching the backend", async () => {
+    const { container, findByText } = await renderRoll([note(0, 60)]);
+    selectAll();
+    // PSG voice onto an FM roll.
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("psg") });
+    expect(await findByText(/FM voices/)).toBeInTheDocument();
+    expect(library.libraryEnsureProjectInstrument).not.toHaveBeenCalled();
+    expect(ipc.setNoteInstrument).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a backend voice-overlap rejection non-modally in the header", async () => {
+    vi.mocked(library.libraryEnsureProjectInstrument).mockResolvedValue("inst-9");
+    vi.mocked(ipc.setNoteInstrument).mockRejectedValue(
+      "voice-overlap: notes with different voices would overlap on FM1 at ticks 240-480",
+    );
+    const { container, findByText } = await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm") });
+    expect(await findByText(/voice-overlap/)).toBeInTheDocument();
   });
 });

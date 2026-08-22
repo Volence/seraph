@@ -914,11 +914,37 @@ pub fn add_note(
     pitch: u8,
     velocity: u8,
     duration_ticks: u64,
+    instrument_id: Option<String>,
 ) -> Result<usize, String> {
     let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
     let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let inst_uuid = instrument_id
+        .map(|s| Uuid::parse_str(&s).map_err(|e| format!("invalid UUID: {e}")))
+        .transpose()?;
     let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
-    mgr.add_note(t_uuid, r_uuid, tick, pitch, velocity, duration_ticks)
+    mgr.add_note(t_uuid, r_uuid, tick, pitch, velocity, duration_ticks, inst_uuid)
+}
+
+/// Set (or clear, with `None`) the per-note voice on a batch of selected
+/// notes — one undoable edit. Validated in the manager: kind gate (FM voice
+/// ↔ FM channel, …) then the "voice-overlap" gate (an edit may not leave
+/// notes with DIFFERENT effective voices overlapping on one channel).
+#[tauri::command]
+#[specta::specta]
+pub fn set_note_instrument(
+    state: State<'_, ProjectState>,
+    track_id: String,
+    region_id: String,
+    note_indices: Vec<usize>,
+    instrument_id: Option<String>,
+) -> Result<(), String> {
+    let t_uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let r_uuid = Uuid::parse_str(&region_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let inst_uuid = instrument_id
+        .map(|s| Uuid::parse_str(&s).map_err(|e| format!("invalid UUID: {e}")))
+        .transpose()?;
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.set_note_instrument(t_uuid, r_uuid, &note_indices, inst_uuid)
 }
 
 #[tauri::command]
@@ -1466,6 +1492,24 @@ pub fn library_assign_to_track(
     let inst = find_library_instrument(&lib, &hash)?;
     let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let id = mgr.assign_library_instrument_to_track(track_uuid, &inst, &hash)?;
+    Ok(id.to_string())
+}
+
+/// Resolve a library entry into the project's instrument bank WITHOUT
+/// touching any track: reuse a same-content-hash project instrument or add
+/// the voice. Returns the project instrument id. Backs the piano-roll
+/// note-voice drop, where `set_note_instrument` needs a project instrument
+/// id but the drag payload carries a library hash.
+#[tauri::command]
+#[specta::specta]
+pub fn library_ensure_project_instrument(
+    project_state: State<'_, ProjectState>,
+    lib: State<'_, LibraryState>,
+    hash: String,
+) -> Result<String, String> {
+    let inst = find_library_instrument(&lib, &hash)?;
+    let mut mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    let (id, _name) = mgr.ensure_library_instrument_in_bank(&inst, &hash);
     Ok(id.to_string())
 }
 

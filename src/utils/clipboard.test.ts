@@ -3,6 +3,7 @@ import type { Note } from "../types/model";
 import {
   copyNotes,
   getNoteClipboard,
+  getNoteClipboardChannelType,
   copyRegions,
   getRegionClipboard,
   lastCopiedKind,
@@ -66,8 +67,8 @@ describe("planNotePaste", () => {
     const clip = [note(480, 60), note(960, 64)];
     const plan = planNotePaste(clip, 1200, 7680);
     expect(plan.placements).toEqual([
-      { tick: 1200, pitch: 60, velocity: 100, durationTicks: 240 },
-      { tick: 1680, pitch: 64, velocity: 100, durationTicks: 240 },
+      { tick: 1200, pitch: 60, velocity: 100, durationTicks: 240, instrumentId: null },
+      { tick: 1680, pitch: 64, velocity: 100, durationTicks: 240, instrumentId: null },
     ]);
     expect(plan.skipped).toBe(0);
   });
@@ -85,7 +86,7 @@ describe("planNotePaste", () => {
     const clip = [note(0, 60, 480)];
     const plan = planNotePaste(clip, 900, 1000);
     expect(plan.placements).toEqual([
-      { tick: 900, pitch: 60, velocity: 100, durationTicks: 100 },
+      { tick: 900, pitch: 60, velocity: 100, durationTicks: 100, instrumentId: null },
     ]);
     expect(plan.skipped).toBe(0);
   });
@@ -94,5 +95,33 @@ describe("planNotePaste", () => {
     const plan = planNotePaste([], 0, 1000);
     expect(plan.placements).toEqual([]);
     expect(plan.skipped).toBe(0);
+  });
+});
+
+describe("per-note voice preservation", () => {
+  it("planNotePaste carries each note's instrumentId through to its placement", () => {
+    const clip: Note[] = [{ ...note(0, 60), instrumentId: "voice-1" }, note(240, 62)];
+    const plan = planNotePaste(clip, 0, 7680);
+    expect(plan.placements.map((p) => p.instrumentId)).toEqual(["voice-1", null]);
+  });
+
+  it("copyNotes records the source channel kind for kind-gated paste", () => {
+    copyNotes([note(0, 60)], new Set([0]), "fm");
+    expect(getNoteClipboardChannelType()).toBe("fm");
+  });
+
+  it("a copy without a channel kind, and a reset, clear the recorded kind", () => {
+    copyNotes([note(0, 60)], new Set([0]), "psg");
+    copyNotes([note(0, 60)], new Set([0]));
+    expect(getNoteClipboardChannelType()).toBeNull();
+    copyNotes([note(0, 60)], new Set([0]), "psg");
+    resetClipboardForTest();
+    expect(getNoteClipboardChannelType()).toBeNull();
+  });
+
+  it("an empty selection does not clobber the recorded kind (clipboard untouched)", () => {
+    copyNotes([note(0, 60)], new Set([0]), "fm");
+    copyNotes([note(0, 60)], new Set(), "psg");
+    expect(getNoteClipboardChannelType()).toBe("fm");
   });
 });

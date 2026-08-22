@@ -6,6 +6,7 @@ import {
   marqueePreviewSelection,
 } from "../utils/pianoRollEdit";
 import { followScrollLeft, followAllowed } from "../utils/followPlayhead";
+import { voiceColor } from "../utils/voiceColor";
 import styles from "./PianoRollCanvas.module.css";
 
 interface PianoRollCanvasProps {
@@ -38,6 +39,11 @@ interface PianoRollCanvasProps {
   /** Suppress follow-playhead paging entirely (set while a preview loop is
    *  active — owner ruling: a looping playback must not move the view). */
   suppressFollow?: boolean;
+  /** The voice a note WITHOUT a per-note override inherits (region default,
+   *  else track default). Notes whose own instrumentId differs draw in a
+   *  deterministic per-voice color with a patch chip at the left edge;
+   *  same-as-default notes render exactly as before. */
+  defaultVoiceId?: string | null;
 }
 
 const EDGE_THRESHOLD = 6;
@@ -74,6 +80,7 @@ export function PianoRollCanvas({
   playheadTick,
   playing,
   suppressFollow = false,
+  defaultVoiceId = null,
 }: PianoRollCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -179,12 +186,27 @@ export function PianoRollCanvas({
       const y = row * rowHeight + 1;
       const h = rowHeight - 2;
 
+      // A per-note voice differing from the inherited default draws in its
+      // deterministic per-voice color; same-as-default notes keep the
+      // channel color exactly as before. Selected-state styling (solid
+      // fill + white stroke) stays readable on top of either.
+      const noteVoice = note.instrumentId ?? null;
+      const voiceOverridden = noteVoice !== null && noteVoice !== defaultVoiceId;
+      const baseColor = voiceOverridden ? voiceColor(noteVoice) : channelColor;
+
       const selected = highlight.has(i);
-      ctx.fillStyle = selected ? channelColor : channelColor + "cc";
+      ctx.fillStyle = selected ? baseColor : baseColor + "cc";
       ctx.fillRect(drawX, y, w, h);
-      ctx.strokeStyle = selected ? "#ffffff" : channelColor;
+      ctx.strokeStyle = selected ? "#ffffff" : baseColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(drawX + 0.5, y + 0.5, w - 1, h - 1);
+
+      if (voiceOverridden && w > 6) {
+        // "Patch chip" (S4 vocabulary): a small marker at the note's left
+        // edge flagging a per-note voice.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(drawX + 1, y + 1, 3, h - 2);
+      }
 
       if (note.modulation && w > 8) {
         ctx.strokeStyle = "#ffffff44";
@@ -249,7 +271,7 @@ export function PianoRollCanvas({
         ctx.stroke();
       }
     }
-  }, [notes, minPitch, maxPitch, durationTicks, ticksPerPixel, scrollLeft, rowHeight, gridSnapTicks, channelColor, selectedNotes, canvasHeight, totalNotes, playheadTick]);
+  }, [notes, minPitch, maxPitch, durationTicks, ticksPerPixel, scrollLeft, rowHeight, gridSnapTicks, channelColor, selectedNotes, canvasHeight, totalNotes, playheadTick, defaultVoiceId]);
 
   const animRef = useRef(0);
   useEffect(() => {

@@ -323,9 +323,9 @@ async deleteRegion(trackId: string, regionId: string) : Promise<Result<null, str
     else return { status: "error", error: e  as any };
 }
 },
-async addNote(trackId: string, regionId: string, tick: number, pitch: number, velocity: number, durationTicks: number) : Promise<Result<number, string>> {
+async addNote(trackId: string, regionId: string, tick: number, pitch: number, velocity: number, durationTicks: number, instrumentId: string | null) : Promise<Result<number, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("add_note", { trackId, regionId, tick, pitch, velocity, durationTicks }) };
+    return { status: "ok", data: await TAURI_INVOKE("add_note", { trackId, regionId, tick, pitch, velocity, durationTicks, instrumentId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -342,6 +342,20 @@ async updateNote(trackId: string, regionId: string, noteIndex: number, tick: num
 async deleteNote(trackId: string, regionId: string, noteIndex: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("delete_note", { trackId, regionId, noteIndex }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set (or clear, with `None`) the per-note voice on a batch of selected
+ * notes — one undoable edit. Validated in the manager: kind gate (FM voice
+ * ↔ FM channel, …) then the "voice-overlap" gate (an edit may not leave
+ * notes with DIFFERENT effective voices overlapping on one channel).
+ */
+async setNoteInstrument(trackId: string, regionId: string, noteIndices: number[], instrumentId: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_note_instrument", { trackId, regionId, noteIndices, instrumentId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -616,6 +630,21 @@ async libraryAddToProject(hash: string) : Promise<Result<string, string>> {
 async libraryAssignToTrack(trackId: string, hash: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("library_assign_to_track", { trackId, hash }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Resolve a library entry into the project's instrument bank WITHOUT
+ * touching any track: reuse a same-content-hash project instrument or add
+ * the voice. Returns the project instrument id. Backs the piano-roll
+ * note-voice drop, where `set_note_instrument` needs a project instrument
+ * id but the drag payload carries a library hash.
+ */
+async libraryEnsureProjectInstrument(hash: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("library_ensure_project_instrument", { hash }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

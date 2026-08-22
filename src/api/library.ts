@@ -87,6 +87,16 @@ export async function libraryAssignToTrack(trackId: string, hash: string): Promi
   return unwrap(await commands.libraryAssignToTrack(trackId, hash));
 }
 
+/**
+ * Resolve a library entry into the project's instrument bank WITHOUT touching
+ * any track (reuse by content hash, else add). Returns the project instrument
+ * id — the id `setNoteInstrument` wants when a library entry is dropped on
+ * selected notes.
+ */
+export async function libraryEnsureProjectInstrument(hash: string): Promise<string> {
+  return unwrap(await commands.libraryEnsureProjectInstrument(hash));
+}
+
 export async function librarySaveFromProject(
   kind: string,
   id: string,

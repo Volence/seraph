@@ -253,7 +253,9 @@ export function ArrangementView({
                 // …else replay the copied payload (source was deleted).
                 newId = await ipc.addRegion(c.trackId, newStart, c.payload.durationTicks);
                 for (const n of c.payload.notes) {
-                  await ipc.addNote(c.trackId, newId, n.tick, n.pitch, n.velocity, n.durationTicks);
+                  // Replay lands on the SAME track the region was copied
+                  // from, so per-note voices are always kind-safe to keep.
+                  await ipc.addNote(c.trackId, newId, n.tick, n.pitch, n.velocity, n.durationTicks, n.instrumentId ?? null);
                 }
               }
               const track = tracks.find((t) => t.id === c.trackId);

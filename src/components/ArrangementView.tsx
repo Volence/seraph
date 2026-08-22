@@ -63,6 +63,9 @@ export function ArrangementView({
 }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [showAddTrack, setShowAddTrack] = useState(false);
+  // Arrangement snap (region create/move/resize, ruler loop drag). The
+  // piano roll keeps its own grid selector.
+  const [snapMode, setSnapMode] = useState<grid.SnapMode>("bar");
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta);
@@ -342,6 +345,18 @@ export function ArrangementView({
             );
           })}
           <div className={styles.addButtons}>
+            <label className={styles.snapControl} title="Arrangement snap (regions and loop drag)">
+              Snap
+              <select
+                className={styles.snapSelect}
+                value={snapMode}
+                onChange={(e) => setSnapMode(e.target.value as grid.SnapMode)}
+              >
+                <option value="bar">Bar</option>
+                <option value="beat">Beat</option>
+                <option value="off">Off</option>
+              </select>
+            </label>
             <button className={styles.addBtn} onClick={() => setShowAddTrack(true)}>+ Track</button>
             <button className={styles.addBtn} onClick={addFm}>+ FM Patch</button>
             <button className={styles.addBtn} onClick={addPsg}>+ PSG Env</button>
@@ -385,6 +400,7 @@ export function ArrangementView({
           onRegionCreate={handleRegionCreate}
           onSeek={handleSeek}
           seekTick={seekTick}
+          snapMode={snapMode}
         />
       </div>
       {showAddTrack && (

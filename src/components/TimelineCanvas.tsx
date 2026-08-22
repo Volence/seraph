@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import type { Track, SelectedRegion } from "../types/model";
+import { snapTick, snapUnit, type SnapMode } from "../utils/grid";
 import styles from "./TimelineCanvas.module.css";
 
 interface TimelineCanvasProps {
@@ -17,10 +18,12 @@ interface TimelineCanvasProps {
   onSelectRegions: (regions: SelectedRegion[]) => void;
   onRegionMove: (srcTrackId: string, regionId: string, dstTrackId: string, startTick: number, tickDelta: number, trackDelta: number) => void;
   onRegionResize: (trackId: string, regionId: string, startTick: number, durationTicks: number) => void;
-  /** Double-click on an empty stretch of a track lane: create a region there (bar-snapped). */
+  /** Double-click on an empty stretch of a track lane: create a region there (snapped to `snapMode`). */
   onRegionCreate: (trackIdx: number, startTick: number) => void;
   onSeek: (tick: number) => void;
   seekTick: number;
+  /** Arrangement snap granularity (region create/move/resize). */
+  snapMode: SnapMode;
 }
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -72,6 +75,7 @@ export function TimelineCanvas({
   onRegionCreate,
   onSeek,
   seekTick,
+  snapMode,
 }: TimelineCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,14 +83,18 @@ export function TimelineCanvas({
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
   dragRef.current = drag;
-  const ticksPerBar = ticksPerBeat * beatsPerBar;
+  // The denominator never enters bar math (ticksPerBar = tpb * numerator),
+  // so a placeholder 4 keeps GridMeta satisfied without threading it through.
+  const gridMeta = { ticksPerBeat, timeSignature: [beatsPerBar, 4] as [number, number] };
+  // One snap step: the minimum region length and the resize floor.
+  const snapStep = snapUnit(gridMeta, snapMode);
 
   function pixelToTick(px: number): number {
     return px * ticksPerPixel + scrollLeft * ticksPerPixel;
   }
 
-  function snapToBar(tick: number): number {
-    return Math.floor(tick / ticksPerBar) * ticksPerBar;
+  function snap(tick: number): number {
+    return snapTick(tick, gridMeta, snapMode);
   }
 
   function hitTestRegion(x: number, y: number): {
@@ -226,7 +234,7 @@ export function TimelineCanvas({
       if (d.mode === "move" && d.regionStartTick != null && d.regionDuration != null) {
         const deltaPx = d.currentX - d.startX;
         const deltaTick = deltaPx * ticksPerPixel;
-        const snappedTickDelta = snapToBar(Math.max(0, d.regionStartTick + deltaTick)) - d.regionStartTick;
+        const snappedTickDelta = snap(Math.max(0, d.regionStartTick + deltaTick)) - d.regionStartTick;
         const trackDelta = d.currentTrackIdx - d.trackIdx;
 
         const regionsToPreview = selectedRegions.length > 1 && selectedRegions.some((s) => s.regionId === d.regionId)
@@ -262,13 +270,13 @@ export function TimelineCanvas({
         const deltaTick = deltaPx * ticksPerPixel;
         let newStart: number, newEnd: number;
         if (d.mode === "resize-left") {
-          newStart = snapToBar(Math.max(0, origStart + deltaTick));
+          newStart = snap(Math.max(0, origStart + deltaTick));
           newEnd = origEnd;
-          if (newStart >= newEnd) newStart = newEnd - ticksPerBar;
+          if (newStart >= newEnd) newStart = newEnd - snapStep;
         } else {
           newStart = origStart;
-          newEnd = snapToBar(origEnd + deltaTick);
-          if (newEnd <= newStart) newEnd = newStart + ticksPerBar;
+          newEnd = snap(origEnd + deltaTick);
+          if (newEnd <= newStart) newEnd = newStart + snapStep;
         }
         const tIdx = d.trackIdx;
         const track = tIdx < tracks.length ? tracks[tIdx] : null;
@@ -309,7 +317,7 @@ export function TimelineCanvas({
         ctx.stroke();
       }
     }
-  }, [tracks, ticksPerPixel, scrollLeft, trackHeight, playbackTick, playing, selectedRegions, ticksPerBar, drag, seekTick]);
+  }, [tracks, ticksPerPixel, scrollLeft, trackHeight, playbackTick, playing, selectedRegions, snapStep, drag, seekTick]);
 
   useEffect(() => {
     function animate() {
@@ -423,7 +431,7 @@ export function TimelineCanvas({
       if (d.mode === "move" && movedEnough && d.regionTrackId && d.regionId && d.regionStartTick != null) {
         const deltaPx = endX - d.startX;
         const deltaTick = deltaPx * ticksPerPixel;
-        const snappedTickDelta = snapToBar(Math.max(0, d.regionStartTick + deltaTick)) - d.regionStartTick;
+        const snappedTickDelta = snap(Math.max(0, d.regionStartTick + deltaTick)) - d.regionStartTick;
         const newStart = Math.max(0, d.regionStartTick + snappedTickDelta);
         const endTrackIdx = Math.max(0, Math.min(tracks.length - 1, Math.floor(endY / trackHeight)));
         const trackDelta = endTrackIdx - d.trackIdx;
@@ -438,13 +446,13 @@ export function TimelineCanvas({
         const deltaTick = deltaPx * ticksPerPixel;
         let newStart: number, newEnd: number;
         if (d.mode === "resize-left") {
-          newStart = snapToBar(Math.max(0, origStart + deltaTick));
+          newStart = snap(Math.max(0, origStart + deltaTick));
           newEnd = origEnd;
-          if (newStart >= newEnd) newStart = newEnd - ticksPerBar;
+          if (newStart >= newEnd) newStart = newEnd - snapStep;
         } else {
           newStart = origStart;
-          newEnd = snapToBar(origEnd + deltaTick);
-          if (newEnd <= newStart) newEnd = newStart + ticksPerBar;
+          newEnd = snap(origEnd + deltaTick);
+          if (newEnd <= newStart) newEnd = newStart + snapStep;
         }
         onRegionResize(d.regionTrackId, d.regionId, newStart, newEnd - newStart);
       }
@@ -458,7 +466,7 @@ export function TimelineCanvas({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, trackHeight, onSelectRegions, onRegionMove, onRegionResize]);
+  }, [drag, ticksPerPixel, scrollLeft, snapStep, tracks, trackHeight, onSelectRegions, onRegionMove, onRegionResize]);
 
   function handleClick(e: React.MouseEvent) {
     if (drag) return;
@@ -489,7 +497,7 @@ export function TimelineCanvas({
       if (trackIdx >= 0 && trackIdx < tracks.length) {
         // Empty stretch of a track lane: create a region at the bar the
         // click landed in. Seeking stays on the ruler (TimelineRuler).
-        onRegionCreate(trackIdx, snapToBar(Math.max(0, pixelToTick(x))));
+        onRegionCreate(trackIdx, snap(Math.max(0, pixelToTick(x))));
       } else {
         // Below the last lane there is nothing to create in — keep seek.
         const tick = pixelToTick(x);

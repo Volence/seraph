@@ -53,3 +53,25 @@
   border-color: var(--text-secondary);
 }
 
+.snapControl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.snapSelect {
+  font-size: 11px;
+  padding: 3px 2px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.snapSelect:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+

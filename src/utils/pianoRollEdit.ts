@@ -143,3 +143,21 @@ export function transposeNotes(
   }
   return moves;
 }
+
+/**
+ * Zoom-out floor for the piano-roll view: however far the user zooms out,
+ * the open region (or one bar, for sub-bar regions) always spans at least
+ * this many pixels — a region editor never benefits from shrinking its own
+ * region toward invisibility, and an unbounded zoom-out is exactly how the
+ * ruler ended up drawing ~1281 one-pixel bars over a 4-bar region.
+ */
+export const MIN_REGION_VIEW_PX = 400;
+
+/**
+ * Largest allowed ticksPerPixel for the piano roll editing `durationTicks`.
+ * Derived, never a constant: long regions may legitimately zoom far out
+ * (their overview needs it), short regions may not.
+ */
+export function maxPianoRollTicksPerPixel(durationTicks: number, barTicks: number): number {
+  return Math.max(durationTicks, barTicks) / MIN_REGION_VIEW_PX;
+}

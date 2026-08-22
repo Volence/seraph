@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Track, SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
 import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
@@ -9,12 +9,17 @@ import { TimelineCanvas } from "./TimelineCanvas";
 import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
-import { SONG_REVERTED_EVENT } from "../utils/keyboard";
+import { SONG_REVERTED_EVENT, isEditableTarget } from "../utils/keyboard";
+import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
   projectMeta: SongMetadata;
   playing: boolean;
+  /** Seek cursor position + seek request; owned by App (G29). */
+  seekTick: number;
+  onSeek: (tick: number) => void;
   onSelectRegions: (regions: SelectedRegion[]) => void;
   selectedRegions: SelectedRegion[];
   onSelectInstrument: (inst: SelectedInstrument | null) => void;
@@ -23,6 +28,11 @@ interface ArrangementViewProps {
 
 const M = DEFAULT_FM_MODULATOR;
 const C = DEFAULT_FM_CARRIER;
+
+// Fixed width of the track-header column; must match the
+// `grid-template-columns: 180px 1fr` in ArrangementView.module.css so the
+// follow-playhead logic knows the timeline's visible width.
+const HEADER_COLUMN_WIDTH = 180;
 
 function channelType(track: Track): "fm" | "psg" | "dac" {
   const ch = track.channel;
@@ -44,6 +54,8 @@ function channelLabel(track: Track): string {
 export function ArrangementView({
   projectMeta,
   playing,
+  seekTick,
+  onSeek,
   onSelectRegions,
   selectedRegions,
   onSelectInstrument,
@@ -54,9 +66,23 @@ export function ArrangementView({
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta);
-  const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
-  const [seekTick, setSeekTick] = useState(0);
+  const { interpolatedTick, currentTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const trackHeight = 60;
+  // Manual scrolls (wheel, ruler drag) suspend follow-playhead briefly so the
+  // user can inspect other bars during playback (G28).
+  const lastManualScrollRef = useRef(-Infinity);
+
+  useEffect(() => {
+    if (!playing) return;
+    if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;
+    const body = zoom.bodyRef.current;
+    if (!body) return;
+    // Follow keys off the event-driven tick (interpolation only mutates a ref
+    // between renders); paging accuracy at event granularity is plenty.
+    const viewWidth = body.clientWidth - HEADER_COLUMN_WIDTH;
+    const next = followScrollLeft(currentTick / zoom.ticksPerPixel, zoom.scrollLeft, viewWidth);
+    if (next !== null) zoom.setScrollLeft(next);
+  }, [currentTick, playing, zoom.ticksPerPixel, zoom.scrollLeft, zoom.setScrollLeft, zoom.bodyRef]);
 
   const { visibleTracks, groupHeads } = useMemo(() => {
     const groups = new Map<string, Track[]>();
@@ -119,7 +145,13 @@ export function ArrangementView({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Never hijack keys while the user is typing in a field (G2).
+      if (isEditableTarget(e.target)) return;
       if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.length > 0) {
+        // Opening a region in the piano roll selects it, so while the roll
+        // has a note selection Delete belongs to the notes — never cascade
+        // into deleting the enclosing region (G1).
+        if (pianoRollNoteSelectionActive()) return;
         e.preventDefault();
         // One gesture = one undo step: group the multi-delete batch.
         (async () => {
@@ -130,6 +162,8 @@ export function ArrangementView({
             await ipc.endUndoGroup();
           }
           onSelectRegions([]);
+          // Reload so the next playback stops sounding the deleted regions (G30).
+          await ipc.reloadSequence();
           refresh();
         })();
       }
@@ -172,11 +206,17 @@ export function ArrangementView({
       // Single-region move commits once on mouseup — already one undo step.
       await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
     }
+    // Moves commit once per released drag (TimelineCanvas fires onRegionMove
+    // from mouseup only), so a plain reload keeps playback audible-current
+    // without needing a debounce (G30).
+    await ipc.reloadSequence();
     refresh();
   }
 
   async function handleRegionResize(trackId: string, regionId: string, startTick: number, durationTicks: number) {
     await ipc.updateRegion(trackId, regionId, startTick, durationTicks);
+    // Resizes also commit on mouse release only — one reload per gesture (G30).
+    await ipc.reloadSequence();
     refresh();
   }
 
@@ -200,10 +240,8 @@ export function ArrangementView({
     await ipc.reloadSequence();
   }
 
-  async function handleSeek(tick: number) {
-    setSeekTick(tick);
-    await ipc.transportSeek(tick);
-  }
+  // Seeks route through App, which owns the cursor and the transport call.
+  const handleSeek = onSeek;
 
   function handleTrackClick(track: Track) {
     if (!track.instrumentId) return;
@@ -256,7 +294,13 @@ export function ArrangementView({
   }
 
   return (
-    <div className={styles.arrangement} onWheel={zoom.handleWheel}>
+    <div
+      className={styles.arrangement}
+      onWheel={(e) => {
+        lastManualScrollRef.current = performance.now();
+        zoom.handleWheel(e);
+      }}
+    >
       <div className={styles.rulerRow}>
         <div className={styles.headerSpacer} />
         <TimelineRuler
@@ -265,7 +309,10 @@ export function ArrangementView({
           ticksPerBeat={projectMeta.ticksPerBeat}
           beatsPerBar={projectMeta.timeSignature[0]}
           onSeek={handleSeek}
-          onScrollChange={zoom.setScrollLeft}
+          onScrollChange={(v) => {
+            lastManualScrollRef.current = performance.now();
+            zoom.setScrollLeft(v);
+          }}
         />
       </div>
       <div className={styles.body} ref={zoom.bodyRef}>

@@ -1,11 +1,20 @@
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import styles from "./PianoRollKeys.module.css";
+
+/** Key-column widths. The width is owned by PianoRoll so siblings (the
+ *  velocity lane) can offset themselves by the same amount (G5). */
+export const MELODIC_KEYS_WIDTH = 48;
+export const DAC_KEYS_WIDTH = 120;
+export const MIN_KEYS_WIDTH = 48;
+export const MAX_KEYS_WIDTH = 240;
 
 interface PianoRollKeysProps {
   minPitch: number;
   maxPitch: number;
   rowHeight: number;
   scrollTop: number;
+  width: number;
+  onWidthChange: (width: number) => void;
   onAudition: (pitch: number) => void;
   drumLabels?: Record<number, string>;
 }
@@ -16,10 +25,9 @@ function isBlackKey(pitch: number): boolean {
   return [1, 3, 6, 8, 10].includes(pitch % 12);
 }
 
-export function PianoRollKeys({ minPitch, maxPitch, rowHeight, scrollTop, onAudition, drumLabels }: PianoRollKeysProps) {
+export function PianoRollKeys({ minPitch, maxPitch, rowHeight, scrollTop, width, onWidthChange, onAudition, drumLabels }: PianoRollKeysProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(drumLabels ? 120 : 48);
 
   const totalNotes = maxPitch - minPitch + 1;
 
@@ -93,8 +101,8 @@ export function PianoRollKeys({ minPitch, maxPitch, rowHeight, scrollTop, onAudi
     const startX = e.clientX;
     const startWidth = width;
     function onMove(ev: MouseEvent) {
-      const newW = Math.max(48, Math.min(240, startWidth + ev.clientX - startX));
-      setWidth(newW);
+      const newW = Math.max(MIN_KEYS_WIDTH, Math.min(MAX_KEYS_WIDTH, startWidth + ev.clientX - startX));
+      onWidthChange(newW);
     }
     function onUp() {
       document.removeEventListener("mousemove", onMove);

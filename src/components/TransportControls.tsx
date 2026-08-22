@@ -1,6 +1,7 @@
 import type { SongMetadata } from "../types/model";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import * as ipc from "../api/ipc";
+import { recordPlayStart, recordStop } from "../utils/transportMemory";
 import styles from "./TransportControls.module.css";
 
 interface TransportControlsProps {
@@ -9,6 +10,8 @@ interface TransportControlsProps {
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
   onLoopChange: (enabled: boolean) => void;
+  /** Seek request; App owns the seek cursor + transport call (G29). */
+  onSeek: (tick: number) => void;
 }
 
 function tickToBarBeatTick(
@@ -29,6 +32,7 @@ export function TransportControls({
   loopEnabled,
   onPlayingChange,
   onLoopChange,
+  onSeek,
 }: TransportControlsProps) {
   const { currentTick } = usePlaybackPosition(
     playing,
@@ -39,8 +43,18 @@ export function TransportControls({
   async function handlePlayStop() {
     if (playing) {
       await ipc.transportStop();
+      // Feed the Space double-tap window (G37) from the button too.
+      recordStop();
       onPlayingChange(false);
     } else {
+      // Record where playback starts so a stop double-tap can return there
+      // (G37); best-effort, mirrors App.startPlayback.
+      try {
+        const s = await ipc.getPlaybackState();
+        recordPlayStart(s.tick);
+      } catch {
+        // keep the previous play-start tick
+      }
       await ipc.transportPlay();
       onPlayingChange(true);
     }
@@ -57,8 +71,9 @@ export function TransportControls({
     }
   }
 
-  async function handleHome() {
-    await ipc.transportSeek(0);
+  function handleHome() {
+    // Routes through App so the seek cursor moves with the transport (G29).
+    onSeek(0);
   }
 
   const position = tickToBarBeatTick(

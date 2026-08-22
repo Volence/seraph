@@ -6,6 +6,10 @@ interface MainAreaProps {
   projectOpen: boolean;
   projectMeta: SongMetadata | null;
   playing: boolean;
+  /** Seek cursor position; owned by App so transport shortcuts and the
+   *  stop-sync (G29) keep it truthful. */
+  seekTick: number;
+  onSeek: (tick: number) => void;
   onNewProject: () => void;
   onOpenProject: () => void;
   onSelectRegions: (regions: SelectedRegion[]) => void;
@@ -18,6 +22,8 @@ export function MainArea({
   projectOpen,
   projectMeta,
   playing,
+  seekTick,
+  onSeek,
   onNewProject,
   onOpenProject,
   onSelectRegions,
@@ -42,6 +48,8 @@ export function MainArea({
     <ArrangementView
       projectMeta={projectMeta}
       playing={playing}
+      seekTick={seekTick}
+      onSeek={onSeek}
       onSelectRegions={onSelectRegions}
       selectedRegions={selectedRegions}
       onSelectInstrument={onSelectInstrument}

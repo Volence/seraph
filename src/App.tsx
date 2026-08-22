@@ -10,6 +10,7 @@ import { StatusBar } from "./components/StatusBar";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
 import { LibraryPanel } from "./components/LibraryPanel";
+import { recordPlayStart, recordStop, consumeStopDoubleTap } from "./utils/transportMemory";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -38,6 +39,13 @@ export default function App() {
   const dirtyRef = useRef(false);
   dirtyRef.current = undoState.dirty;
 
+  // The white seek cursor. Owned here (not in ArrangementView) so it can be
+  // re-synced to the transport's real tick when playback stops (G29) and
+  // repositioned by transport shortcuts. The generation counter discards
+  // stale async stop-syncs that would otherwise clobber a newer manual seek.
+  const [seekTick, setSeekTick] = useState(0);
+  const seekGenRef = useRef(0);
+
   const projectOpen = projectMeta !== null;
 
   const refreshUndoState = useCallback(async () => {
@@ -56,6 +64,42 @@ export default function App() {
     const interval = setInterval(refreshUndoState, 1000);
     return () => clearInterval(interval);
   }, [projectOpen, refreshUndoState]);
+
+  const handleSeek = useCallback((tick: number) => {
+    seekGenRef.current++;
+    setSeekTick(tick);
+    ipc.transportSeek(tick);
+  }, []);
+
+  // G29: transport_stop pauses in place, so when playback stops the cursor
+  // must move to where the sequencer actually is. get_playback_state's tick
+  // field is the source of truth.
+  useEffect(() => {
+    if (playing || !projectMeta) return;
+    const gen = ++seekGenRef.current;
+    ipc.getPlaybackState()
+      .then((s) => {
+        if (seekGenRef.current === gen) setSeekTick(s.tick);
+      })
+      .catch(() => {});
+  }, [playing, projectMeta]);
+
+  const resetSeekCursor = useCallback(() => {
+    seekGenRef.current++;
+    setSeekTick(0);
+  }, []);
+
+  const startPlayback = useCallback(async () => {
+    // Record where playback starts so a stop double-tap can return there
+    // (G37). Best-effort: a failed tick read must not block playing.
+    try {
+      const s = await ipc.getPlaybackState();
+      recordPlayStart(s.tick);
+    } catch {
+      // keep the previous play-start tick
+    }
+    await ipc.transportPlay();
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!projectMeta) return;
@@ -129,6 +173,8 @@ export default function App() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        // Deliberately above the editable-target guard: saving must work
+        // (and suppress the browser default) even while typing in a field.
         e.preventDefault();
         handleSave();
       }
@@ -147,14 +193,25 @@ export default function App() {
           return;
         }
       }
+      // Plain-key shortcuts must not fire while the user is typing (G2).
+      if (isEditableTarget(e.target)) return;
       if (e.key === " " && projectMeta) {
         e.preventDefault();
         if (playing) {
+          // Space = pause in place (G37 owner ruling).
           ipc.transportStop();
           setPlaying(false);
+          recordStop();
         } else {
-          ipc.transportPlay();
-          setPlaying(true);
+          const returnTick = consumeStopDoubleTap();
+          if (returnTick !== null) {
+            // Stop double-tap: return the playhead to where the last
+            // playback started, WITHOUT starting playback.
+            handleSeek(returnTick);
+          } else {
+            startPlayback();
+            setPlaying(true);
+          }
         }
       }
       if (e.key === "l" && projectMeta && !e.ctrlKey && !e.metaKey) {
@@ -168,12 +225,12 @@ export default function App() {
         }
       }
       if (e.key === "Home" && projectMeta) {
-        ipc.transportSeek(0);
+        handleSeek(0);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, handleRevert, playing, loopEnabled, projectMeta]);
+  }, [handleSave, handleRevert, handleSeek, startPlayback, playing, loopEnabled, projectMeta]);
 
   async function handleNewProject() {
     if (!(await confirmDiscard("Create a new project"))) return;
@@ -188,6 +245,7 @@ export default function App() {
     try {
       if (projectOpen) await ipc.closeProject();
       setPlaying(false);
+      resetSeekCursor();
       const song = await ipc.openProject(selected as string);
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
@@ -199,6 +257,7 @@ export default function App() {
 
   function handleProjectCreated(meta: SongMetadata) {
     setPlaying(false);
+    resetSeekCursor();
     setProjectMeta(meta);
     setShowNewProject(false);
     setSelectedInstrument(null);
@@ -228,6 +287,7 @@ export default function App() {
 
   function handleImported(meta: SongMetadata, warnings: ipc.ImportWarning[]) {
     setPlaying(false);
+    resetSeekCursor();
     setProjectMeta(meta);
     setSelectedInstrument(null);
     setSelectedRegions([]);
@@ -252,6 +312,7 @@ export default function App() {
         loopEnabled={loopEnabled}
         onPlayingChange={setPlaying}
         onLoopChange={setLoopEnabled}
+        onSeek={handleSeek}
       />
       <SpectrumAnalyzer height={100} />
       {exportStatus?.type === "success" && (
@@ -298,6 +359,8 @@ export default function App() {
           projectOpen={projectOpen}
           projectMeta={projectMeta}
           playing={playing}
+          seekTick={seekTick}
+          onSeek={handleSeek}
           onNewProject={handleNewProject}
           onOpenProject={handleOpenProject}
           onSelectRegions={(regions) => {

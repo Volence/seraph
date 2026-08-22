@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Note, SelectedRegion, SongMetadata } from "../types/model";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
-import { PianoRollKeys } from "./PianoRollKeys";
+import { PianoRollKeys, MELODIC_KEYS_WIDTH, DAC_KEYS_WIDTH } from "./PianoRollKeys";
 import { PianoRollCanvas } from "./PianoRollCanvas";
 import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
 import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes } from "../utils/pianoRollEdit";
+import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { isEditableTarget } from "../utils/keyboard";
 import styles from "./PianoRoll.module.css";
 
 interface PianoRollProps {
@@ -71,6 +73,13 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   const rowHeight = isDac ? 22 : 14;
   const defaultTpp = Math.min(region.durationTicks / 800, ticksPerBar * 8 / 800);
   const [ticksPerPixel, setTicksPerPixel] = useState(defaultTpp);
+  // Key-column width is owned here so the velocity lane can offset itself by
+  // the same amount (G5). Reset when the channel kind flips (DAC keys are
+  // wider and user-resizable).
+  const [keysWidth, setKeysWidth] = useState(isDac ? DAC_KEYS_WIDTH : MELODIC_KEYS_WIDTH);
+  useEffect(() => {
+    setKeysWidth(isDac ? DAC_KEYS_WIDTH : MELODIC_KEYS_WIDTH);
+  }, [isDac]);
   const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
 
@@ -115,6 +124,14 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     window.addEventListener(SONG_REVERTED_EVENT, onReverted);
     return () => window.removeEventListener(SONG_REVERTED_EVENT, onReverted);
   }, [refresh]);
+
+  // Publish whether this piano roll owns a note selection, so the
+  // arrangement's window-level Delete handler defers to us (G1). Cleared on
+  // unmount so region deletion works again once the roll closes.
+  useEffect(() => {
+    setPianoRollNoteSelectionActive(selectedNotes.size > 0);
+  }, [selectedNotes]);
+  useEffect(() => () => setPianoRollNoteSelectionActive(false), []);
 
   async function handleNoteAdd(tick: number, pitch: number, duration: number) {
     await ipc.addNote(region.trackId, region.regionId, tick, pitch, 100, duration);
@@ -175,9 +192,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // Don't hijack keys while the user is in a form control (e.g. the
-      // grid-size <select>, where arrows change the value).
-      const target = e.target as HTMLElement | null;
-      if (target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
+      // grid-size <select>, where arrows change the value) or any other
+      // editable target (G2).
+      if (isEditableTarget(e.target)) return;
 
       if ((e.key === "ArrowUp" || e.key === "ArrowDown") && selectedNotes.size > 0) {
         e.preventDefault();
@@ -202,7 +219,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           })();
         }
       }
-      if (e.key === "Delete" && selectedNotes.size > 0) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedNotes.size > 0) {
         const sorted = Array.from(selectedNotes).sort((a, b) => b - a);
         (async () => {
           // One multi-delete = one undo step: group the batch.
@@ -317,6 +334,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           maxPitch={maxPitch}
           rowHeight={rowHeight}
           scrollTop={scrollTop}
+          width={keysWidth}
+          onWidthChange={setKeysWidth}
           onAudition={handleAudition}
           drumLabels={drumLabels}
         />
@@ -353,6 +372,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
         ticksPerPixel={ticksPerPixel}
         scrollLeft={pianoScrollLeft}
         channelColor={channelColor}
+        keysWidth={keysWidth}
         onVelocityChange={handleVelocityChange}
       />
     </div>

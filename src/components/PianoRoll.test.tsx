@@ -72,6 +72,69 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("velocity lane alignment (G5)", () => {
+  // The velocity lane canvas starts at x=0 of the piano roll, but the note
+  // canvas starts after the key column — the lane must be offset by the key
+  // column width so bars sit under their notes.
+
+  function velocityLaneContainer(container: HTMLElement): HTMLElement {
+    // DOM order: keys canvas, note canvas, velocity lane canvas (last).
+    const canvases = container.querySelectorAll("canvas");
+    return canvases[canvases.length - 1].parentElement as HTMLElement;
+  }
+
+  it("offsets the lane by the melodic key column width", async () => {
+    const { container } = await renderRoll([note(0, 60)]);
+    const { MELODIC_KEYS_WIDTH } = await import("./PianoRollKeys");
+    expect(velocityLaneContainer(container).style.marginLeft).toBe(`${MELODIC_KEYS_WIDTH}px`);
+  });
+
+  it("offsets by the DAC key column width and tracks its resize", async () => {
+    const { region } = (() => {
+      const track: Track = {
+        id: "track-1",
+        name: "Drums",
+        channel: { Dac: 0 },
+        instrumentId: null,
+        regions: [{ id: "region-1", startTick: 0, durationTicks: 7680, notes: [note(0, 40)] }],
+        muted: false,
+        solo: false,
+        volume: 100,
+        pan: "Center",
+        pitchOffset: 0,
+      };
+      vi.mocked(ipc.listTracks).mockResolvedValue([track]);
+      return {
+        region: {
+          trackId: "track-1",
+          trackName: "Drums",
+          regionId: "region-1",
+          channelType: "dac",
+          startTick: 0,
+          durationTicks: 7680,
+        } as SelectedRegion,
+      };
+    })();
+    const { container } = render(
+      <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} />,
+    );
+    await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
+    await act(async () => {});
+
+    const { DAC_KEYS_WIDTH } = await import("./PianoRollKeys");
+    expect(velocityLaneContainer(container).style.marginLeft).toBe(`${DAC_KEYS_WIDTH}px`);
+
+    // Drag the key-column resize handle 50px right; the lane offset follows.
+    const keysContainer = container.querySelectorAll("canvas")[0].parentElement as HTMLElement;
+    const handle = keysContainer.querySelector("div") as HTMLElement;
+    expect(handle).not.toBeNull();
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.mouseMove(document, { clientX: 150 });
+    fireEvent.mouseUp(document);
+    expect(velocityLaneContainer(container).style.marginLeft).toBe(`${DAC_KEYS_WIDTH + 50}px`);
+  });
+});
+
 describe("PianoRoll keyboard transpose", () => {
   it("ArrowUp transposes every selected note up one semitone", async () => {
     await renderRoll([note(0, 60), note(480, 64)]);

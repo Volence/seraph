@@ -56,6 +56,43 @@ function renderCanvas(tracks: Track[]) {
   return canvas as HTMLCanvasElement;
 }
 
+describe("TimelineCanvas single-click region select (G6)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const region = { id: "region-1", startTick: 0, durationTicks: 5000, notes: [] };
+
+  it("press + sub-slop move + release + click still selects the region", () => {
+    // Audit G6 suspected the click handler's `if (drag) return` guard could
+    // read a stale non-null drag from the render closure and swallow the
+    // selection click. Reproduce the exact browser sequence: mousedown on the
+    // region (starts a move-drag), a <4px move, mouseup (clears drag), then
+    // the browser-generated click.
+    const track = makeTrack({ regions: [region] });
+    const canvas = renderCanvas([track]);
+
+    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 10 });
+    fireEvent.mouseMove(window, { clientX: 102, clientY: 10 });
+    fireEvent.mouseUp(window, { clientX: 102, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 102, clientY: 10 });
+
+    expect(handlers.onRegionClick).toHaveBeenCalledWith(track.id, region.id, false);
+    expect(handlers.onRegionMove).not.toHaveBeenCalled();
+  });
+
+  it("press + release with no move at all selects the region", () => {
+    const track = makeTrack({ regions: [region] });
+    const canvas = renderCanvas([track]);
+
+    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 10 });
+    fireEvent.mouseUp(window, { clientX: 100, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 100, clientY: 10 });
+
+    expect(handlers.onRegionClick).toHaveBeenCalledWith(track.id, region.id, false);
+  });
+});
+
 describe("TimelineCanvas double-click", () => {
   beforeEach(() => {
     vi.clearAllMocks();

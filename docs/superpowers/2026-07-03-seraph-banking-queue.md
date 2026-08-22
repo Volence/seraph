@@ -590,18 +590,18 @@ designs target the banked specs (normative); manifest flags carry the gates.
     region switch cannot interleave with a drag on one pointer);
     `fmPreviewTimer` (a pending preview STOP — firing late is correct);
     `gestureMutatedRef` (reset by the next `handleGestureStart`; a stray
-    late reload is region-agnostic and cheap); ALL PianoRollCanvas
-    in-flight gesture state — `drag`, `moveDrag.targets` (index-bearing!),
-    `drawingRef`, `isPanning`/`panRef`, `isMarquee`/`marqueeRef`/
-    `marqueePreviewRef` (index-bearing!) — and PianoRollRuler's
-    `gestureRef`/`dragging`/`dragAxis`. **Reasoning for the index-bearing
-    ones:** switching regions requires a double-click in the arrangement,
-    and those gestures' mouseup listeners are on `window`, so the
-    arrangement's own mousedown→mouseup tears the gesture down BEFORE
-    `onSelectRegions` ever fires. Unreachable with a single pointer;
-    reachable only with multi-touch/second pointing device. If touch input
-    is ever added, this becomes live and the canvas needs a `regionId`
-    prop (or a keyed remount of just the canvas).
+    late reload is region-agnostic and cheap); PianoRollRuler's
+    `gestureRef`/`dragging`/`dragAxis` (zoom/scroll/seek only, no note
+    indices); and — see the CORRECTION below — PianoRollCanvas's marquee
+    and pan state.
+    **CORRECTED 2026-08-22 (overseer review), see the follow-up entry:**
+    this bucket originally also held PianoRollCanvas's `drag`,
+    `moveDrag.targets` and `drawingRef`, justified by "switching regions
+    requires a double-click in the arrangement, so the arrangement's own
+    mousedown→mouseup tears the gesture down first — unreachable with a
+    single pointer". **That frame is wrong and must not be reused: a
+    region switch needs no pointer event at all.** Those three were real
+    defects and are fixed.
   - NOT IN THE SUBTREE: TimelineRuler's `hoverZone`/`gestureRef` (loop
     handles) live in the ARRANGEMENT, which is not affected by a piano-roll
     region switch; the zone is recomputed from pointer position on every
@@ -635,6 +635,82 @@ designs target the banked specs (normative); manifest flags carry the gates.
   selection readout must clear and Delete must do nothing until you
   re-select; and switching regions must no longer flash the previous
   region's notes.
+
+- 2026-08-22 (cont.): **IN-FLIGHT GESTURES TAGGED WITH THEIR REGION**
+  (same branch, commit `5fd8988`; lanes: cargo 241/0, vitest 290/290
+  across 28 files, build clean, no bindings drift). Overseer review
+  overturned one verdict in the enumeration above — recorded here in full
+  because the WRONG FRAME is the reusable part.
+
+  **What the frame got wrong.** The HARMLESS verdict on PianoRollCanvas's
+  index-bearing gesture state rested on: *"switching regions requires a
+  double-click in the arrangement, and those gestures' mouseup listeners
+  are on `window`, so the arrangement's own mousedown→mouseup tears the
+  gesture down before `onSelectRegions` fires."* The window-listener half
+  is true. The premise is false: **a region switch needs no pointer event
+  at all.** Grepping every caller of `onSelectRegions` (which is what the
+  standing "enumerate by what TOUCHES the state, not what declares it" bar
+  demanded, and which I applied to declarations and then dropped for the
+  reachability argument) finds two KEYBOARD paths in ArrangementView's
+  window keydown effect: **Ctrl+D duplicate** ("the duplicates become the
+  selection") and **Ctrl+V region paste** ("the pasted regions become the
+  selection"). Neither involves the mouse, so a held drag survives.
+  Method lesson: I reasoned from ONE entry path instead of enumerating the
+  callers. A hedge on a hypothetical ("goes live if touch input is added")
+  reads as a certificate that the live case was checked to the same
+  standard — it was not, and it steered scrutiny away from the real path.
+
+  **Reachability, per gesture (derived from the guards, which differ):**
+  - Ctrl+D carries the G1 guard `if (pianoRollNoteSelectionActive()) return`.
+  - Ctrl+V carries NO G1 guard — only the clipboard arbitration
+    `lastCopiedKind() === "regions"`. **That is the documented design**
+    (you paste whatever you copied last, and the two window-level paste
+    handlers are mutually exclusive), so the fix does NOT belong in a new
+    guard there.
+  - note MOVE drag: mousedown selects the pressed note ⇒ G1 true ⇒ Ctrl+D
+    blocked, **Ctrl+V reachable**.
+  - RESIZE drag: near-edge mousedown does NOT select ⇒ with an empty
+    selection G1 is false ⇒ **both keys reachable**. (Not in the review's
+    reading; found on re-derivation.)
+  - DRAW (double-click): never touches the selection ⇒ **both reachable**.
+  - MARQUEE: commits only on mouseup, so from an empty selection G1 is
+    false ⇒ **both reachable**.
+  - ArrangementView Delete also switches, but to `[]` ⇒ the roll unmounts
+    and the gesture's window listeners go with it ⇒ safe.
+
+  **THREE REAL DEFECTS (red-first, each assertion showing the actual
+  cross-region write, with region B sized LARGER than A so every stale
+  index is in range):**
+  - move: `updateNote("track-1","region-2", 0, 960, 60, 100, 240)` —
+    region A's pitch 60 onto region B's note 0, which lives at tick 1920
+    pitch 72. Fires ONCE PER MOUSEMOVE.
+  - resize: `updateNote("track-1","region-2", 0, 1920, 72, 100, 1200)` —
+    B's note 0 resized to a duration derived from A's note.
+  - draw: `addNote("track-1","region-2", 0, 62, 127, 120)` — a note
+    created in B by a gesture aimed at A. **This one reads no notes, so
+    the `loaded` tag never masked it at all**; the other two were masked
+    only until B's fetch landed.
+
+  **FIX:** `PianoRollCanvas` takes `regionId` as a REQUIRED prop and tags
+  `drag` / `moveDrag` / `drawingRef` with it at mousedown, refusing to
+  commit once it no longer matches (compared through a ref at event time,
+  the same event-time-read pattern `noteSelection.ts` documents). Chosen
+  over resetting the gesture on switch, which would leave the canvas
+  mid-gesture with the button still down. Move/resize refuse only the
+  WRITE and keep the gesture alive so mouseup still closes the undo group
+  its mousedown opened; draw drops its preview so the user is not shown a
+  note that will never commit. The prop is required rather than defaulted
+  because a default silently disables the guard for a caller that forgets
+  it — it immediately caught two fixtures in `PianoRollCanvas.test.tsx`.
+
+  **MARQUEE and PAN stay HARMLESS, with the reasoning replaced.** Not
+  "unreachable" (they are reachable) but "they write nothing". `draw()`
+  renders the band from the very same view pixels `marqueeRectFromView`
+  converts, so what the user sees over the new region is exactly what it
+  selects — refusing it would leave a visible rubber band that does
+  nothing. Pan only offsets `scrollLeft`, is visible, and is corrected by
+  the next scroll. The marquee's continue-to-commit behavior is PINNED by
+  a test so the choice is deliberate rather than incidental.
 
 ## EXECUTION HANDOFF (cold start — read this first)
 

@@ -969,6 +969,65 @@ designs target the banked specs (normative); manifest flags carry the gates.
   **OWNER GATE OPEN (by-ear):** overlapping notes on one channel must now
   re-attack rather than drop out.
 
+- 2026-08-22: **ONE-GESTURE NOTE ENTRY + RIGHT-CLICK ERASE SHIPPED** (F6, the
+  audit's #5; G13/G14 closed). Branch `feat/note-entry-grammar`, commits
+  `9f2dc66` (feature+tests) and this doc entry. Lanes: cargo 259/0 (untouched),
+  vitest 331/331 across 30 files (+27 new), `npm run build` clean 0 warnings,
+  no `src/bindings.ts` diff (frontend-only parcel).
+  **COMPLETES the banked Ableton ruling rather than forking it:** double-click
+  draw survives as the no-mode default; one-gesture entry is a MODE, exactly as
+  `2026-08-21-daw-comparator-idioms.md` §1 describes. Grammar now: *no mode* —
+  double-click draws (drag sets length), left-drag marquees, Shift additive,
+  middle/Alt pans, edge-drag resizes; *Draw Mode* — click paints one
+  grid-length note, drag paints a RUN (one cell per grid cell entered, pitch
+  follows the pointer row, Shift = Ableton Pitch Lock to the start row),
+  double-click-draw suppressed, empty-space marquee unavailable, note
+  move/resize/pan unchanged; *both modes* — right-click erases the note under
+  the cursor, empty space does nothing (browser menu still suppressed).
+  **RATIFIED-PENDING (each an explicit judgement call, listed so they can be
+  rejected one by one):** (1) binding = `B` (Ableton's Draw key AND FL's Paint
+  key — the same letter in both comparators for the gesture added; `P` would
+  have been FL's single-note Draw, which is the no-mode default we already
+  have). (2) Right-click erase applies in BOTH modes (FL's rule: the commonest
+  correction never costs a tool switch). (3) Right-click on empty space does
+  nothing — reserved for a real context menu. (4) Left-click on an existing
+  note in Draw Mode still selects/moves it; Ableton would DELETE it, but with
+  a dedicated erase button already bound, click-to-delete under a paint gesture
+  is a data-loss trap. (5) Paint pitch follows the pointer (FL) rather than
+  locking by default (Ableton), Shift inverts it. (6) Draw Mode suppresses
+  double-click-draw, so note LENGTH in Draw Mode comes from edge-drag. (7)
+  Draw Mode is TOOL state: it survives a region switch (pinned), like the grid
+  selector. (8) Paint refuses cells already occupied by a note (a stacked
+  duplicate is inaudible under last-note-priority = silent corruption) and
+  cells past the region end. (9) Right-click erase REMAPS the surviving
+  selection for the index shift instead of clearing it.
+  **INVARIANTS HONOURED (all pinned by test):** paint run is region-TAGGED and
+  commits nothing after a switch (proven red: without the guard it wrote 3
+  notes into the region that replaced it); one paint gesture = ONE undo group
+  + ONE `reloadSequence` (F1); new notes derive velocity from the new
+  `DEFAULT_NOTE_VELOCITY = MAX_VELOCITY` constant in `pianoRollEdit.ts` (the
+  last hand-typed 127 is gone); grid snap honoured (never a hardcoded step);
+  `B` sits behind the existing `isEditableTarget` guard (G2 — proven red by
+  hoisting it above the guard). Cross-gesture de-dup shadow (`recentlyPainted`)
+  kills the double-click-in-Draw-Mode duplicate that the async re-fetch window
+  would otherwise allow.
+  **RED-FIRST:** all 27 tests proven red — 23 by reverting both components to
+  `ecb2fcd` (13 canvas + 10 roll: "expected vi.fn() to be called 1 times, but
+  got 0 times", "Unable to find an accessible element with the role button and
+  name Draw"), the guard-shaped ones by targeted mutation (occupancy/dedup →
+  `paintCellBlocked` returning false: "expected vi.fn() to be called 1 times,
+  but got 2 times"; velocity+grouping → per-note group at velocity 100:
+  "expected vi.fn() to be called 1 times, but got 3 times"; audition →
+  per-cell: "expected [[95],[95],[96]] to deeply equal [[95],[96]]").
+  **NOT BUILT (owner call still open):** QWERTY/step entry (F5, G36).
+  **DEFERRED (named, not silently dropped):** right-DRAG erase (a swipe
+  deleting a run — needs index-stability handling across N deletes mid-drag);
+  velocity paint (F21/G17); a real right-click context menu.
+  **OWNER GATE OPEN (visual + by-ear, never attempted here):** the Draw toggle
+  reads clearly in the header; a paint-drag over a running transport is audible
+  on the next pass and sounds at audition loudness; painted-run preview
+  rendering (jsdom has no 2D context, so no test can see it).
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

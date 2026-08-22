@@ -28,7 +28,21 @@ export type {
 } from "../bindings";
 
 // The DEFAULT_* constants below still need to satisfy the generated types.
-import type { FmOperator, InstrumentMetadata } from "../bindings";
+import type { FmOperator, InstrumentMetadata, Track } from "../bindings";
+
+/**
+ * Which editor kind a track's channel assignment maps to. Lives here rather
+ * than inside ArrangementView because the view-state restore rebuilds a
+ * SelectedRegion from live tracks without going through that component — two
+ * copies of this mapping would be free to drift.
+ */
+export function channelTypeOf(track: Track): "fm" | "psg" | "dac" {
+  const ch = track.channel;
+  if (ch === "PsgNoise") return "psg";
+  if (typeof ch === "object" && "Fm" in ch) return "fm";
+  if (typeof ch === "object" && "Psg" in ch) return "psg";
+  return "dac";
+}
 
 export type SelectedInstrument =
   | { type: "fm"; id: string }

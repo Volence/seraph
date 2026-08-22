@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { ticksPerBar as ticksPerBarOf, type GridMeta } from "../utils/grid";
 import { zoomAroundPixel } from "../utils/zoomDrag";
 
-const MIN_TICKS_PER_PIXEL = 0.05;
+/** Zoom-in floor. Exported so the view-state restore clamps a persisted
+ *  ticksPerPixel to exactly the range the live zoom paths allow. */
+export const MIN_TICKS_PER_PIXEL = 0.05;
 
 interface ZoomState {
   ticksPerPixel: number;

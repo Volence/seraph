@@ -15,8 +15,13 @@ export const RECENT_LOCATIONS_KEY = "seraph.recentProjectLocations.v1";
 /** Maximum entries kept; oldest are dropped. */
 export const MAX_RECENT_LOCATIONS = 8;
 
-/** Strip trailing separators so "/a/b" and "/a/b/" dedup as one entry. */
-function normalize(path: string): string {
+/**
+ * Strip trailing separators so "/a/b" and "/a/b/" dedup as one entry.
+ * Exported as `normalizePath` because `viewState.ts` keys its per-project
+ * records by the same normalization — two modules disagreeing about whether
+ * "/a/b/" and "/a/b" are one project would silently split its stored state.
+ */
+export function normalizePath(path: string): string {
   const trimmed = path.trim();
   if (trimmed === "") return "";
   const stripped = trimmed.replace(/[/\\]+$/, "");
@@ -52,9 +57,9 @@ export function mostRecentLocation(fallback = ""): string {
  * an error path.
  */
 export function rememberLocation(path: string): void {
-  const entry = normalize(path);
+  const entry = normalizePath(path);
   if (entry === "") return;
-  const list = [entry, ...getRecentLocations().filter((e) => normalize(e) !== entry)];
+  const list = [entry, ...getRecentLocations().filter((e) => normalizePath(e) !== entry)];
   try {
     localStorage.setItem(RECENT_LOCATIONS_KEY, JSON.stringify(list.slice(0, MAX_RECENT_LOCATIONS)));
   } catch {
@@ -68,7 +73,7 @@ export function rememberLocation(path: string): void {
  * "location" worth remembering for future creates.
  */
 export function parentDirectory(path: string): string {
-  const normalized = normalize(path);
+  const normalized = normalizePath(path);
   const cut = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
   if (cut <= 0) return "";
   return normalized.slice(0, cut);

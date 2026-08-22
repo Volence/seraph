@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Track, SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
-import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER } from "../types/model";
+import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER, channelTypeOf } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { TrackHeader, channelLevelIndex } from "./TrackHeader";
@@ -39,13 +39,8 @@ const C = DEFAULT_FM_CARRIER;
 // follow-playhead logic knows the timeline's visible width.
 const HEADER_COLUMN_WIDTH = 180;
 
-function channelType(track: Track): "fm" | "psg" | "dac" {
-  const ch = track.channel;
-  if (ch === "PsgNoise") return "psg";
-  if (typeof ch === "object" && "Fm" in ch) return "fm";
-  if (typeof ch === "object" && "Psg" in ch) return "psg";
-  return "dac";
-}
+// Shared with the view-state restore path (see types/model).
+const channelType = channelTypeOf;
 
 function channelLabel(track: Track): string {
   const ch = track.channel;

@@ -13,6 +13,8 @@ interface TopBarProps {
   onExport?: () => void;
   onImport?: () => void;
   showSaved: boolean;
+  /** Unsaved changes — marks the Save button. */
+  dirty?: boolean;
   playing: boolean;
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
@@ -27,6 +29,7 @@ export function TopBar({
   onExport,
   onImport,
   showSaved,
+  dirty,
   playing,
   loopEnabled,
   onPlayingChange,
@@ -79,7 +82,14 @@ export function TopBar({
         <button className={styles.btn} onClick={onOpenProject}>Open</button>
         <button className={styles.btn} onClick={onImport}>Import</button>
         {projectMeta && (
-          <button className={styles.btn} onClick={onSave}>Save</button>
+          <button className={styles.btn} onClick={onSave}>
+            Save
+            {dirty && (
+              <span className={styles.dirtyDot} title="Unsaved changes">
+                ●
+              </span>
+            )}
+          </button>
         )}
         {onExport && (
           <button className={styles.btn} onClick={onExport}>Export</button>

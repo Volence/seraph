@@ -9,6 +9,7 @@ import { TimelineCanvas } from "./TimelineCanvas";
 import { AddTrackDialog } from "./AddTrackDialog";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
+import { SONG_REVERTED_EVENT } from "../utils/keyboard";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -97,6 +98,13 @@ export function ArrangementView({
     return () => clearInterval(interval);
   }, [refresh]);
 
+  // Undo/redo replaced the tracks server-side — re-fetch immediately.
+  useEffect(() => {
+    const onReverted = () => { refresh(); };
+    window.addEventListener(SONG_REVERTED_EVENT, onReverted);
+    return () => window.removeEventListener(SONG_REVERTED_EVENT, onReverted);
+  }, [refresh]);
+
   useEffect(() => {
     if (!playing) {
       setChannelLevels([]);
@@ -113,10 +121,17 @@ export function ArrangementView({
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.length > 0) {
         e.preventDefault();
-        Promise.all(selectedRegions.map((r) => ipc.deleteRegion(r.trackId, r.regionId))).then(() => {
+        // One gesture = one undo step: group the multi-delete batch.
+        (async () => {
+          await ipc.beginUndoGroup();
+          try {
+            await Promise.all(selectedRegions.map((r) => ipc.deleteRegion(r.trackId, r.regionId)));
+          } finally {
+            await ipc.endUndoGroup();
+          }
           onSelectRegions([]);
           refresh();
-        });
+        })();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -140,14 +155,21 @@ export function ArrangementView({
 
   async function handleRegionMove(srcTrackId: string, regionId: string, dstTrackId: string, startTick: number, tickDelta: number, trackDelta: number) {
     if (selectedRegions.length > 1 && selectedRegions.some((r) => r.regionId === regionId)) {
-      await Promise.all(selectedRegions.map((r) => {
-        const srcIdx = visibleTracks.findIndex((t) => t.id === r.trackId);
-        const dstIdx = Math.max(0, Math.min(visibleTracks.length - 1, srcIdx + trackDelta));
-        const dst = visibleTracks[dstIdx].id;
-        const newStart = Math.max(0, r.startTick + tickDelta);
-        return ipc.moveRegion(r.trackId, r.regionId, dst, newStart);
-      }));
+      // One gesture = one undo step: group the multi-region move batch.
+      await ipc.beginUndoGroup();
+      try {
+        await Promise.all(selectedRegions.map((r) => {
+          const srcIdx = visibleTracks.findIndex((t) => t.id === r.trackId);
+          const dstIdx = Math.max(0, Math.min(visibleTracks.length - 1, srcIdx + trackDelta));
+          const dst = visibleTracks[dstIdx].id;
+          const newStart = Math.max(0, r.startTick + tickDelta);
+          return ipc.moveRegion(r.trackId, r.regionId, dst, newStart);
+        }));
+      } finally {
+        await ipc.endUndoGroup();
+      }
     } else {
+      // Single-region move commits once on mouseup — already one undo step.
       await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
     }
     refresh();

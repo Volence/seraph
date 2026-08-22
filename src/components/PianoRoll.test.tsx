@@ -314,6 +314,61 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
   });
 });
 
+describe("PianoRoll arrow nudge (ArrowLeft/Right)", () => {
+  // Default grid index is 4 => 1/16 of a bar. ticksPerBar = 480 * 4 = 1920,
+  // so the default snap step is 1920 / 16 = 120 ticks (derived, not pinned).
+  const SNAP = (meta.ticksPerBeat * meta.timeSignature[0]) / 16;
+
+  it("ArrowRight moves every selected note right by the grid-snap step", async () => {
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await waitFor(() => expect(ipc.updateNote).toHaveBeenCalledTimes(2));
+    expect(ipc.updateNote).toHaveBeenCalledWith("track-1", "region-1", 0, SNAP, 60, 100, 240);
+    expect(ipc.updateNote).toHaveBeenCalledWith("track-1", "region-1", 1, 480 + SNAP, 64, 100, 240);
+  });
+
+  it("ArrowLeft moves left by the grid-snap step", async () => {
+    await renderRoll([note(480, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await waitFor(() => expect(ipc.updateNote).toHaveBeenCalledWith("track-1", "region-1", 0, 480 - SNAP, 60, 100, 240));
+  });
+
+  it("Ctrl+Arrow nudges by exactly 1 tick", async () => {
+    await renderRoll([note(480, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
+    await waitFor(() => expect(ipc.updateNote).toHaveBeenCalledWith("track-1", "region-1", 0, 481, 60, 100, 240));
+  });
+
+  it("blocks the whole move when any note would cross tick 0", async () => {
+    // One note at 0, one with room: block-whole-move (transpose convention).
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ipc.updateNote).not.toHaveBeenCalled();
+  });
+
+  it("blocks at the region end", async () => {
+    // Note end at 7680 (region end): any right nudge must be refused.
+    await renderRoll([note(7440, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ipc.updateNote).not.toHaveBeenCalled();
+  });
+
+  it("wraps the nudge batch in a single undo group", async () => {
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expectGroupWraps(vi.mocked(ipc.updateNote));
+  });
+});
+
 describe("PianoRoll refresh on undo/redo", () => {
   it("re-fetches notes when the song is reverted", async () => {
     await renderRoll([note(0, 60)]);

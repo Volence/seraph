@@ -7,7 +7,7 @@ import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
-import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes } from "../utils/pianoRollEdit";
+import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes } from "../utils/pianoRollEdit";
 import { copyNotes, getNoteClipboard, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
@@ -238,6 +238,30 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick }: P
         refresh();
       };
 
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && selectedNotes.size > 0) {
+        e.preventDefault();
+        const direction = e.key === "ArrowRight" ? 1 : -1;
+        // Plain arrow = the grid selector's snap step; Ctrl/Cmd = 1-tick fine nudge.
+        const step = e.ctrlKey || e.metaKey ? 1 : gridSnapTicks;
+        // Blocked (null) when any selected note would cross tick 0 or the
+        // region end: block-whole-move, matching the transpose convention.
+        const moves = nudgeNotes(notes, selectedNotes, direction * step, region.durationTicks);
+        if (moves) {
+          (async () => {
+            // One nudge keypress = one undo step: group the batch.
+            await ipc.beginUndoGroup();
+            try {
+              for (const m of moves) {
+                const n = notes[m.index];
+                await ipc.updateNote(region.trackId, region.regionId, m.index, m.tick, n.pitch, n.velocity, n.durationTicks);
+              }
+            } finally {
+              await ipc.endUndoGroup();
+            }
+            refresh();
+          })();
+        }
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedNotes.size > 0) {
         deleteSelection();
       }

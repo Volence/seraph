@@ -421,6 +421,23 @@ designs target the banked specs (normative); manifest flags carry the gates.
   if objectionable by ear, a targeted per-channel reprogram is the fix.
   Remaining in flight: `feat/note-voice-set`, `fix/play-start-memory`.
 
+- 2026-08-21 (cont.): **ITEM 7 SHIPPED — pause never moves the double-Space
+  return point** (merged; lanes on merged tree: cargo 237/0, vitest 236/236
+  across 23 files, build clean, no bindings drift). transportMemory owns
+  the record decision: `launchPointStale` flag (starts true; reset at
+  project boundaries via resetSeekCursor→resetTransportMemory);
+  `recordPlayStart` records only when stale; `noteSeek()` re-arms — hooked
+  once in App.handleSeek, which covers ruler/mouse seeks, Home (key +
+  button), and the double-Space return-jump. Resume no-ops on the tick.
+  Double-tap mechanics (400ms, consumed on use) unchanged. Red-first: the
+  exact bug shown failing (resume tick 2400 overwrote launch 960).
+  RATIFIED (3 agent calls): seek-then-quick-Space inside the 400ms window
+  still jumps to the launch point (pre-existing, rare; one-line change in
+  noteSeek if ever wanted); seek-while-playing re-arms literally (next
+  play — usually the following resume — records); project-boundary reset
+  (scope addition, prevents cross-project launch-point leaks).
+  Remaining in flight: `feat/note-voice-set` only.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

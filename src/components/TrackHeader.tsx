@@ -47,6 +47,21 @@ function levelColor(pct: number): string {
   return "#4f4";
 }
 
+/** Mid-song voice changes on a track: per-region overrides plus per-note
+ *  overrides — exactly the data a track-level voice swap clears server-side
+ *  (importer-stamped ids take precedence over the track binding, so the
+ *  clear is what makes the swap audible). */
+export function countVoiceOverrides(track: Track): number {
+  let count = 0;
+  for (const region of track.regions) {
+    if (region.instrumentId) count++;
+    for (const note of region.notes) {
+      if (note.instrumentId) count++;
+    }
+  }
+  return count;
+}
+
 export function channelLevelIndex(track: Track): number {
   const ch = track.channel;
   if (typeof ch === "object" && "Fm" in ch) return ch.Fm;
@@ -116,6 +131,25 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
     e.preventDefault();
     try {
       const { hash } = JSON.parse(raw) as { hash: string };
+      // The backend deliberately clears every per-region/per-note voice on
+      // assign (a swap without the clear is inaudible under the
+      // note > region > track precedence) — but one header drag must not
+      // silently destroy an imported song's mid-track voice changes.
+      const overrides = countVoiceOverrides(track);
+      if (overrides > 0) {
+        let name = "the dropped voice";
+        try {
+          name = `"${(await library.libraryGetEntry(hash)).name}"`;
+        } catch {
+          // Detail fetch failing must not block the confirm — keep the fallback.
+        }
+        const plural = overrides === 1 ? "" : "s";
+        if (!confirm(
+          `This track has ${overrides} mid-song voice change${plural} — replace them all with ${name}?`,
+        )) {
+          return;
+        }
+      }
       await library.libraryAssignToTrack(track.id, hash);
       onUpdate();
       await ipc.reloadSequence();

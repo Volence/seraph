@@ -208,6 +208,24 @@ designs target the banked specs (normative); manifest flags carry the gates.
   coalescing feel (one Ctrl+Z per drag), dirty dot + close confirm, stop
   double-tap, marquee + transpose, seeded roster + measure creation.
 
+- 2026-08-21 (cont.): **WAVE 2 PARCEL C SHIPPED — clipboard/nudge/duplicate**
+  (merged `f1a5a08`; lanes on merged tree: cargo 228/0, vitest 127/127 across
+  16 files, build clean, bindings regenerated+committed). Note Ctrl+C/X/V
+  (module clipboard src/utils/clipboard.ts, two slots + lastCopiedKind()
+  arbitration since region-open implies region-selected; paste anchored at
+  seek cursor when inside the open region else region start; overhanging
+  notes clamped, out-of-range skipped with console.warn count); Arrow
+  Left/Right nudge by grid step, Ctrl+Arrow = 1 tick (block-whole-move);
+  new `duplicate_region` IPC (validate-first, undoable, returns new id);
+  region Ctrl+D duplicates after source, region Ctrl+C/V pastes at
+  bar-snapped cursor (server duplicate with payload-replay fallback if the
+  source was deleted); drag click-through defect FIXED (did-drag one-shot
+  ref in TimelineCanvas; the booked wart from the G6 probe). Ratified:
+  clipboard arbitration; payload-replay fallback; paste drops note
+  detune/modulation (add_note IPC lacks them — same as pre-existing Ctrl+D;
+  becomes moot when S4's NoteInspector extends update_note). Parcel D
+  (loop/snap/tempo/track-ops, branch feat/loop-snap-tempo) still in flight.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

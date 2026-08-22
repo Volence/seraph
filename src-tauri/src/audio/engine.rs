@@ -56,9 +56,24 @@ struct PsgModulationPlayer {
 /// be guessed from what the UI last asked for, which is exactly what made
 /// them dishonest.
 ///
-/// Loop consistency: the writer stores the bounds first and the presence flag
-/// last (Release); the reader takes the flag first (Acquire), so a `true` flag
-/// always publishes bounds that were written before it.
+/// Loop consistency — what the flag ordering DOES and DOES NOT give you.
+/// `loop_active` gates the bounds: the writer stores them first and the flag
+/// last (Release), the reader takes the flag first (Acquire). That makes the
+/// UNARMED → ARMED transition safe (a `true` flag never precedes the bounds
+/// it refers to) and makes disarming safe (a `false` flag means `None`
+/// whatever the bounds hold).
+///
+/// It does NOT make an armed → RE-ARMED range change atomic. With the flag
+/// already `true`, a reader can acquire it from the *previous* publish and
+/// then relaxed-load the new `loop_start` next to the previous `loop_end` —
+/// a torn `(new_start, old_end)` pair. That window is open whenever the range
+/// is edited while a loop is already armed, i.e. every drag of a loop edge.
+///
+/// This is tolerable ONLY because the fields have no consumer:
+/// `get_playback_state`'s `loopStart`/`loopEnd` are read by nothing today
+/// (enumerated 2026-08-22). **Close the window — a seqlock, or pack both
+/// bounds into one `AtomicU64` — BEFORE wiring either field to anything.**
+/// Booked in `docs/superpowers/2026-07-03-seraph-banking-queue.md`.
 #[derive(Default)]
 pub struct TransportPublish {
     playing: AtomicBool,
@@ -84,6 +99,8 @@ impl TransportPublish {
         self.playing.load(Ordering::Relaxed)
     }
 
+    /// The armed loop, or `None`. See the type's note: an armed → re-armed
+    /// range change can be read torn. Safe while nothing consumes it.
     pub fn loop_range(&self) -> Option<(u64, u64)> {
         if !self.loop_active.load(Ordering::Acquire) {
             return None;

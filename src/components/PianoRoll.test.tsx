@@ -342,7 +342,11 @@ describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
     vi.mocked(ipc.addNote).mockRejectedValueOnce("instrument not found");
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
 
-    await waitFor(() => expect(getByText(/Paste failed: instrument not found/)).toBeInTheDocument());
+    // The paste chain is entirely mocked promises (no timers), so one async
+    // act() drains it and flushes the notice render — deterministic, with no
+    // polling budget for a loaded box to blow through.
+    await act(async () => {});
+    expect(getByText(/Paste failed: instrument not found/)).toBeInTheDocument();
     expect(error).toHaveBeenCalledWith("Paste failed:", "instrument not found");
     error.mockRestore();
   });

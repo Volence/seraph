@@ -1058,6 +1058,21 @@ designs target the banked specs (normative); manifest flags carry the gates.
   `assertion left == right failed: left: None, right: Some((480, 1920))`.
   No IPC type changed, so `src/bindings.ts` is untouched (verified: `cargo
   test` regenerates it and `git status` is clean).
+  **BOOKED — the loop-bound publish can be read torn (overseer FIX 1).**
+  `TransportPublish`'s Release/Acquire on `loop_active` gates the bounds
+  correctly for UNARMED -> ARMED and for disarming, but it does NOT make an
+  armed -> RE-ARMED range change atomic: with the flag already `true` a
+  reader can acquire it from the previous publish and then relaxed-load the
+  new `loop_start` next to the previous `loop_end` — a torn
+  `(new_start, old_end)`. The window is open on every drag of a loop edge.
+  Deliberately NOT fixed here: nothing reads `loopStart`/`loopEnd` (that
+  enumeration is above), so a seqlock for a field with no reader is
+  gold-plating. **CLOSE IT (seqlock, or pack both bounds into one
+  `AtomicU64`) BEFORE the first consumer wires either field to anything.**
+  The type's doc comment now states the guarantee it actually provides and
+  names the window — the original comment asserted the strong version, and a
+  stale claim inside a comment outlives every doc that recorded it because
+  nobody re-reads a comment to check whether it still holds.
   **NOT DONE, deliberately:** no view was rewired to the now-honest
   `playing` / loop range. Doing so changes transport UI behaviour (the
   button would stop lying about a refused play) and is a separate call.
@@ -1074,11 +1089,24 @@ designs target the banked specs (normative); manifest flags carry the gates.
   number inherits the defect it was correcting". Severities and verdicts
   untouched; this was citation hygiene, not a re-audit.
 
-  **OBSERVED, not a regression:** `ArrangementView.test.tsx` > "paste
-  replays the copied payload when the source region is gone" timed out its
-  1 s `waitFor` ONCE in ~9 full-suite runs (8 isolated runs of that file:
-  clean). Load-sensitive `waitFor`, not a logic failure — recorded so the
-  next session sees it as known rather than new.
+  **FLAKE KILLED, NOT WATCH-LISTED (overseer FIX 2).**
+  `ArrangementView.test.tsx` > "paste replays the copied payload when the
+  source region is gone" timed out its 1 s `waitFor` ONCE in ~9 full-suite
+  runs. Rather than raise the budget, the assertions were made
+  DETERMINISTIC: the paste chain is entirely mocked promises with no timers,
+  so one `await act(async () => {})` drains it and the assertions run
+  synchronously — no polling, no timeout for a loaded box to blow through.
+  Proven to still have teeth: with the expected trackId swapped for a
+  sentinel the test fails in **19 ms** with a real argument diff, i.e. the
+  drain genuinely completed rather than the assertion being skipped. The
+  same treatment was applied to both paste-rejection tests added by this
+  parcel, so the parcel adds no new load-sensitive gate. It also now asserts
+  `getRegionClipboard()` is non-empty BEFORE the paste: a copy that silently
+  no-ops (empty `tracks`) used to surface as a slow timeout that reads like
+  a flake instead of the bug it is.
+  **Reusable rule:** in this suite, `waitFor` on a chain of mocked promises
+  buys nothing but a 1 s failure budget — drain with async `act` and assert
+  directly. Keep `waitFor` for genuinely timed or event-loop-deferred work.
 
   **TAGGED for foreground confirmation (no emulator/app launched here):**
   copy notes in project A, open project B, Ctrl+V — nothing should paste

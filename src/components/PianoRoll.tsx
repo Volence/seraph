@@ -151,7 +151,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   useEffect(() => () => setPianoRollNoteSelectionActive(false), []);
 
   async function handleNoteAdd(tick: number, pitch: number, duration: number) {
-    await ipc.addNote(region.trackId, region.regionId, tick, pitch, 100, duration);
+    // Velocity is TL-denominated in the engine (127 = no attenuation,
+    // 0.75 dB per step down) — place at full so new notes match audition.
+    await ipc.addNote(region.trackId, region.regionId, tick, pitch, 127, duration);
     refresh();
   }
 

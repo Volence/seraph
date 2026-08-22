@@ -403,6 +403,27 @@ describe("a mouse gesture in flight when the region switches", () => {
     expect(ipc.addNote).not.toHaveBeenCalled();
   });
 
+  it("a Draw-Mode paint run is not committed into the region that replaced it", async () => {
+    // Same class as the draw gesture above, N notes at a time: the run's
+    // cells are ticks and pitches picked in region A's view, and nothing
+    // masks them — the paint path never indexes `notes`.
+    const { container, rerender, getByRole } = await openRegion1();
+    fireEvent.click(getByRole("button", { name: "Draw" }));
+    const canvas = noteCanvas(container);
+
+    const PAINT_PITCH = 62; // empty in both regions
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(PAINT_PITCH), button: 0 });
+    fireEvent.mouseMove(window, { clientX: 20, clientY: rowY(PAINT_PITCH) });
+
+    rerender(roll("region-2"));
+    await flush();
+
+    fireEvent.mouseMove(window, { clientX: 40, clientY: rowY(PAINT_PITCH) });
+    fireEvent.mouseUp(window, { clientX: 40, clientY: rowY(PAINT_PITCH) });
+    await flush();
+    expect(ipc.addNote).not.toHaveBeenCalled();
+  });
+
   it("still commits a marquee begun before the switch — it selects what it visibly covers", async () => {
     // Deliberately NOT guarded, unlike the three above: a marquee writes
     // nothing, and draw() renders the band from the very same view pixels
@@ -451,6 +472,22 @@ describe("state that SHOULD survive a region switch stays put", () => {
         "track-1", "region-2", n.tick, n.pitch, n.velocity, n.durationTicks, null,
       );
     }
+  });
+
+  it("keeps Draw Mode across a switch (a tool setting, like the grid selector)", async () => {
+    vi.mocked(ipc.listTracks).mockResolvedValue(BOTH_REGIONS);
+    const { rerender, getByRole } = render(roll("region-1"));
+    await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
+    await flush();
+
+    fireEvent.click(getByRole("button", { name: "Draw" }));
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("true");
+
+    rerender(roll("region-2"));
+    await flush();
+    // Ableton's Draw Mode is global, not per-clip: switching what you edit
+    // must not silently disarm the tool you are holding.
+    expect(getByRole("button", { name: "Draw" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("keeps the grid-size selection across a switch", async () => {

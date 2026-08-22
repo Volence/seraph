@@ -44,6 +44,29 @@
   text-align: center;
 }
 
+/* Draw-mode toggle: the mode must be VISIBLE, not just a keystroke (F17 —
+   invisible core gestures are a booked finding). */
+.drawBtn {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.drawBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.drawBtnActive {
+  color: var(--bg-panel);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .gridSelect {
   font-size: 11px;
   padding: 2px 6px;

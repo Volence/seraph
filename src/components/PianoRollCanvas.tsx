@@ -4,6 +4,9 @@ import {
   notesIntersectingRect,
   marqueeRectFromView,
   marqueePreviewSelection,
+  paintCellAt,
+  paintCellBlocked,
+  type PaintCell,
 } from "../utils/pianoRollEdit";
 import { followScrollLeft, followAllowed } from "../utils/followPlayhead";
 import { voiceColor } from "../utils/voiceColor";
@@ -31,6 +34,18 @@ interface PianoRollCanvasProps {
   onMarqueeSelect: (indices: number[], additive: boolean) => void;
   onClearSelection: () => void;
   onNoteAdd: (tick: number, pitch: number, durationTicks: number) => void;
+  /** Draw Mode (B): one-gesture entry. Click paints one grid-length note,
+   *  click-and-drag paints a run of them. While on, the no-mode
+   *  double-click-draw path is suppressed (a double-click here is two paint
+   *  clicks) and empty-space left-drag paints instead of marqueeing. */
+  drawMode: boolean;
+  /** Commit of one paint gesture: every cell the drag covered, in the order
+   *  it covered them. ONE call per gesture, so the parent can wrap it in one
+   *  undo group and one sequence reload. */
+  onNotesPaint: (cells: { tick: number; pitch: number; durationTicks: number }[]) => void;
+  /** Right-click on a note: erase it. Mode-independent — the most common
+   *  correction never costs a tool switch (FL's Draw/Paint rule). */
+  onNoteErase: (index: number) => void;
   onAudition: (pitch: number) => void;
   onNoteResize: (index: number, newDurationTicks: number) => void;
   onNotesMove: (moves: { index: number; tick: number; pitch: number }[]) => void;
@@ -77,6 +92,9 @@ export function PianoRollCanvas({
   onMarqueeSelect,
   onClearSelection,
   onNoteAdd,
+  drawMode,
+  onNotesPaint,
+  onNoteErase,
   onAudition,
   onNoteResize,
   onNotesMove,
@@ -114,6 +132,31 @@ export function PianoRollCanvas({
   } | null>(null);
   const drawingRef = useRef<{ regionId: string; startTick: number; pitch: number; endTick: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  /** In-flight Draw-Mode paint run. Region-TAGGED like every other mutating
+   *  gesture: its cells are ticks/pitches picked in one region's view, and a
+   *  region switch needs no pointer event (ArrangementView's Ctrl+D / Ctrl+V
+   *  switch from a window keydown), so this can outlive its document with
+   *  the button still down. */
+  const paintRef = useRef<{
+    regionId: string;
+    cells: PaintCell[];
+    /** Last pitch auditioned, so a run is heard once per pitch, not per cell. */
+    lastPitch: number;
+    /** Row the gesture began on — the row Shift locks the run to. */
+    startPitch: number;
+  } | null>(null);
+  const [isPainting, setIsPainting] = useState(false);
+  /** Cells committed by the PREVIOUS paint gesture, held until the parent's
+   *  re-fetch lands. `notes` is refreshed asynchronously, so without this a
+   *  double-click in Draw Mode (two gestures inside one IPC round trip)
+   *  stacks a second note in the same cell — inaudible under
+   *  last-note-priority, and therefore silent corruption. */
+  const recentlyPaintedRef = useRef<PaintCell[]>([]);
+  useEffect(() => {
+    // A new notes array is the re-fetch landing (or a region switch): the
+    // committed cells are now visible in `notes` and the shadow is stale.
+    recentlyPaintedRef.current = [];
+  }, [notes]);
   const [isPanning, setIsPanning] = useState(false);
   const panRef = useRef<{ startX: number; startY: number; startScrollLeft: number; startScrollTop: number } | null>(null);
   // Marquee (rubber-band) selection; x in view px, y in canvas/content px.
@@ -264,6 +307,25 @@ export function PianoRollCanvas({
       ctx.setLineDash([]);
     }
 
+    // Paint run in flight: each cell previews as a dashed grid-length note,
+    // the same vocabulary the draw preview uses.
+    const paint = paintRef.current;
+    if (paint) {
+      for (const cell of paint.cells) {
+        const x = (cell.tick - startTick) / ticksPerPixel;
+        const w = Math.max(2, gridSnapTicks / ticksPerPixel);
+        const y = (maxPitch - cell.pitch) * rowHeight + 1;
+        const h = rowHeight - 2;
+        ctx.fillStyle = channelColor + "88";
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = channelColor;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        ctx.setLineDash([]);
+      }
+    }
+
     const mq = marqueeRef.current;
     if (mq) {
       const x1 = Math.min(mq.startX, mq.currentX);
@@ -325,12 +387,56 @@ export function PianoRollCanvas({
     return null;
   }
 
+  /** The grid cell under a pointer position, or null when the row is outside
+   *  the visible pitch range. */
+  function cellAtPointer(viewX: number, y: number): PaintCell | null {
+    const pitch = maxPitch - Math.floor(y / rowHeight);
+    if (pitch < minPitch || pitch > maxPitch) return null;
+    return paintCellAt(pixelToTick(viewX), pitch, gridSnapTicks);
+  }
+
+  /** Add the cell under the pointer to the in-flight run, unless it is
+   *  blocked (already painted this gesture, occupied by an existing note or
+   *  a just-committed one, or past the region end). Auditions on each new
+   *  PITCH so a painted run is heard without one preview per cell. */
+  function paintCellUnderPointer(viewX: number, y: number, lockPitch: number | null) {
+    const paint = paintRef.current;
+    if (!paint) return;
+    const raw = cellAtPointer(viewX, y);
+    if (!raw) return;
+    const cell = lockPitch === null ? raw : { tick: raw.tick, pitch: lockPitch };
+    const blocked =
+      paintCellBlocked(cell, paint.cells, notes, gridSnapTicks, durationTicks) ||
+      paintCellBlocked(cell, recentlyPaintedRef.current, [], gridSnapTicks, durationTicks);
+    if (blocked) return;
+    paint.cells.push(cell);
+    if (cell.pitch !== paint.lastPitch) {
+      paint.lastPitch = cell.pitch;
+      onAudition(cell.pitch);
+    }
+  }
+
   function handleMouseDown(e: React.MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    // Right button: erase the note under the cursor, in BOTH modes. On empty
+    // space it does nothing (the browser menu stays suppressed by the
+    // container's onContextMenu either way).
+    if (e.button === 2) {
+      e.preventDefault();
+      const target = findNoteAtPos(x, y);
+      // No region tag needed and none faked: the hit test and the callback
+      // both come from THIS render, and PianoRoll only ever exposes notes
+      // whose `loaded.regionId` matches the open region — so the index and
+      // the ids the parent sends describe the same document, with no
+      // gesture state surviving the event.
+      if (target) onNoteErase(target.index);
+      return;
+    }
 
     const hit = findNoteAtPos(x, y);
     if (hit && hit.nearEdge) {
@@ -383,6 +489,19 @@ export function PianoRollCanvas({
       return;
     }
 
+    // Draw Mode: empty-space left-press starts a paint run instead of a
+    // marquee. The first cell lands on mousedown, so a plain click is one
+    // note and a drag is a run — one gesture either way.
+    if (drawMode && e.button === 0) {
+      const first = cellAtPointer(x, y);
+      if (!first) return; // press outside the pitch range: no gesture at all
+      paintRef.current = { regionId, cells: [], lastPitch: -1, startPitch: first.pitch };
+      paintCellUnderPointer(x, y, null);
+      setIsPainting(true);
+      draw();
+      return;
+    }
+
     marqueeRef.current = { startX: x, startY: y, currentX: x, currentY: y, additive: e.shiftKey };
     // Seed the live preview: an empty rect hits nothing, so a plain press
     // previews the clear and Shift keeps the selection until notes hit.
@@ -391,6 +510,10 @@ export function PianoRollCanvas({
   }
 
   function handleDoubleClick(e: React.MouseEvent) {
+    // In Draw Mode the two clicks already painted (and de-duplicated) their
+    // cell; running the no-mode draw path on top would add a third note.
+    // Length in Draw Mode comes from dragging the note's right edge.
+    if (drawMode) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -494,6 +617,53 @@ export function PianoRollCanvas({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isMarquee, notes, maxPitch, rowHeight, ticksPerPixel, scrollLeft, selectedNotes, onMarqueeSelect, onClearSelection, draw]);
+
+  // Draw-Mode paint run: every grid cell the drag enters becomes a
+  // grid-length note, committed as ONE gesture on mouseup.
+  useEffect(() => {
+    if (!isPainting) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const canvas = canvasRef.current;
+      const paint = paintRef.current;
+      if (!canvas || !paint) return;
+      if (!stillSameRegion(paint.regionId)) {
+        // Same rule as the draw path: drop the run rather than keep
+        // previewing notes that will never commit.
+        paintRef.current = null;
+        draw();
+        return;
+      }
+      canvas.style.cursor = "crosshair";
+      const rect = canvas.getBoundingClientRect();
+      // Shift = Ableton's Pitch Lock: the run stays on the row it began on.
+      paintCellUnderPointer(e.clientX - rect.left, e.clientY - rect.top, e.shiftKey ? paint.startPitch : null);
+      draw();
+    }
+
+    function handleMouseUp() {
+      const paint = paintRef.current;
+      // A run that outlived its region commits nothing: its ticks and
+      // pitches were picked in another document's view.
+      if (paint && stillSameRegion(paint.regionId) && paint.cells.length > 0) {
+        recentlyPaintedRef.current = paint.cells;
+        onNotesPaint(paint.cells.map((c) => ({ tick: c.tick, pitch: c.pitch, durationTicks: gridSnapTicks })));
+      }
+      paintRef.current = null;
+      setIsPainting(false);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = "";
+      draw();
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPainting, ticksPerPixel, scrollLeft, gridSnapTicks, rowHeight, minPitch, maxPitch, durationTicks, notes, onNotesPaint, onAudition, draw]);
 
   useEffect(() => {
     if (!isDrawing) return;
@@ -633,7 +803,7 @@ export function PianoRollCanvas({
   }, [moveDrag, ticksPerPixel, gridSnapTicks, rowHeight, minPitch, maxPitch, onNotesMove, onGestureEnd]);
 
   function handleMouseMove(e: React.MouseEvent) {
-    if (drag || moveDrag || isDrawing || isPanning || isMarquee) return;
+    if (drag || moveDrag || isDrawing || isPainting || isPanning || isMarquee) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -641,7 +811,9 @@ export function PianoRollCanvas({
     const y = e.clientY - rect.top;
 
     const hit = findNoteAtPos(x, y);
-    canvas.style.cursor = hit?.nearEdge ? "ew-resize" : hit ? "grab" : "";
+    // Draw Mode advertises itself on the pointer too: empty grid is a
+    // crosshair, notes keep their move/resize affordances.
+    canvas.style.cursor = hit?.nearEdge ? "ew-resize" : hit ? "grab" : drawMode ? "crosshair" : "";
   }
 
   useEffect(() => {

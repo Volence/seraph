@@ -121,8 +121,10 @@ export function ArrangementView({
         // into deleting the enclosing region (G1).
         if (pianoRollNoteSelectionActive()) return;
         e.preventDefault();
-        Promise.all(selectedRegions.map((r) => ipc.deleteRegion(r.trackId, r.regionId))).then(() => {
+        Promise.all(selectedRegions.map((r) => ipc.deleteRegion(r.trackId, r.regionId))).then(async () => {
           onSelectRegions([]);
+          // Reload so the next playback stops sounding the deleted regions (G30).
+          await ipc.reloadSequence();
           refresh();
         });
       }
@@ -158,11 +160,17 @@ export function ArrangementView({
     } else {
       await ipc.moveRegion(srcTrackId, regionId, dstTrackId, startTick);
     }
+    // Moves commit once per released drag (TimelineCanvas fires onRegionMove
+    // from mouseup only), so a plain reload keeps playback audible-current
+    // without needing a debounce (G30).
+    await ipc.reloadSequence();
     refresh();
   }
 
   async function handleRegionResize(trackId: string, regionId: string, startTick: number, durationTicks: number) {
     await ipc.updateRegion(trackId, regionId, startTick, durationTicks);
+    // Resizes also commit on mouse release only — one reload per gesture (G30).
+    await ipc.reloadSequence();
     refresh();
   }
 

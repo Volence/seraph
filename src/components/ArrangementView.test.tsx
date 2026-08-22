@@ -89,6 +89,68 @@ describe("ArrangementView", () => {
     expect(await screen.findByText("Add Track")).toBeInTheDocument();
   });
 
+  describe("region edits reload the sequence so playback hears them (G30)", () => {
+    const oneBar = ticksPerBar(meta);
+    const region = { id: "region-1", startTick: 0, durationTicks: oneBar, notes: [] };
+    const trackWithRegion: Track = { ...fmTrack, regions: [region] };
+    const selected = {
+      trackId: fmTrack.id,
+      trackName: fmTrack.name,
+      regionId: region.id,
+      channelType: "fm" as const,
+      startTick: 0,
+      durationTicks: oneBar,
+    };
+
+    async function timelineCanvas(container: HTMLElement) {
+      await screen.findByText("Bass Lane");
+      const canvases = container.querySelectorAll("canvas");
+      return canvases[canvases.length - 1] as HTMLCanvasElement;
+    }
+
+    it("after deleting a region via Delete", async () => {
+      vi.mocked(ipc.listTracks).mockResolvedValue([trackWithRegion]);
+      renderView({ selectedRegions: [selected] });
+      await screen.findByText("Bass Lane");
+
+      fireEvent.keyDown(window, { key: "Delete" });
+
+      await waitFor(() =>
+        expect(ipc.deleteRegion).toHaveBeenCalledWith(fmTrack.id, region.id),
+      );
+      await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+    });
+
+    it("after a region move (committed on mouse release)", async () => {
+      vi.mocked(ipc.listTracks).mockResolvedValue([trackWithRegion]);
+      const { container } = renderView();
+      const canvas = await timelineCanvas(container);
+
+      // Region spans x 0..oneBar/ticksPerPixel (75px at the default zoom).
+      // Grab its middle and drag one bar to the right.
+      fireEvent.mouseDown(canvas, { clientX: 30, clientY: 10 });
+      fireEvent.mouseMove(window, { clientX: 130, clientY: 10 });
+      fireEvent.mouseUp(window, { clientX: 130, clientY: 10 });
+
+      await waitFor(() => expect(ipc.moveRegion).toHaveBeenCalled());
+      await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+    });
+
+    it("after a region resize (committed on mouse release)", async () => {
+      vi.mocked(ipc.listTracks).mockResolvedValue([trackWithRegion]);
+      const { container } = renderView();
+      const canvas = await timelineCanvas(container);
+
+      // Right edge sits at 75px; press within the 8px edge threshold.
+      fireEvent.mouseDown(canvas, { clientX: 71, clientY: 10 });
+      fireEvent.mouseMove(window, { clientX: 150, clientY: 10 });
+      fireEvent.mouseUp(window, { clientX: 150, clientY: 10 });
+
+      await waitFor(() => expect(ipc.updateRegion).toHaveBeenCalled());
+      await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+    });
+  });
+
   it("empty-lane double-click adds a one-bar region, selects it, reloads the sequence", async () => {
     const onSelectRegions = vi.fn();
     const { container } = renderView({ onSelectRegions });

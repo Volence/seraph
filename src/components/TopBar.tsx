@@ -7,6 +7,9 @@ import { SeraphMark } from "../assets/SeraphMark";
 
 interface TopBarProps {
   projectMeta: SongMetadata | null;
+  /** Tempo/time-sig were edited inline; App refreshes its projectMeta so
+   *  every grid consumer picks up the new bar math. */
+  onProjectMetaChange: (meta: SongMetadata) => void;
   onNewProject: () => void;
   onOpenProject: () => void;
   onSave: () => void;
@@ -18,13 +21,15 @@ interface TopBarProps {
   playing: boolean;
   loopEnabled: boolean;
   onPlayingChange: (playing: boolean) => void;
-  onLoopChange: (enabled: boolean) => void;
+  /** Toggle the preview loop; App owns the range + transport calls. */
+  onToggleLoop: () => void;
   /** Seek request (Home button); App owns the cursor + transport call (G29). */
   onSeek: (tick: number) => void;
 }
 
 export function TopBar({
   projectMeta,
+  onProjectMetaChange,
   onNewProject,
   onOpenProject,
   onSave,
@@ -35,11 +40,50 @@ export function TopBar({
   playing,
   loopEnabled,
   onPlayingChange,
-  onLoopChange,
+  onToggleLoop,
   onSeek,
 }: TopBarProps) {
   const [masterVol, setMasterVol] = useState(100);
   const [exporting, setExporting] = useState(false);
+  // Inline tempo/time-sig editing (Knob edit-field idiom: Enter commits,
+  // Esc cancels). Text state so partial input never round-trips to the IPC.
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [tempoText, setTempoText] = useState("");
+  const [sigNumText, setSigNumText] = useState("");
+  const [sigDen, setSigDen] = useState(4);
+
+  function beginMetaEdit() {
+    if (!projectMeta) return;
+    setTempoText(String(projectMeta.tempo));
+    setSigNumText(String(projectMeta.timeSignature[0]));
+    setSigDen(projectMeta.timeSignature[1]);
+    setEditingMeta(true);
+  }
+
+  async function commitMetaEdit() {
+    if (!projectMeta) return;
+    const tempo = parseFloat(tempoText);
+    const num = parseInt(sigNumText, 10);
+    if (isNaN(tempo) || isNaN(num)) {
+      setEditingMeta(false);
+      return;
+    }
+    try {
+      const meta = await ipc.updateProjectMetadata(tempo, num, sigDen);
+      onProjectMetaChange(meta);
+      // Tempo/time-sig feed the sequencer snapshot — rebuild it so the
+      // next playback runs at the new tempo.
+      await ipc.reloadSequence();
+    } catch (e) {
+      alert(`Update failed: ${e}`);
+    }
+    setEditingMeta(false);
+  }
+
+  function handleMetaKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") commitMetaEdit();
+    else if (e.key === "Escape") setEditingMeta(false);
+  }
   const handleMasterVol = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseInt(e.target.value);
     setMasterVol(v);
@@ -72,10 +116,59 @@ export function TopBar({
         {projectMeta && (
           <>
             <span className={styles.separator}>|</span>
-            <span className={styles.detail}>{projectMeta.tempo} BPM</span>
-            <span className={styles.detail}>
-              {projectMeta.timeSignature[0]}/{projectMeta.timeSignature[1]}
-            </span>
+            {editingMeta ? (
+              <span className={styles.metaEdit} onKeyDown={handleMetaKeyDown}>
+                <input
+                  className={styles.metaInput}
+                  type="number"
+                  min={20}
+                  max={300}
+                  value={tempoText}
+                  onChange={(e) => setTempoText(e.target.value)}
+                  title="Tempo (BPM), Enter commits, Esc cancels"
+                  autoFocus
+                />
+                <span className={styles.detail}>BPM</span>
+                <input
+                  className={styles.metaInput}
+                  type="number"
+                  min={1}
+                  max={16}
+                  value={sigNumText}
+                  onChange={(e) => setSigNumText(e.target.value)}
+                  title="Time signature numerator (1-16)"
+                />
+                <span className={styles.detail}>/</span>
+                <select
+                  className={styles.metaSelect}
+                  value={sigDen}
+                  onChange={(e) => setSigDen(Number(e.target.value))}
+                  title="Time signature denominator"
+                >
+                  <option value={2}>2</option>
+                  <option value={4}>4</option>
+                  <option value={8}>8</option>
+                  <option value={16}>16</option>
+                </select>
+              </span>
+            ) : (
+              <>
+                <span
+                  className={`${styles.detail} ${styles.editable}`}
+                  onClick={beginMetaEdit}
+                  title="Click to edit tempo / time signature"
+                >
+                  {projectMeta.tempo} BPM
+                </span>
+                <span
+                  className={`${styles.detail} ${styles.editable}`}
+                  onClick={beginMetaEdit}
+                  title="Click to edit tempo / time signature"
+                >
+                  {projectMeta.timeSignature[0]}/{projectMeta.timeSignature[1]}
+                </span>
+              </>
+            )}
             <span className={styles.driverBadge}>Flamedriver</span>
           </>
         )}
@@ -110,7 +203,7 @@ export function TopBar({
           playing={playing}
           loopEnabled={loopEnabled}
           onPlayingChange={onPlayingChange}
-          onLoopChange={onLoopChange}
+          onToggleLoop={onToggleLoop}
           onSeek={onSeek}
         />
       ) : (

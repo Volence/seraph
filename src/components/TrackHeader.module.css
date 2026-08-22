@@ -68,6 +68,46 @@
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: default;
+  flex: 1;
+  min-width: 0;
+}
+
+.renameInput {
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+}
+
+.deleteBtn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 2px;
+  visibility: hidden;
+}
+
+.header:hover .deleteBtn {
+  visibility: visible;
+}
+
+.deleteBtn:hover {
+  color: #ff6666;
+  background: var(--bg-surface);
 }
 
 .controls {

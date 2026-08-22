@@ -58,6 +58,44 @@ export function channelLevelIndex(track: Track): number {
 
 export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroupHead, groupCollapsed, groupSize, onToggleCollapse }: TrackHeaderProps) {
   const [dragOver, setDragOver] = useState(false);
+  // Inline rename (Knob edit-field idiom: Enter/blur commit, Esc cancels).
+  // Global single-key shortcuts stay quiet while typing (isEditableTarget).
+  const [renaming, setRenaming] = useState(false);
+  const [renameText, setRenameText] = useState("");
+
+  function beginRename(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRenameText(track.name);
+    setRenaming(true);
+  }
+
+  async function commitRename() {
+    setRenaming(false);
+    const name = renameText.trim();
+    if (!name || name === track.name) return;
+    await ipc.updateTrack(
+      track.id, name, track.channel, track.instrumentId,
+      track.muted, track.solo, track.volume, track.pan, track.pitchOffset,
+    );
+    onUpdate();
+  }
+
+  function handleRenameKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      commitRename();
+    } else if (e.key === "Escape") {
+      setRenaming(false);
+    }
+  }
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm(`Delete track "${track.name}"? Its regions go with it.`)) return;
+    await ipc.deleteTrack(track.id);
+    // Reload so the next playback stops sounding the deleted regions (G30).
+    await ipc.reloadSequence();
+    onUpdate();
+  }
 
   function handleDragOver(e: React.DragEvent) {
     if (!e.dataTransfer.types.includes(library.LIBRARY_DRAG_TYPE)) return;
@@ -162,10 +200,35 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
         <span className={styles.badge} style={{ background: channelColor(track) }}>
           {channelLabel(track)}
         </span>
-        <span className={styles.name}>{track.name}</span>
+        {renaming ? (
+          <input
+            className={styles.renameInput}
+            value={renameText}
+            onChange={(e) => setRenameText(e.target.value)}
+            onKeyDown={handleRenameKeyDown}
+            onBlur={commitRename}
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+          />
+        ) : (
+          <span
+            className={styles.name}
+            onDoubleClick={beginRename}
+            title="Double-click to rename"
+          >
+            {track.name}
+          </span>
+        )}
         {isGroupHead && groupCollapsed && groupSize && groupSize > 1 && (
           <span className={styles.hiddenCount}>+{groupSize - 1}</span>
         )}
+        <button
+          className={styles.deleteBtn}
+          onClick={handleDelete}
+          title="Delete track"
+        >
+          ✕
+        </button>
       </div>
       <div className={styles.controls}>
         <button

@@ -21,6 +21,10 @@ interface ArrangementViewProps {
   /** Seek cursor position + seek request; owned by App (G29). */
   seekTick: number;
   onSeek: (tick: number) => void;
+  /** Preview loop (transport-scratch, App-owned); drawn on the ruler. */
+  previewLoop: import("../utils/previewLoop").PreviewLoopRange | null;
+  loopEnabled: boolean;
+  onPreviewLoopSet: (startTick: number, endTick: number) => void;
   onSelectRegions: (regions: SelectedRegion[]) => void;
   selectedRegions: SelectedRegion[];
   onSelectInstrument: (inst: SelectedInstrument | null) => void;
@@ -57,6 +61,9 @@ export function ArrangementView({
   playing,
   seekTick,
   onSeek,
+  previewLoop,
+  loopEnabled,
+  onPreviewLoopSet,
   onSelectRegions,
   selectedRegions,
   onSelectInstrument,
@@ -64,6 +71,9 @@ export function ArrangementView({
 }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [showAddTrack, setShowAddTrack] = useState(false);
+  // Arrangement snap (region create/move/resize, ruler loop drag). The
+  // piano roll keeps its own grid selector.
+  const [snapMode, setSnapMode] = useState<grid.SnapMode>("bar");
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta);
@@ -405,11 +415,15 @@ export function ArrangementView({
           scrollLeft={zoom.scrollLeft}
           ticksPerBeat={projectMeta.ticksPerBeat}
           beatsPerBar={projectMeta.timeSignature[0]}
+          loop={previewLoop}
+          loopEnabled={loopEnabled}
+          snapMode={snapMode}
           onSeek={handleSeek}
           onScrollChange={(v) => {
             lastManualScrollRef.current = performance.now();
             zoom.setScrollLeft(v);
           }}
+          onLoopDrag={onPreviewLoopSet}
         />
       </div>
       <div className={styles.body} ref={zoom.bodyRef}>
@@ -439,6 +453,18 @@ export function ArrangementView({
             );
           })}
           <div className={styles.addButtons}>
+            <label className={styles.snapControl} title="Arrangement snap (regions and loop drag)">
+              Snap
+              <select
+                className={styles.snapSelect}
+                value={snapMode}
+                onChange={(e) => setSnapMode(e.target.value as grid.SnapMode)}
+              >
+                <option value="bar">Bar</option>
+                <option value="beat">Beat</option>
+                <option value="off">Off</option>
+              </select>
+            </label>
             <button className={styles.addBtn} onClick={() => setShowAddTrack(true)}>+ Track</button>
             <button className={styles.addBtn} onClick={addFm}>+ FM Patch</button>
             <button className={styles.addBtn} onClick={addPsg}>+ PSG Env</button>
@@ -482,6 +508,7 @@ export function ArrangementView({
           onRegionCreate={handleRegionCreate}
           onSeek={handleSeek}
           seekTick={seekTick}
+          snapMode={snapMode}
         />
       </div>
       {showAddTrack && (

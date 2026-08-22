@@ -82,6 +82,17 @@ export async function getProjectInfo(): Promise<SongMetadata | null> {
   return unwrap(await commands.getProjectInfo());
 }
 
+/** Edit tempo / time signature after creation. Returns the updated
+ *  metadata. Marks dirty; NOT undoable in v1 (metadata is outside the
+ *  track undo snapshot). */
+export async function updateProjectMetadata(
+  tempo: number,
+  timeSigNum: number,
+  timeSigDen: number,
+): Promise<SongMetadata> {
+  return unwrap(await commands.updateProjectMetadata(tempo, timeSigNum, timeSigDen));
+}
+
 export async function listDrivers(): Promise<DriverInfo[]> {
   return unwrap(await commands.listDrivers());
 }

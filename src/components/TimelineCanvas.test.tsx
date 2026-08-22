@@ -45,11 +45,12 @@ const gridProps = {
   playing: false,
   selectedRegions: [],
   seekTick: 0,
+  snapMode: "bar" as import("../utils/grid").SnapMode,
 };
 
-function renderCanvas(tracks: Track[]) {
+function renderCanvas(tracks: Track[], overrides: Partial<typeof gridProps> = {}) {
   const { container } = render(
-    <TimelineCanvas tracks={tracks} {...gridProps} {...handlers} />,
+    <TimelineCanvas tracks={tracks} {...gridProps} {...overrides} {...handlers} />,
   );
   const canvas = container.querySelector("canvas");
   expect(canvas).not.toBeNull();
@@ -178,6 +179,32 @@ describe("TimelineCanvas double-click", () => {
       Math.round(clickX * gridProps.ticksPerPixel),
     );
     expect(handlers.onRegionCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates a beat-snapped region when snap mode is beat", () => {
+    const canvas = renderCanvas([makeTrack()], { snapMode: "beat" });
+
+    const clickX = 200; // tick 2000: inside beat 5 (beat = 480 ticks)
+    fireEvent.doubleClick(canvas, { clientX: clickX, clientY: 10 });
+
+    const clickTick = clickX * gridProps.ticksPerPixel;
+    const beatSnapped =
+      Math.floor(clickTick / gridProps.ticksPerBeat) * gridProps.ticksPerBeat;
+    const barTicks = gridProps.ticksPerBeat * gridProps.beatsPerBar;
+    // The case must distinguish beat snap from bar snap.
+    expect(beatSnapped % barTicks).not.toBe(0);
+    expect(handlers.onRegionCreate).toHaveBeenCalledWith(0, beatSnapped);
+  });
+
+  it("creates at the exact tick when snap mode is off", () => {
+    const canvas = renderCanvas([makeTrack()], { snapMode: "off" });
+
+    const clickX = 201; // tick 2010: on no bar or beat boundary
+    fireEvent.doubleClick(canvas, { clientX: clickX, clientY: 10 });
+
+    const clickTick = clickX * gridProps.ticksPerPixel;
+    expect(clickTick % gridProps.ticksPerBeat).not.toBe(0);
+    expect(handlers.onRegionCreate).toHaveBeenCalledWith(0, clickTick);
   });
 
   it("opens the region under the cursor instead of creating", () => {

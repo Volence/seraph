@@ -210,7 +210,10 @@ impl ProjectManager {
                 regions: Vec::new(),
                 muted: false,
                 solo: false,
-                volume: 100,
+                // Volume is TL-denominated (0.75 dB/step, added to carrier
+                // TLs by the sequencer): 127 = no attenuation. See
+                // test_default_track_volume_is_driver_faithful_full.
+                volume: 127,
                 pan: Pan::Center,
                 pitch_offset: 0,
                 modulation: None,
@@ -1092,7 +1095,9 @@ impl ProjectManager {
             regions: Vec::new(),
             muted: false,
             solo: false,
-            volume: 100,
+            // TL-denominated: 127 = no attenuation (see
+            // test_default_track_volume_is_driver_faithful_full).
+            volume: 127,
             pan: Pan::Center,
             pitch_offset: 0,
             modulation: None,
@@ -1374,6 +1379,35 @@ mod tests {
         let mut mgr2 = ProjectManager::new(test_registry());
         let song = mgr2.open(&path).unwrap();
         assert_eq!(song.tracks.len(), expected.len(), "roster persisted to project.json");
+
+        cleanup(&path);
+    }
+
+    /// Track volume is TL-denominated (the sequencer adds `127 - volume`
+    /// straight to every FM carrier TL, 0.75 dB per step; SMPS import's
+    /// `fm_effective_velocity` and the audition path share that convention).
+    /// 127 is therefore the only "no attenuation" default. A default of 100
+    /// silently costs ~20 dB per control; stacked with the piano roll's note
+    /// velocity default it rendered hand-placed FM notes ~35 dB quieter than
+    /// audition (measured in `audio::rendered_rms` — the "Animal Boss voice
+    /// 151 is extremely quiet" report).
+    #[test]
+    fn test_default_track_volume_is_driver_faithful_full() {
+        let path = temp_project_path("default_volume");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Vol", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        for track in mgr.list_tracks() {
+            assert_eq!(
+                track.volume, 127,
+                "seeded track '{}' must default to driver-faithful full volume",
+                track.name
+            );
+        }
+
+        let id = mgr.add_track("Extra".into(), ChannelAssignment::Fm(1), None);
+        let track = mgr.list_tracks().into_iter().find(|t| t.id == id).unwrap();
+        assert_eq!(track.volume, 127, "add_track must default to full volume");
 
         cleanup(&path);
     }
@@ -2230,7 +2264,7 @@ mod tests {
         mgr.undo();
         let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();
         assert!(!t.muted, "undo restores mute state");
-        assert_eq!(t.volume, 100);
+        assert_eq!(t.volume, 127, "undo restores the (driver-faithful) default volume");
         assert_eq!(t.pitch_offset, 0);
         mgr.redo();
         let t = mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap();

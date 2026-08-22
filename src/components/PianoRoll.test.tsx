@@ -393,3 +393,23 @@ describe("PianoRoll refresh on undo/redo", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });
+
+describe("note placement velocity", () => {
+  // Velocity is TL-denominated in the engine: the sequencer adds
+  // (127 - velocity) straight to every FM carrier TL (0.75 dB/step), so 127
+  // is the only "no attenuation" value. Hand-placed notes must default to
+  // 127 or every new note plays ~20 dB under the audition the instrument
+  // was chosen with (the "library voice is extremely quiet" bug — see
+  // src-tauri/src/audio/rendered_rms.rs).
+  it("draws new notes at full (driver-faithful) velocity 127", async () => {
+    const { container } = await renderRoll([]);
+    // DOM order: keys canvas, note canvas, velocity lane canvas.
+    const canvases = container.querySelectorAll("canvas");
+    const noteCanvas = canvases[1];
+    fireEvent.doubleClick(noteCanvas, { clientX: 5, clientY: 50 });
+    fireEvent.mouseUp(window, { clientX: 5, clientY: 50 });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalled());
+    const call = vi.mocked(ipc.addNote).mock.calls[0];
+    expect(call[4]).toBe(127);
+  });
+});

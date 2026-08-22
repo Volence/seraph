@@ -12,7 +12,7 @@ import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT, isEditableTarget } from "../utils/keyboard";
 import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { copyRegions, getRegionClipboard, lastCopiedKind } from "../utils/clipboard";
-import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
+import { followScrollLeft, followAllowed } from "../utils/followPlayhead";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -82,31 +82,19 @@ export function ArrangementView({
   // Manual scrolls (wheel, ruler drag) suspend follow-playhead briefly so the
   // user can inspect other bars during playback (G28).
   const lastManualScrollRef = useRef(-Infinity);
-  // Previous playhead tick, so follow can tell a loop wrap (backward jump)
-  // from the user having scrolled ahead. Ticks, not px: zoom-invariant.
-  const prevPlayheadTickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!playing) {
-      prevPlayheadTickRef.current = null;
-      return;
-    }
-    const prevTick = prevPlayheadTickRef.current;
-    prevPlayheadTickRef.current = currentTick;
-    if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;
+    // followAllowed also suppresses follow entirely while the preview loop
+    // is active (owner ruling: looping playback must not move the view).
+    if (!followAllowed(playing, loopEnabled, lastManualScrollRef.current, performance.now())) return;
     const body = zoom.bodyRef.current;
     if (!body) return;
     // Follow keys off the event-driven tick (interpolation only mutates a ref
     // between renders); paging accuracy at event granularity is plenty.
     const viewWidth = body.clientWidth - HEADER_COLUMN_WIDTH;
-    const next = followScrollLeft(
-      currentTick / zoom.ticksPerPixel,
-      zoom.scrollLeft,
-      viewWidth,
-      prevTick !== null ? prevTick / zoom.ticksPerPixel : null,
-    );
+    const next = followScrollLeft(currentTick / zoom.ticksPerPixel, zoom.scrollLeft, viewWidth);
     if (next !== null) zoom.setScrollLeft(next);
-  }, [currentTick, playing, zoom.ticksPerPixel, zoom.scrollLeft, zoom.setScrollLeft, zoom.bodyRef]);
+  }, [currentTick, playing, loopEnabled, zoom.ticksPerPixel, zoom.scrollLeft, zoom.setScrollLeft, zoom.bodyRef]);
 
   const { visibleTracks, groupHeads } = useMemo(() => {
     const groups = new Map<string, Track[]>();

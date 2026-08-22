@@ -9,11 +9,10 @@
  * the left edge), and callers suspend following for FOLLOW_SUSPEND_MS after
  * any manual scroll so the user can inspect other bars during playback.
  *
- * Backward jumps (loop wrap, seek-back) are the exception to "behind the
- * left edge means leave it alone": when the caller passes the previous
- * playhead position and the playhead moved BACKWARD off-screen, the view
- * snaps so the playhead sits at the reposition anchor again — otherwise a
- * looping playback strands the view at the loop end every cycle.
+ * Follow is strictly forward-only (owner ruling): a backward playhead jump
+ * (loop wrap, seek-back) NEVER scrolls the view. Additionally, while a
+ * preview loop is active follow is suppressed entirely — see followAllowed —
+ * so a looping playback moves the view only by user input.
  */
 
 /** Page forward once the playhead passes this fraction of the visible width. */
@@ -24,35 +23,40 @@ export const FOLLOW_REPOSITION_FRACTION = 0.1;
 export const FOLLOW_SUSPEND_MS = 2000;
 
 /**
+ * Whether follow-playhead may act at all right now. Shared by both views so
+ * the gating rules can't drift:
+ * - only while playing;
+ * - NEVER while a preview loop is active (owner ruling: a looping playback
+ *   must not move the user's view — they are editing in place);
+ * - not within FOLLOW_SUSPEND_MS of a manual scroll.
+ */
+export function followAllowed(
+  playing: boolean,
+  loopActive: boolean,
+  lastManualScrollAt: number,
+  now: number,
+): boolean {
+  if (!playing || loopActive) return false;
+  return now - lastManualScrollAt >= FOLLOW_SUSPEND_MS;
+}
+
+/**
  * Returns the new scrollLeft when the view should page forward to follow the
- * playhead, or null to leave the scroll alone.
+ * playhead, or null to leave the scroll alone. Forward-only: a playhead at
+ * or behind the follow edge — including one that just jumped backward on a
+ * loop wrap or seek — never moves the view.
  *
  * @param playheadContentPx playhead position in content px (tick / ticksPerPixel)
  * @param scrollLeft current scroll offset in content px
  * @param viewWidth visible width in px (0 or negative disables following)
- * @param prevPlayheadContentPx previous playhead position in content px, in
- *   the SAME scale as playheadContentPx (convert both with the current
- *   ticksPerPixel). null/omitted = direction unknown, forward-only behavior.
  */
 export function followScrollLeft(
   playheadContentPx: number,
   scrollLeft: number,
   viewWidth: number,
-  prevPlayheadContentPx: number | null = null,
 ): number | null {
   if (viewWidth <= 0) return null;
   const viewX = playheadContentPx - scrollLeft;
-  if (prevPlayheadContentPx !== null && playheadContentPx < prevPlayheadContentPx) {
-    // Backward jump (loop wrap / seek-back). If the playhead is still
-    // visible, leave the view alone; if it left the view, snap it back to
-    // the reposition anchor so the user keeps their place across the wrap.
-    // Exception: a playhead that was ALREADY behind the view before the
-    // jump means the user scrolled ahead — small backward corrections from
-    // interpolation jank must not yank the view away from them.
-    if (prevPlayheadContentPx - scrollLeft < 0) return null;
-    if (viewX >= 0 && viewX <= viewWidth) return null;
-    return Math.max(0, playheadContentPx - viewWidth * FOLLOW_REPOSITION_FRACTION);
-  }
   if (viewX <= viewWidth * FOLLOW_EDGE_FRACTION) return null;
   return Math.max(0, playheadContentPx - viewWidth * FOLLOW_REPOSITION_FRACTION);
 }

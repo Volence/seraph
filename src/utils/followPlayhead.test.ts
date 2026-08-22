@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   followScrollLeft,
+  followAllowed,
   FOLLOW_EDGE_FRACTION,
   FOLLOW_REPOSITION_FRACTION,
   FOLLOW_SUSPEND_MS,
@@ -46,47 +47,20 @@ describe("followScrollLeft", () => {
     expect(followScrollLeft(500, 0, -5)).toBeNull();
   });
 
-  describe("backward playhead jumps (loop wrap / seek-back)", () => {
-    it("snaps the view back when the playhead wraps behind the left edge", () => {
-      // Loop wrap: view is at the loop end (scrollLeft 4000), the playhead
-      // jumps from content px 4900 back to the loop start at 500. The view
-      // must page back so the playhead sits at the reposition anchor.
-      const next = followScrollLeft(500, 4000, viewWidth, 4900);
-      expect(next).toBe(Math.max(0, 500 - viewWidth * FOLLOW_REPOSITION_FRACTION));
+  describe("backward playhead jumps never scroll (owner ruling)", () => {
+    // A loop wrap or seek-back must not move the user's view. The function
+    // is forward-only and position-based: a playhead behind the left edge
+    // is always left alone, wherever it came from. (While a preview loop is
+    // active, callers additionally suppress follow entirely — see
+    // followAllowed.)
+    it("leaves the view alone after a wrap behind the left edge", () => {
+      // View parked at the loop end (scrollLeft 4000); playhead wrapped
+      // back to content px 500. No scroll.
+      expect(followScrollLeft(500, 4000, viewWidth)).toBeNull();
     });
 
-    it("clamps the wrap target at zero for early loop starts", () => {
-      // Loop start near tick 0: reposition anchor would be negative.
-      expect(followScrollLeft(20, 4000, viewWidth, 4900)).toBe(0);
-    });
-
-    it("snaps when the playhead jumps backward but lands right of the view", () => {
-      // User is inspecting early bars (scrollLeft 0) while the loop runs in
-      // bars far to the right: wrap from 9000 to 5000 is still off-screen.
-      const next = followScrollLeft(5000, 0, viewWidth, 9000);
-      expect(next).toBe(5000 - viewWidth * FOLLOW_REPOSITION_FRACTION);
-    });
-
-    it("leaves the view alone when a backward jump stays visible", () => {
-      // Wrap landed inside the current view: nothing to fix.
-      expect(followScrollLeft(4200, 4000, viewWidth, 4900)).toBeNull();
-    });
-
-    it("ignores backward jitter while the playhead is already behind the view", () => {
-      // The user scrolled ahead (playhead behind the left edge). A small
-      // backward correction from interpolation jank must not yank the view:
-      // only a jump from a visible/ahead playhead counts as a wrap.
-      expect(followScrollLeft(3000, 4000, viewWidth, 3050)).toBeNull();
-    });
-
-    it("keeps the scrolled-ahead behavior for forward motion", () => {
-      // Playhead moving forward while behind the view (user scrolled ahead):
-      // still left alone, exactly as without the prev argument.
-      expect(followScrollLeft(110, 4000, viewWidth, 100)).toBeNull();
-    });
-
-    it("ignores degenerate widths on backward jumps too", () => {
-      expect(followScrollLeft(500, 4000, 0, 4900)).toBeNull();
+    it("leaves the view alone after a wrap to the very start", () => {
+      expect(followScrollLeft(0, 4000, viewWidth)).toBeNull();
     });
   });
 
@@ -95,5 +69,32 @@ describe("followScrollLeft", () => {
     expect(FOLLOW_EDGE_FRACTION).toBeLessThan(1);
     expect(FOLLOW_REPOSITION_FRACTION).toBeLessThan(FOLLOW_EDGE_FRACTION);
     expect(FOLLOW_SUSPEND_MS).toBeGreaterThan(0);
+  });
+});
+
+describe("followAllowed", () => {
+  const now = 100_000;
+  const longAgo = now - FOLLOW_SUSPEND_MS - 1;
+
+  it("allows follow while playing with no loop and no recent manual scroll", () => {
+    expect(followAllowed(true, false, longAgo, now)).toBe(true);
+    // -Infinity is the components' "never scrolled" initial value.
+    expect(followAllowed(true, false, -Infinity, now)).toBe(true);
+  });
+
+  it("suppresses follow entirely while a preview loop is active (owner ruling)", () => {
+    // While looping, the view moves only by user input.
+    expect(followAllowed(true, true, longAgo, now)).toBe(false);
+    expect(followAllowed(true, true, -Infinity, now)).toBe(false);
+  });
+
+  it("suppresses follow while not playing", () => {
+    expect(followAllowed(false, false, longAgo, now)).toBe(false);
+  });
+
+  it("suspends follow for FOLLOW_SUSPEND_MS after a manual scroll", () => {
+    // Just inside the window: suspended. At/after the boundary: allowed.
+    expect(followAllowed(true, false, now - FOLLOW_SUSPEND_MS + 1, now)).toBe(false);
+    expect(followAllowed(true, false, now - FOLLOW_SUSPEND_MS, now)).toBe(true);
   });
 });

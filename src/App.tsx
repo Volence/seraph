@@ -11,6 +11,7 @@ import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ImportDialog } from "./components/ImportDialog";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { recordPlayStart, recordStop, noteSeek, consumeStopDoubleTap, resetTransportMemory } from "./utils/transportMemory";
+import { mostRecentLocation, parentDirectory, rememberLocation } from "./utils/recentLocations";
 import { defaultPreviewLoop, type PreviewLoopRange } from "./utils/previewLoop";
 import styles from "./App.module.css";
 
@@ -268,13 +269,20 @@ export default function App() {
   async function handleOpenProject() {
     if (!(await confirmDiscard("Open another project"))) return;
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, title: "Open Project" });
+    const selected = await open({
+      directory: true,
+      title: "Open Project",
+      defaultPath: mostRecentLocation() || undefined,
+    });
     if (!selected) return;
     try {
       if (projectOpen) await ipc.closeProject();
       setPlaying(false);
       resetSeekCursor();
       const song = await ipc.openProject(selected as string);
+      // The chosen directory is the project itself; its parent is the
+      // "location" worth prefilling in future New Project dialogs.
+      rememberLocation(parentDirectory(selected as string));
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
       setSelectedRegions([]);

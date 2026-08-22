@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as ipc from "../api/ipc";
 import type { SongMetadata } from "../types/model";
+import { mostRecentLocation, rememberLocation } from "../utils/recentLocations";
 import styles from "./NewProjectDialog.module.css";
 
 const ZYRINX_SONGS: { id: number; name: string }[] = [
@@ -38,7 +39,8 @@ export function ImportDialog({ onClose, onImported, projectOpen }: ImportDialogP
   const [sourcePath, setSourcePath] = useState("");
   const [dacDir, setDacDir] = useState("");
   const [gameId, setGameId] = useState(1);
-  const [parentDir, setParentDir] = useState("");
+  // Prefill with the last location a project was created/opened in.
+  const [parentDir, setParentDir] = useState(() => mostRecentLocation());
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
 
@@ -79,6 +81,7 @@ export function ImportDialog({ onClose, onImported, projectOpen }: ImportDialogP
     const path = await open({
       directory: true,
       title: "Choose Where to Save Imported Project",
+      defaultPath: mostRecentLocation() || undefined,
     });
     if (path) setParentDir(path as string);
   }
@@ -102,6 +105,7 @@ export function ImportDialog({ onClose, onImported, projectOpen }: ImportDialogP
       }
 
       const song = await ipc.openProject(result.projectDir);
+      rememberLocation(parentDir);
       onImported(song.metadata, result.warnings);
     } catch (e: any) {
       setError(e?.message ?? String(e));

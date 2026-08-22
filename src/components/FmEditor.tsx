@@ -3,6 +3,7 @@ import type { FmInstrument, FmOperator } from "../types/model";
 import { isCarrier } from "../types/model";
 import * as ipc from "../api/ipc";
 import { librarySaveFromProject } from "../api/library";
+import { scheduleReloadSequence } from "../utils/liveReload";
 import { Knob } from "../widgets/Knob";
 import { AlgorithmDiagram } from "../widgets/AlgorithmDiagram";
 import { EnvelopeDisplay } from "../widgets/EnvelopeDisplay";
@@ -32,6 +33,12 @@ export function FmEditor({ instrumentId, onSavedToLibrary }: FmEditorProps) {
     setInstrument(updated);
     try {
       await ipc.updateFmInstrument(instrumentId, updated);
+      // The running snapshot embeds patch bytes per NoteOn, so an edit is
+      // inaudible until the sequence is rebuilt. Reloading is now safe
+      // mid-playback (it carries sounding notes across and reprograms them
+      // in place), which is what makes tweak-while-looping work — audit F3.
+      // Coalesced: the knobs fire one change per mousemove.
+      scheduleReloadSequence();
     } catch {
       load();
     }

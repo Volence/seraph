@@ -4,6 +4,7 @@ import { fireEvent } from "@testing-library/dom";
 import { TrackHeader } from "./TrackHeader";
 import * as ipc from "../api/ipc";
 import * as library from "../api/library";
+import { whenReloadsSettled, resetLiveReloadForTests } from "../utils/liveReload";
 import type { Track } from "../types/model";
 
 vi.mock("../api/ipc");
@@ -212,5 +213,62 @@ describe("TrackHeader voice drop wipes require confirmation", () => {
       expect(library.libraryAssignToTrack).toHaveBeenCalledWith(track.id, "hash-1"),
     );
     expect(confirmFn).not.toHaveBeenCalled();
+  });
+});
+
+// Audit F13: the volume slider fires updateTrack + reloadSequence on EVERY
+// input event of a drag. The reload no longer silences sounding notes (proved
+// by the rendered-audio tests in src-tauri/src/audio/live_edit_audibility.rs),
+// but one snapshot rebuild per pixel is still work the backend cannot keep up
+// with, so the reloads coalesce.
+describe("TrackHeader volume ride (F13)", () => {
+  beforeEach(() => {
+    resetLiveReloadForTests();
+  });
+
+  function volumeSlider() {
+    return document.querySelector('input[type="range"]') as HTMLInputElement;
+  }
+
+  it("a volume change commits the new value and reloads the running sequence", async () => {
+    render(<TrackHeader track={track} {...handlers} />);
+
+    fireEvent.change(volumeSlider(), { target: { value: "80" } });
+
+    await waitFor(() => expect(ipc.updateTrack).toHaveBeenCalledWith(
+      track.id, track.name, track.channel, track.instrumentId,
+      track.muted, track.solo, 80, track.pan, track.pitchOffset,
+    ));
+    await whenReloadsSettled();
+    expect(ipc.reloadSequence).toHaveBeenCalled();
+  });
+
+  it("a whole drag issues far fewer reloads than input events", async () => {
+    // Hold every reload open for the duration of the drag, the way a real
+    // backend rebuild outlasts the next mousemove.
+    const outstanding: Array<() => void> = [];
+    vi.mocked(ipc.reloadSequence).mockImplementation(
+      () => new Promise<void>((resolve) => { outstanding.push(resolve); }),
+    );
+    render(<TrackHeader track={track} {...handlers} />);
+
+    const slider = volumeSlider();
+    // Start below the current value (100): setting a range input to the value
+    // it already holds fires no change event.
+    for (let v = 99; v >= 80; v--) {
+      fireEvent.change(slider, { target: { value: String(v) } });
+    }
+    // Every input event must still commit — coalescing is about the reload,
+    // never about dropping the user's edits.
+    await waitFor(() => expect(ipc.updateTrack).toHaveBeenCalledTimes(20));
+    expect(ipc.reloadSequence).toHaveBeenCalledTimes(1);
+
+    // Drag over: let the in-flight reload and its trailing successor complete.
+    vi.mocked(ipc.reloadSequence).mockResolvedValue(undefined);
+    while (outstanding.length) outstanding.shift()!();
+    await whenReloadsSettled();
+    // Exactly one trailing reload, carrying the value the drag ended on —
+    // 20 input events cost 2 snapshot rebuilds, not 20.
+    expect(ipc.reloadSequence).toHaveBeenCalledTimes(2);
   });
 });

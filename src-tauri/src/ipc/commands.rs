@@ -1069,11 +1069,19 @@ pub fn get_playback_state(audio_state: State<'_, AudioState>) -> Result<Playback
     let levels: Vec<u8> = thread.channel_levels().iter()
         .map(|a| a.load(std::sync::atomic::Ordering::Relaxed))
         .collect();
+    // playing / loop_start / loop_end come from the sequencer itself, via the
+    // atomics the engine republishes after every command. They were hardcoded
+    // false/None/None (G41) — a report that looked complete and was not.
+    let transport = thread.transport();
+    let (loop_start, loop_end) = match transport.loop_range() {
+        Some((start, end)) => (Some(start), Some(end)),
+        None => (None, None),
+    };
     Ok(PlaybackState {
-        playing: false,
+        playing: transport.playing(),
         tick,
-        loop_start: None,
-        loop_end: None,
+        loop_start,
+        loop_end,
         channel_levels: levels,
     })
 }

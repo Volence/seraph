@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use crate::audio::command::AudioCommand;
 use crate::audio::spectrum::{SpectrumAnalyzer, SpectrumBuffer};
 use crate::sequencer::{Sequencer, SequencerOutput};
@@ -45,6 +45,56 @@ struct PsgModulationPlayer {
     steps_reset: u8,
 }
 
+/// Transport state published FROM the audio thread so command handlers can
+/// read it.
+///
+/// The `AudioEngine` (and with it the `Sequencer` that owns `playing` and the
+/// loop range) is moved into the cpal callback closure, so nothing on the
+/// command side can borrow it. This is the same publish channel
+/// `position_tick` already uses, widened to the rest of what
+/// `get_playback_state` claims to report — without it those fields could only
+/// be guessed from what the UI last asked for, which is exactly what made
+/// them dishonest.
+///
+/// Loop consistency: the writer stores the bounds first and the presence flag
+/// last (Release); the reader takes the flag first (Acquire), so a `true` flag
+/// always publishes bounds that were written before it.
+#[derive(Default)]
+pub struct TransportPublish {
+    playing: AtomicBool,
+    loop_active: AtomicBool,
+    loop_start: AtomicU64,
+    loop_end: AtomicU64,
+}
+
+impl TransportPublish {
+    fn store(&self, playing: bool, loop_range: Option<(u64, u64)>) {
+        self.playing.store(playing, Ordering::Relaxed);
+        match loop_range {
+            Some((start, end)) => {
+                self.loop_start.store(start, Ordering::Relaxed);
+                self.loop_end.store(end, Ordering::Relaxed);
+                self.loop_active.store(true, Ordering::Release);
+            }
+            None => self.loop_active.store(false, Ordering::Release),
+        }
+    }
+
+    pub fn playing(&self) -> bool {
+        self.playing.load(Ordering::Relaxed)
+    }
+
+    pub fn loop_range(&self) -> Option<(u64, u64)> {
+        if !self.loop_active.load(Ordering::Acquire) {
+            return None;
+        }
+        Some((
+            self.loop_start.load(Ordering::Relaxed),
+            self.loop_end.load(Ordering::Relaxed),
+        ))
+    }
+}
+
 pub struct AudioEngine {
     ym2612: Ym2612,
     sn76489: Sn76489,
@@ -68,6 +118,7 @@ pub struct AudioEngine {
     psg_env_tick_acc: f64,
     sequencer: Sequencer,
     position_tick: Arc<AtomicU64>,
+    transport: Arc<TransportPublish>,
     channel_levels: Arc<Vec<AtomicU8>>,
     level_decay_counter: u32,
     sequencer_output_buf: Vec<SequencerOutput>,
@@ -136,6 +187,7 @@ impl AudioEngine {
             psg_env_tick_acc: 0.0,
             sequencer: Sequencer::new(sample_rate),
             position_tick: Arc::new(AtomicU64::new(0)),
+            transport: Arc::new(TransportPublish::default()),
             channel_levels: Arc::new((0..16).map(|_| AtomicU8::new(0)).collect()),
             level_decay_counter: 0,
             sequencer_output_buf: Vec::new(),
@@ -169,6 +221,19 @@ impl AudioEngine {
 
     pub fn position_tick(&self) -> Arc<AtomicU64> {
         self.position_tick.clone()
+    }
+
+    pub fn transport(&self) -> Arc<TransportPublish> {
+        self.transport.clone()
+    }
+
+    /// Republish the sequencer's transport state. Called after EVERY command:
+    /// `play` can refuse (empty snapshot) and `LoadSequence` drops the loop,
+    /// so publishing per-command from the sequencer itself is the only way the
+    /// atomics stay a copy of the truth rather than an echo of the request.
+    fn publish_transport(&self) {
+        self.transport
+            .store(self.sequencer.is_playing(), self.sequencer.loop_range());
     }
 
     pub fn channel_levels(&self) -> Arc<Vec<AtomicU8>> {
@@ -327,6 +392,9 @@ impl AudioEngine {
                 self.master_volume = volume.clamp(0.0, 1.5);
             }
         }
+        // Cheap (three relaxed stores) and unconditional: no command list to
+        // keep in sync with whichever ones happen to move transport state.
+        self.publish_transport();
     }
 
     fn apply_sequencer_output(&mut self, output: &mut Vec<SequencerOutput>) {
@@ -1359,5 +1427,90 @@ mod tests {
             "after Panic, all output should be near-silent (< 0.05); loudest was {:.6}",
             buf_after.iter().cloned().fold(0.0f32, f32::max)
         );
+    }
+
+    // --- Transport publish (G41: get_playback_state used to hardcode
+    // playing:false / loop:None while returning a real tick) ---
+
+    use crate::sequencer::{ChannelSequence, ChannelType, SequencerSnapshot};
+
+    /// A snapshot with one channel — `Sequencer::play` refuses to start on an
+    /// untouched default snapshot, which is itself one of the divergences the
+    /// published flag has to report.
+    fn one_channel_snapshot() -> SequencerSnapshot {
+        let mut snap = SequencerSnapshot::empty();
+        snap.channels.push(ChannelSequence {
+            channel_type: ChannelType::Fm(0),
+            volume: 100,
+            pan: 0xC0,
+            noise_reg: 0,
+            events: Vec::new(),
+            overlaps: Vec::new(),
+        });
+        snap
+    }
+
+    #[test]
+    fn transport_publish_tracks_play_and_stop() {
+        let mut engine = AudioEngine::new(44100);
+        let transport = engine.transport();
+        assert!(!transport.playing(), "a fresh engine is not playing");
+
+        engine.process_command(AudioCommand::LoadSequence { snapshot: one_channel_snapshot() });
+        engine.process_command(AudioCommand::TransportPlay);
+        assert!(transport.playing(), "after TransportPlay the sequencer is playing");
+        assert_eq!(transport.playing(), engine.sequencer.is_playing());
+
+        engine.process_command(AudioCommand::TransportStop);
+        assert!(!transport.playing(), "after TransportStop it is not");
+        assert_eq!(transport.playing(), engine.sequencer.is_playing());
+    }
+
+    #[test]
+    fn transport_publish_reports_a_refused_play_as_not_playing() {
+        // No sequence loaded: `play` bails out. The UI still flips its own
+        // button to "playing", so this is exactly the case where an honest
+        // report differs from the request that was sent.
+        let mut engine = AudioEngine::new(44100);
+        let transport = engine.transport();
+        engine.process_command(AudioCommand::TransportPlay);
+        assert!(!engine.sequencer.is_playing(), "precondition: play refuses an empty snapshot");
+        assert!(!transport.playing(), "the published flag must follow the sequencer, not the command");
+    }
+
+    #[test]
+    fn transport_publish_tracks_the_loop_range() {
+        let mut engine = AudioEngine::new(44100);
+        let transport = engine.transport();
+        assert_eq!(transport.loop_range(), None, "no loop is armed on a fresh engine");
+
+        engine.process_command(AudioCommand::LoadSequence { snapshot: one_channel_snapshot() });
+        engine.process_command(AudioCommand::TransportSetLoop { start_tick: 480, end_tick: 1920 });
+        assert_eq!(transport.loop_range(), Some((480, 1920)));
+        assert_eq!(transport.loop_range(), engine.sequencer.loop_range());
+
+        engine.process_command(AudioCommand::TransportClearLoop);
+        assert_eq!(transport.loop_range(), None);
+        assert_eq!(transport.loop_range(), engine.sequencer.loop_range());
+    }
+
+    #[test]
+    fn transport_publish_follows_the_sequencer_through_a_reload_and_a_load() {
+        let mut engine = AudioEngine::new(44100);
+        let transport = engine.transport();
+        engine.process_command(AudioCommand::LoadSequence { snapshot: one_channel_snapshot() });
+        engine.process_command(AudioCommand::TransportPlay);
+        engine.process_command(AudioCommand::TransportSetLoop { start_tick: 0, end_tick: 960 });
+
+        // A live-edit commit keeps both (reload_snapshot restores them)...
+        engine.process_command(AudioCommand::ReloadSequence { snapshot: one_channel_snapshot() });
+        assert!(transport.playing(), "a reload does not stop the transport");
+        assert_eq!(transport.loop_range(), Some((0, 960)), "a reload carries the loop across");
+
+        // ...while loading a NEW sequence drops the loop with the snapshot it
+        // lived in. Whatever the sequencer does, the report follows it.
+        engine.process_command(AudioCommand::LoadSequence { snapshot: one_channel_snapshot() });
+        assert_eq!(transport.loop_range(), engine.sequencer.loop_range());
+        assert_eq!(transport.loop_range(), None);
     }
 }

@@ -5,7 +5,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rtrb::RingBuffer;
 
 use crate::audio::command::AudioCommand;
-use crate::audio::engine::AudioEngine;
+use crate::audio::engine::{AudioEngine, TransportPublish};
 use crate::audio::spectrum::SpectrumBuffer;
 
 const RING_BUFFER_CAPACITY: usize = 1024;
@@ -27,6 +27,9 @@ pub struct AudioThread {
     #[allow(dead_code)]
     running: Arc<AtomicBool>,
     position_tick: Arc<AtomicU64>,
+    /// Transport truth published by the engine (playing + loop range); the
+    /// engine itself lives inside the callback closure and cannot be read.
+    transport: Arc<TransportPublish>,
     channel_levels: Arc<Vec<AtomicU8>>,
     spectrum_buffer: Arc<SpectrumBuffer>,
 }
@@ -57,6 +60,7 @@ impl AudioThread {
         // AudioEngine is created here; capture the position atomic before moving into the closure.
         let mut engine = AudioEngine::new(sample_rate);
         let position_tick = engine.position_tick();
+        let transport = engine.transport();
         let channel_levels = engine.channel_levels();
         let spectrum_buffer = engine.spectrum_buffer();
 
@@ -95,6 +99,7 @@ impl AudioThread {
             _stream: stream,
             running,
             position_tick,
+            transport,
             channel_levels,
             spectrum_buffer,
         })
@@ -110,6 +115,10 @@ impl AudioThread {
 
     pub fn position_tick(&self) -> &Arc<AtomicU64> {
         &self.position_tick
+    }
+
+    pub fn transport(&self) -> &Arc<TransportPublish> {
+        &self.transport
     }
 
     pub fn channel_levels(&self) -> &Arc<Vec<AtomicU8>> {

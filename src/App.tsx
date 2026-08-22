@@ -382,6 +382,7 @@ export default function App() {
           onCloseRegion={() => setSelectedRegions([])}
           playing={playing}
           projectMeta={projectMeta!}
+          seekTick={seekTick}
           onSavedToLibrary={() => setLibraryRefresh((n) => n + 1)}
         />
       )}

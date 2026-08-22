@@ -4,6 +4,7 @@ import { fireEvent } from "@testing-library/dom";
 import { PianoRoll } from "./PianoRoll";
 import * as ipc from "../api/ipc";
 import { OCTAVE_SEMITONES, PITCH_RANGES } from "../utils/pianoRollEdit";
+import { resetClipboardForTest } from "../utils/clipboard";
 import type { Note, SelectedRegion, SongMetadata, Track } from "../types/model";
 
 vi.mock("../api/ipc");
@@ -51,10 +52,10 @@ function setupTracks(notes: Note[]): { region: SelectedRegion } {
   };
 }
 
-async function renderRoll(notes: Note[]) {
+async function renderRoll(notes: Note[], seekTick = 0) {
   const { region } = setupTracks(notes);
   const utils = render(
-    <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} />,
+    <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={seekTick} />,
   );
   // Flush the initial refresh() so the notes state (and the keydown
   // handler's re-registration against it) has definitely landed before
@@ -70,6 +71,7 @@ function selectAll() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetClipboardForTest();
 });
 
 describe("velocity lane alignment (G5)", () => {
@@ -116,7 +118,7 @@ describe("velocity lane alignment (G5)", () => {
       };
     })();
     const { container } = render(
-      <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} />,
+      <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={0} />,
     );
     await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
     await act(async () => {});
@@ -230,6 +232,88 @@ describe("PianoRoll batch edits coalesce into one undo group", () => {
   });
 });
 
+describe("PianoRoll clipboard (Ctrl+C/X/V)", () => {
+  // Region: startTick 0, durationTicks 7680 (see setupTracks).
+
+  it("Ctrl+C then Ctrl+V pastes at the seek cursor when it falls inside the region", async () => {
+    // Cursor at tick 960 (inside 0..7680): the earliest copied note anchors
+    // there; the second keeps its +480 offset.
+    await renderRoll([note(0, 60), note(480, 64)], 960);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 960, 60, 100, 240);
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 1440, 64, 100, 240);
+  });
+
+  it("Ctrl+V anchors at tick 0 when the seek cursor is outside the region", async () => {
+    await renderRoll([note(960, 60)], 9999); // cursor past the region end
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240));
+  });
+
+  it("paste wraps its addNote loop in one undo group and selects the pasted notes", async () => {
+    vi.mocked(ipc.addNote).mockResolvedValueOnce(2).mockResolvedValueOnce(3);
+    const { getByText } = await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expect(ipc.addNote).toHaveBeenCalledTimes(2);
+    expectGroupWraps(vi.mocked(ipc.addNote));
+    // Pasted notes become the selection (2 notes shown in the header).
+    await waitFor(() => expect(getByText("2 notes")).toBeInTheDocument());
+  });
+
+  it("skips (with a console.warn) notes that would land past the region end", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Cursor at 7440: note at offset 0 fits (240 ticks to the end); the
+    // +480-offset note would start at 7920 >= 7680 and must be skipped.
+    await renderRoll([note(0, 60), note(480, 64)], 7440);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(1));
+    expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 7440, 60, 100, 240);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("1"));
+    warn.mockRestore();
+  });
+
+  it("Ctrl+X copies then deletes the selection in one undo group", async () => {
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "x", ctrlKey: true });
+    await waitFor(() => expect(ipc.endUndoGroup).toHaveBeenCalled());
+    expect(ipc.deleteNote).toHaveBeenCalledTimes(2);
+    expectGroupWraps(vi.mocked(ipc.deleteNote));
+    // The cut notes are on the clipboard: paste re-adds them.
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledTimes(2));
+  });
+
+  it("clipboard survives switching regions (module state, not component state)", async () => {
+    const first = await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    first.unmount();
+    // A different region, freshly mounted.
+    await renderRoll([]);
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalledWith("track-1", "region-1", 0, 60, 100, 240));
+  });
+
+  it("Ctrl+C with no selection copies nothing", async () => {
+    await renderRoll([note(0, 60)]);
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ipc.addNote).not.toHaveBeenCalled();
+  });
+});
+
 describe("PianoRoll refresh on undo/redo", () => {
   it("re-fetches notes when the song is reverted", async () => {
     await renderRoll([note(0, 60)]);
@@ -243,7 +327,7 @@ describe("PianoRoll refresh on undo/redo", () => {
   it("closes when the open region no longer exists after a revert", async () => {
     const { region } = setupTracks([note(0, 60)]);
     const onClose = vi.fn();
-    render(<PianoRoll region={region} onClose={onClose} playing={false} projectMeta={meta} />);
+    render(<PianoRoll region={region} onClose={onClose} playing={false} projectMeta={meta} seekTick={0} />);
     await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
     await act(async () => {});
     // The revert removed the region (e.g. undo of add_region).

@@ -45,6 +45,78 @@ fn for_each_conflicting_span<T>(
     }
 }
 
+/// One authored note staged for a single hardware channel, before the merged
+/// event list is emitted. `note_on` is `None` when no instrument could be
+/// resolved for the note — nothing is keyed on, so such a note cannot
+/// terminate a predecessor.
+struct StagedNote {
+    start: u64,
+    end: u64,
+    note_on: Option<SequencerEvent>,
+}
+
+/// Emit the merged event list for one hardware channel under LAST-NOTE
+/// PRIORITY, the semantics the Memra driver actually has.
+///
+/// The driver has no note-off event and no note identity: channel state is
+/// one `sc_note` byte plus one `SCF_KEYED` bit, and `Fm_NoteOnFreqExact`
+/// force-keys-off a sounding channel before keying on (aeon `1ee8f8e6`,
+/// `sound_fm.emp:1092-1099`) — gated on *keyed*, not on pitch. PSG does the
+/// same through `Psg_EnvCursorReset`. So a note's effective duration is
+/// `min(authored, next onset on that channel)`, and a note-off at the
+/// authored end of a note that a successor already took over is a state the
+/// hardware can never occupy — no serialization of the song would produce an
+/// event there. Emitting it anyway keys off the SUCCESSOR (the key-off is
+/// pitch-blind, correctly so), truncating it.
+///
+/// `notes` may come from SEVERAL author-side tracks merged onto this one
+/// channel, so the successor that terminates a note is frequently not in the
+/// same track. The sweep is therefore over the merged, start-sorted order.
+///
+/// Suppressing at `end_i == start_{i+1}` rather than emitting there is
+/// audibly identical: the event sort places NoteOff before NoteOn at equal
+/// ticks, so emitting gives key-off then key-on at the same tick, while
+/// suppressing gives a note-on onto a still-keyed channel, which itself
+/// key-offs first (`process_event`, mirroring `do_keyon`). Same two register
+/// actions, same tick, no samples rendered in between.
+fn emit_channel_events(mut notes: Vec<StagedNote>) -> Vec<SequencerEvent> {
+    // Stable, so notes sharing a start tick keep authoring order — the same
+    // order the (also stable) event sort below gives their NoteOns, which
+    // makes the surviving note-off the one belonging to the note that wins.
+    notes.sort_by_key(|n| n.start);
+
+    let mut events: Vec<SequencerEvent> = Vec::new();
+    for (i, note) in notes.iter().enumerate() {
+        if let Some(ref on) = note.note_on {
+            events.push(on.clone());
+        }
+        let superseded = notes[i + 1..]
+            .iter()
+            .take_while(|next| next.start <= note.end)
+            .any(|next| next.note_on.is_some());
+        if !superseded {
+            events.push(SequencerEvent::NoteOff { tick: note.end });
+        }
+    }
+
+    // NoteOff before NoteOn at same tick
+    events.sort_by(|a, b| {
+        let ta = a.tick();
+        let tb = b.tick();
+        if ta != tb {
+            return ta.cmp(&tb);
+        }
+        let priority = |e: &SequencerEvent| -> u8 {
+            match e {
+                SequencerEvent::NoteOff { .. } => 0,
+                SequencerEvent::NoteOn { .. } => 1,
+            }
+        };
+        priority(a).cmp(&priority(b))
+    });
+    events
+}
+
 /// The BTreeMap key `build_snapshot` groups tracks by — one key per output
 /// channel. The voice-overlap gate groups by the same key so "same channel"
 /// means the same thing in both places.
@@ -900,7 +972,7 @@ impl ProjectManager {
                 ChannelAssignment::Dac(n) => ChannelType::Dac(*n),
             };
 
-            let mut events: Vec<SequencerEvent> = Vec::new();
+            let mut staged: Vec<StagedNote> = Vec::new();
             let mut overlap_sources: Vec<(u64, u64, String)> = Vec::new();
 
             for track in tracks {
@@ -927,7 +999,7 @@ impl ProjectManager {
                         } else {
                             inst_data.clone()
                         };
-                        if let Some(ref data) = note_inst {
+                        let note_on = note_inst.as_ref().map(|data| {
                             let note_mod = if let Some(ref m) = note.modulation {
                                 Some(ModulationParams { wait: m.wait, speed: m.speed, delta: m.delta, steps: m.steps })
                             } else if let Some(ref m) = track.modulation {
@@ -935,7 +1007,7 @@ impl ProjectManager {
                             } else {
                                 None
                             };
-                            events.push(SequencerEvent::NoteOn {
+                            SequencerEvent::NoteOn {
                                 tick: abs_tick,
                                 pitch: pitched,
                                 velocity: note.velocity,
@@ -944,33 +1016,21 @@ impl ProjectManager {
                                 instrument: data.clone(),
                                 modulation: note_mod,
                                 pan_override: note.pan_override,
-                            });
-                        }
-                        events.push(SequencerEvent::NoteOff {
-                            tick: end_tick,
-                            pitch: pitched,
+                            }
                         });
+                        staged.push(StagedNote { start: abs_tick, end: end_tick, note_on });
                         overlap_sources.push((abs_tick, end_tick, track.id.to_string()));
                     }
                 }
             }
 
-            // NoteOff before NoteOn at same tick
-            events.sort_by(|a, b| {
-                let ta = a.tick();
-                let tb = b.tick();
-                if ta != tb {
-                    return ta.cmp(&tb);
-                }
-                let priority = |e: &SequencerEvent| -> u8 {
-                    match e {
-                        SequencerEvent::NoteOff { .. } => 0,
-                        SequencerEvent::NoteOn { .. } => 1,
-                    }
-                };
-                priority(a).cmp(&priority(b))
-            });
+            let events = emit_channel_events(staged);
 
+            // The overlap diagnostics are UNCHANGED by last-note-priority.
+            // The ambiguity is real and still the author's to resolve; it now
+            // resolves at compile time (deterministically, the way the driver
+            // resolves it) instead of at playback, which is a reason to keep
+            // surfacing it, not to stop.
             let mut overlaps = Vec::new();
             for_each_conflicting_span(&mut overlap_sources, |earlier, later, start, end| {
                 overlaps.push(OverlapWarning {
@@ -2202,6 +2262,73 @@ mod tests {
         assert_eq!(snap.channels.len(), 1, "only solo'd track should appear");
 
         cleanup(&path);
+    }
+
+    /// Boundary shapes of the last-note-priority suppression, stated directly
+    /// on `emit_channel_events` so each case is visible as an event list.
+    /// The AUDIBLE consequences are asserted on rendered samples in
+    /// `audio::overlap_audibility`; this pins the boundaries those renders
+    /// cannot each afford a separate song for.
+    #[test]
+    fn test_emit_channel_events_last_note_priority_boundaries() {
+        fn staged(start: u64, end: u64) -> StagedNote {
+            StagedNote {
+                start,
+                end,
+                note_on: Some(SequencerEvent::NoteOn {
+                    tick: start,
+                    pitch: 60,
+                    velocity: 100,
+                    detune: 0,
+                    duration_ticks: end - start,
+                    instrument: InstrumentData::FmPatch { bytes: [0; 25], ssg_eg: [0; 4] },
+                    modulation: None,
+                    pan_override: None,
+                }),
+            }
+        }
+        fn shape(events: &[SequencerEvent]) -> Vec<(u64, bool)> {
+            events
+                .iter()
+                .map(|e| (e.tick(), matches!(e, SequencerEvent::NoteOn { .. })))
+                .collect()
+        }
+
+        // Gap: nothing takes the channel over, so both note-offs survive.
+        assert_eq!(
+            shape(&emit_channel_events(vec![staged(0, 480), staged(960, 1440)])),
+            vec![(0, true), (480, false), (960, true), (1440, false)],
+            "a note-off with no successor to replace it must still be emitted"
+        );
+
+        // Overlap: the successor's note-on terminates the first note, so the
+        // first note's off — an event no serialization would ever produce —
+        // is suppressed.
+        assert_eq!(
+            shape(&emit_channel_events(vec![staged(0, 480), staged(240, 720)])),
+            vec![(0, true), (240, true), (720, false)],
+            "an overlapped note-off must not survive to key off its successor"
+        );
+
+        // Abutting (end_i == start_{i+1}): suppressed. Emitting there would
+        // give key-off-then-key-on at the same tick; suppressing gives a
+        // note-on onto a still-keyed channel, which key-offs first itself.
+        // Same two actions, same tick, no samples rendered in between.
+        assert_eq!(
+            shape(&emit_channel_events(vec![staged(0, 480), staged(480, 960)])),
+            vec![(0, true), (480, true), (960, false)],
+            "abutting notes resolve through the successor's own forced key-off"
+        );
+
+        // A note that resolved no instrument emits no note-on, so it cannot
+        // take the channel over: the predecessor's off still has to fire.
+        let mut silent = staged(240, 720);
+        silent.note_on = None;
+        assert_eq!(
+            shape(&emit_channel_events(vec![staged(0, 480), silent])),
+            vec![(0, true), (480, false), (720, false)],
+            "a successor that keys nothing on cannot terminate its predecessor"
+        );
     }
 
     #[test]

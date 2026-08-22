@@ -1707,7 +1707,7 @@ mod tests {
                         modulation: None,
                         pan_override: None,
                     },
-                    SequencerEvent::NoteOff { tick: 480, pitch: 60 },
+                    SequencerEvent::NoteOff { tick: 480 },
                 ],
                 overlaps: vec![],
             }],

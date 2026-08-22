@@ -541,7 +541,7 @@ fn retuning_the_sounding_note_stops_the_old_pitch() {
     for ev in retuned.channels[0].events.iter_mut() {
         match ev {
             SequencerEvent::NoteOn { pitch, .. } => *pitch = 67,
-            SequencerEvent::NoteOff { pitch, .. } => *pitch = 67,
+            SequencerEvent::NoteOff { .. } => {}
         }
     }
 
@@ -596,7 +596,7 @@ fn a_note_after_panic_reprograms_its_patch() {
                 modulation: None,
                 pan_override: None,
             },
-            SequencerEvent::NoteOff { tick: first_len, pitch: 60 },
+            SequencerEvent::NoteOff { tick: first_len },
             SequencerEvent::NoteOn {
                 tick: second_at,
                 pitch: 60,
@@ -658,7 +658,7 @@ fn editing_one_channel_does_not_cut_another_channels_note() {
         for ev in second.events.iter_mut() {
             match ev {
                 SequencerEvent::NoteOn { pitch, .. } => *pitch = 67,
-                SequencerEvent::NoteOff { pitch, .. } => *pitch = 67,
+                SequencerEvent::NoteOff { .. } => {}
             }
         }
         snap.channels.push(second);

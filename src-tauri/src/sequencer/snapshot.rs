@@ -23,10 +23,14 @@ pub enum InstrumentData {
 #[derive(Debug, Clone)]
 pub enum SequencerEvent {
     NoteOn { tick: u64, pitch: u8, velocity: u8, detune: i8, duration_ticks: u64, instrument: InstrumentData, modulation: Option<ModulationParams>, pan_override: Option<u8> },
-    // FINDING: `pitch` carries the correct (transposed) pitch but `process_event`
-    // keys off unconditionally, so a stale NoteOff truncates a later overlapping
-    // note on the same channel. Kept as the evidence for that gap.
-    NoteOff { tick: u64, #[allow(dead_code)] pitch: u8 },
+    /// Deliberately carries NO pitch. The driver's key-off is pitch-blind —
+    /// there is no note-off event and no note identity in the coordination
+    /// table, only the channel's `SCF_KEYED` bit — so a note-off that names a
+    /// note is a concept the hardware does not have. `build_snapshot`
+    /// suppresses the offs a successor note-on already takes over
+    /// (`emit_channel_events`); the ones that remain always mean "key off
+    /// this channel".
+    NoteOff { tick: u64 },
 }
 
 impl SequencerEvent {
@@ -110,7 +114,7 @@ mod tests {
             pan_override: None,
         };
         assert_eq!(on.tick(), 480);
-        let off = SequencerEvent::NoteOff { tick: 720, pitch: 60 };
+        let off = SequencerEvent::NoteOff { tick: 720 };
         assert_eq!(off.tick(), 720);
     }
 

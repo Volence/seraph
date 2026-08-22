@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import type { Note } from "../types/model";
 import { notesIntersectingRect } from "../utils/pianoRollEdit";
+import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
 import styles from "./PianoRollCanvas.module.css";
 
 interface PianoRollCanvasProps {
@@ -81,6 +82,18 @@ export function PianoRollCanvas({
 
   const totalNotes = maxPitch - minPitch + 1;
   const canvasHeight = totalNotes * rowHeight;
+  // Manual scrolls (wheel, pan) suspend follow-playhead briefly (G28).
+  const lastManualScrollRef = useRef(-Infinity);
+
+  useEffect(() => {
+    if (!playing || playheadTick < 0) return;
+    if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const viewWidth = container.getBoundingClientRect().width;
+    const next = followScrollLeft(playheadTick / ticksPerPixel, scrollLeft, viewWidth);
+    if (next !== null) onScrollLeftChange(next);
+  }, [playheadTick, playing, ticksPerPixel, scrollLeft, onScrollLeftChange]);
 
   function pixelToTick(px: number): number {
     return (px + scrollLeft) * ticksPerPixel;
@@ -337,6 +350,7 @@ export function PianoRollCanvas({
     function handleMouseMove(e: MouseEvent) {
       const p = panRef.current;
       if (!p) return;
+      lastManualScrollRef.current = performance.now();
       const dx = e.clientX - p.startX;
       const dy = e.clientY - p.startY;
       onScrollLeftChange(Math.max(0, p.startScrollLeft - dx));
@@ -538,6 +552,7 @@ export function PianoRollCanvas({
     if (!container) return;
 
     function handleWheel(e: WheelEvent) {
+      lastManualScrollRef.current = performance.now();
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const rect = canvasRef.current?.getBoundingClientRect();

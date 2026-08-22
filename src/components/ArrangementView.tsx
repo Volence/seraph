@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Track, SongMetadata, SelectedRegion, SelectedInstrument } from "../types/model";
 import { DEFAULT_FM_MODULATOR, DEFAULT_FM_CARRIER } from "../types/model";
 import { useArrangementZoom } from "../hooks/useArrangementZoom";
@@ -11,6 +11,7 @@ import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
+import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
@@ -24,6 +25,11 @@ interface ArrangementViewProps {
 
 const M = DEFAULT_FM_MODULATOR;
 const C = DEFAULT_FM_CARRIER;
+
+// Fixed width of the track-header column; must match the
+// `grid-template-columns: 180px 1fr` in ArrangementView.module.css so the
+// follow-playhead logic knows the timeline's visible width.
+const HEADER_COLUMN_WIDTH = 180;
 
 function channelType(track: Track): "fm" | "psg" | "dac" {
   const ch = track.channel;
@@ -55,9 +61,24 @@ export function ArrangementView({
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
   const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
   const zoom = useArrangementZoom(projectMeta);
-  const { interpolatedTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
+  const { interpolatedTick, currentTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const [seekTick, setSeekTick] = useState(0);
   const trackHeight = 60;
+  // Manual scrolls (wheel, ruler drag) suspend follow-playhead briefly so the
+  // user can inspect other bars during playback (G28).
+  const lastManualScrollRef = useRef(-Infinity);
+
+  useEffect(() => {
+    if (!playing) return;
+    if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;
+    const body = zoom.bodyRef.current;
+    if (!body) return;
+    // Follow keys off the event-driven tick (interpolation only mutates a ref
+    // between renders); paging accuracy at event granularity is plenty.
+    const viewWidth = body.clientWidth - HEADER_COLUMN_WIDTH;
+    const next = followScrollLeft(currentTick / zoom.ticksPerPixel, zoom.scrollLeft, viewWidth);
+    if (next !== null) zoom.setScrollLeft(next);
+  }, [currentTick, playing, zoom.ticksPerPixel, zoom.scrollLeft, zoom.setScrollLeft, zoom.bodyRef]);
 
   const { visibleTracks, groupHeads } = useMemo(() => {
     const groups = new Map<string, Track[]>();
@@ -250,7 +271,13 @@ export function ArrangementView({
   }
 
   return (
-    <div className={styles.arrangement} onWheel={zoom.handleWheel}>
+    <div
+      className={styles.arrangement}
+      onWheel={(e) => {
+        lastManualScrollRef.current = performance.now();
+        zoom.handleWheel(e);
+      }}
+    >
       <div className={styles.rulerRow}>
         <div className={styles.headerSpacer} />
         <TimelineRuler
@@ -259,7 +286,10 @@ export function ArrangementView({
           ticksPerBeat={projectMeta.ticksPerBeat}
           beatsPerBar={projectMeta.timeSignature[0]}
           onSeek={handleSeek}
-          onScrollChange={zoom.setScrollLeft}
+          onScrollChange={(v) => {
+            lastManualScrollRef.current = performance.now();
+            zoom.setScrollLeft(v);
+          }}
         />
       </div>
       <div className={styles.body} ref={zoom.bodyRef}>

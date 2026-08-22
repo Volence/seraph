@@ -212,11 +212,21 @@ export function TrackHeader({ track, selected, level, onUpdate, onClick, isGroup
           />
         ) : (
           <span
-            className={styles.name}
+            className={`${styles.name} ${track.instrumentId == null ? styles.nameUnbound : ""}`}
             onDoubleClick={beginRename}
             title="Double-click to rename"
           >
             {track.name}
+          </span>
+        )}
+        {track.instrumentId == null && (
+          // Silent-track cue (F2): build_snapshot drops every note on an
+          // instrument-less lane, so the lane must not look bound.
+          <span
+            className={styles.noVoice}
+            title="No instrument — notes on this lane won't sound. Drag a voice from the Library onto this header, or create one with + FM Patch / + PSG Env."
+          >
+            no voice
           </span>
         )}
         {isGroupHead && groupCollapsed && groupSize && groupSize > 1 && (

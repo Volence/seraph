@@ -712,9 +712,14 @@ designs target the banked specs (normative); manifest flags carry the gates.
   the next scroll. The marquee's continue-to-commit behavior is PINNED by
   a test so the choice is deliberate rather than incidental.
 
-- 2026-08-22 (cont.): **REGION-SWITCH STALENESS LANDED** (merged; lanes on
-  merged tree: cargo 241/0, vitest 290/290 across 28 files, build clean, no
-  bindings drift). Covers both entries above — the declaration sweep and the
+- 2026-08-22 (cont.): **REGION-SWITCH STALENESS LANDED** (merged `e01f6d1`;
+  lanes on merged tree: cargo 241/0, vitest 290/290 across 28 files, build
+  clean, no bindings drift). **Everything the two entries above describe about
+  seraph's own behavior is as of `e01f6d1`** — they name handlers and helpers by
+  symbol, never by line, but the code they describe is exactly the code this
+  parcel changed, so a later refactor can move or rename it. Re-ground against
+  that revision before trusting the narrative; the generalized bar outlives the
+  call sites either way (empyrean `9d2d1f1`, protocol bar 13). Covers both entries above — the declaration sweep and the
   gesture-tagging follow-up landed as one parcel. RATIFIED (all agent calls):
   per-state resets over keyed remount (the subtree holds state that MUST
   survive — grid selector, DAC key-column width, BottomPanel height — and a

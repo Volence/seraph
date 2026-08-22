@@ -39,38 +39,44 @@ pub fn load_pack_fm(rel: &str) -> FmInstrument {
         .unwrap_or_else(|e| panic!("parse instrument in {path}: {e}"))
 }
 
-/// Render `render_secs` of one FM note through the actual playback path.
-///
-/// Mirrors production exactly: patch bytes come from `pack_patch()` (identical
-/// to `FlamedriverProfile::fm_to_bytes`, carrier flags included), and the
-/// sequencer applies its carrier vol_offset from `track_volume`/`velocity`
-/// the same way `ProjectManager::build_sequencer_snapshot` playback does.
-/// Returns the left-channel samples.
-pub fn render_fm_note(
-    inst: &FmInstrument,
+/// Playback tempo used by every snapshot this harness builds.
+/// 120 BPM at 480 ticks/beat -> 960 ticks per second.
+pub const TEMPO_BPM: f64 = 120.0;
+pub const TICKS_PER_BEAT: u32 = 480;
+pub const TICKS_PER_SEC: f64 = TEMPO_BPM / 60.0 * TICKS_PER_BEAT as f64;
+
+/// The 25-byte packed FM patch + the four SSG-EG bytes for `inst`, exactly as
+/// `build_snapshot` would embed them in a NoteOn.
+pub fn fm_instrument_data(inst: &FmInstrument) -> InstrumentData {
+    InstrumentData::FmPatch {
+        bytes: inst.pack_patch(),
+        ssg_eg: [
+            inst.operators[0].ssg_eg,
+            inst.operators[1].ssg_eg,
+            inst.operators[2].ssg_eg,
+            inst.operators[3].ssg_eg,
+        ],
+    }
+}
+
+/// One channel holding one note for `hold_secs`, shaped exactly like a
+/// `build_snapshot` channel (NoteOn at tick 0 + NoteOff at the end).
+pub fn one_note_snapshot(
+    channel_type: ChannelType,
+    instrument: InstrumentData,
     pitch: u8,
     velocity: u8,
     track_volume: u8,
-    render_secs: f64,
-) -> Vec<f32> {
-    let bytes = inst.pack_patch();
-    let ssg_eg = [
-        inst.operators[0].ssg_eg,
-        inst.operators[1].ssg_eg,
-        inst.operators[2].ssg_eg,
-        inst.operators[3].ssg_eg,
-    ];
-    let instrument = InstrumentData::FmPatch { bytes, ssg_eg };
-
-    // 120 BPM, 480 tpb -> 960 ticks/sec. Hold the note for the whole render.
-    let duration_ticks = (render_secs * 2.0 * 960.0) as u64;
-    let snapshot = SequencerSnapshot {
-        tempo_bpm: 120.0,
-        ticks_per_beat: 480,
+    hold_secs: f64,
+) -> SequencerSnapshot {
+    let duration_ticks = (hold_secs * TICKS_PER_SEC) as u64;
+    SequencerSnapshot {
+        tempo_bpm: TEMPO_BPM,
+        ticks_per_beat: TICKS_PER_BEAT,
         loop_start: None,
         loop_end: None,
         channels: vec![ChannelSequence {
-            channel_type: ChannelType::Fm(0),
+            channel_type,
             volume: track_volume,
             pan: 0xC0,
             modulation: None,
@@ -90,16 +96,67 @@ pub fn render_fm_note(
             ],
             overlaps: vec![],
         }],
-    };
+    }
+}
 
+/// Render `total_secs` of `snapshot` through the real playback path, applying
+/// each `(at_secs, command)` in `edits` at its sample boundary — the same
+/// interleaving the audio thread performs when an IPC command lands between
+/// two `render` calls. Returns the left-channel samples.
+///
+/// This is how "did the edit become audible in the *running* stream?" is
+/// measured: split the result with `stats_window` around the edit point.
+pub fn render_snapshot_with_edits(
+    snapshot: SequencerSnapshot,
+    total_secs: f64,
+    edits: &[(f64, AudioCommand)],
+) -> Vec<f32> {
     let mut engine = AudioEngine::new(SAMPLE_RATE);
     engine.process_command(AudioCommand::LoadSequence { snapshot });
     engine.process_command(AudioCommand::TransportPlay);
 
-    let frames = (render_secs * SAMPLE_RATE as f64) as usize;
-    let mut buf = vec![0.0f32; frames * 2];
-    engine.render(&mut buf);
-    buf.iter().step_by(2).copied().collect()
+    let total_frames = (total_secs * SAMPLE_RATE as f64) as usize;
+    let mut out = vec![0.0f32; total_frames * 2];
+
+    let mut cursor = 0usize;
+    for (at_secs, cmd) in edits {
+        let boundary = ((at_secs * SAMPLE_RATE as f64) as usize).min(total_frames);
+        if boundary > cursor {
+            engine.render(&mut out[cursor * 2..boundary * 2]);
+            cursor = boundary;
+        }
+        engine.process_command(cmd.clone());
+    }
+    if cursor < total_frames {
+        engine.render(&mut out[cursor * 2..]);
+    }
+    out.iter().step_by(2).copied().collect()
+}
+
+/// Render `render_secs` of one FM note through the actual playback path.
+///
+/// Mirrors production exactly: patch bytes come from `pack_patch()` (identical
+/// to `FlamedriverProfile::fm_to_bytes`, carrier flags included), and the
+/// sequencer applies its carrier vol_offset from `track_volume`/`velocity`
+/// the same way `ProjectManager::build_sequencer_snapshot` playback does.
+/// Returns the left-channel samples.
+pub fn render_fm_note(
+    inst: &FmInstrument,
+    pitch: u8,
+    velocity: u8,
+    track_volume: u8,
+    render_secs: f64,
+) -> Vec<f32> {
+    let snapshot = one_note_snapshot(
+        ChannelType::Fm(0),
+        fm_instrument_data(inst),
+        pitch,
+        velocity,
+        track_volume,
+        // Hold the note past the end of the render.
+        render_secs * 2.0,
+    );
+    render_snapshot_with_edits(snapshot, render_secs, &[])
 }
 
 /// Render `render_secs` of one FM note through the library-audition path:
@@ -148,6 +205,25 @@ pub fn stats(samples: &[f32], skip_secs: f64) -> RenderStats {
         / body.len() as f64)
         .sqrt() as f32;
     RenderStats { peak, rms }
+}
+
+/// Peak and RMS over the half-open window `[from_secs, to_secs)` of a render.
+/// Used to compare the stream before and after a mid-note edit.
+pub fn stats_window(samples: &[f32], from_secs: f64, to_secs: f64) -> RenderStats {
+    let lo = ((from_secs * SAMPLE_RATE as f64) as usize).min(samples.len());
+    let hi = ((to_secs * SAMPLE_RATE as f64) as usize).min(samples.len());
+    assert!(hi > lo, "analysis window [{from_secs}, {to_secs}) is empty");
+    stats(&samples[lo..hi], 0.0)
+}
+
+/// dB of `a` relative to `b`. Loud on unmeasurable: a zero reference is a
+/// harness bug, not a 0 dB result.
+pub fn db_ratio(a: f32, b: f32) -> f32 {
+    assert!(b > 0.0, "db_ratio reference is zero — nothing was rendered");
+    if a <= 0.0 {
+        return f32::NEG_INFINITY;
+    }
+    20.0 * (a / b).log10()
 }
 
 /// One-call convenience: library entry -> rendered stats.

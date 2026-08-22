@@ -310,6 +310,34 @@ designs target the banked specs (normative); manifest flags carry the gates.
   loop handles — items 1/2/6), quiet-voice-151 rendered-audio diagnosis
   (item 3).
 
+- 2026-08-21 (cont.): **WAVE 3 PARCEL E SHIPPED — piano-roll ruler + drag-zoom
+  + loop handles** (items 1/2/6; merged `fba0e3b`; lanes on merged tree:
+  cargo 231/0, build clean, vitest 211/211 across 23 files, no bindings
+  drift). New `PianoRollRuler` (absolute bar numbers consistent with the
+  arrangement + "Bars N-M" header, beat ticks by zoom, dimmed past region
+  end, click=seek clamped to region, h-drag=scroll); vertical ruler drag
+  zooms BOTH rulers (FL convention drag-down=in, anchored at grab x via
+  `zoomAroundPixel`); loop bracket gains edge handles (±6px, snap-rounded,
+  min one unit) + draggable body (length-preserving) + zone hover cursors.
+  Shared pure helpers: `src/utils/rulerMarks.ts` (bar-label thinning,
+  8px beat floor), `zoomDrag.ts` (dominant-axis lock, 4px slop, ties
+  horizontal), `loopHandles.ts`. All bar math via `ticksPerBar(meta)`;
+  red-first tests use non-4/4 meta. RATIFIED (all 7 agent calls):
+  dominant-axis lock over simultaneous; drag-down=zoom-in; click ON the
+  loop band is a no-op (only outside-band clicks reset a one-unit loop —
+  regression-guarded); label thinning; degenerate click = one-SNAP-UNIT
+  loop (pre-existing, kept); piano-roll ruler h-drag=scroll/click=seek;
+  loop feedback begins after the 4px slop. TAGGED for the owner gate:
+  zoom sensitivity (~1%/px), slop, handle width, cursor affordances —
+  feel-check in the live app.
+  **ITEM-4 RULING REVISED (owner, mid-session):** loop wrap must not move
+  the piano-roll view AT ALL — the parcel-F wrap-snap (2b3ed88) is
+  OVERTURNED. New rule dispatched to the same lane (branch
+  fix/loop-follow-marquee, revision in flight): while a preview loop is
+  active, follow-playhead is suppressed entirely in both views; backward
+  playhead jumps never scroll, loop or not (followScrollLeft returns to
+  forward-only). Marquee preview work stands.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

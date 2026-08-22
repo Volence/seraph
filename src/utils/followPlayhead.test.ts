@@ -72,6 +72,13 @@ describe("followScrollLeft", () => {
       expect(followScrollLeft(4200, 4000, viewWidth, 4900)).toBeNull();
     });
 
+    it("ignores backward jitter while the playhead is already behind the view", () => {
+      // The user scrolled ahead (playhead behind the left edge). A small
+      // backward correction from interpolation jank must not yank the view:
+      // only a jump from a visible/ahead playhead counts as a wrap.
+      expect(followScrollLeft(3000, 4000, viewWidth, 3050)).toBeNull();
+    });
+
     it("keeps the scrolled-ahead behavior for forward motion", () => {
       // Playhead moving forward while behind the view (user scrolled ahead):
       // still left alone, exactly as without the prev argument.

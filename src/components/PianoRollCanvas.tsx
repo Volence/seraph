@@ -103,10 +103,14 @@ export function PianoRollCanvas({
   const prevPlayheadTickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!playing || playheadTick < 0) {
+    if (!playing) {
       prevPlayheadTickRef.current = null;
       return;
     }
+    // playheadTick is region-relative and may be negative while the loop
+    // runs before this region; keep tracking it so a wrap to a point left
+    // of the region still reads as a backward jump (the follow target is
+    // clamped to 0 = region start).
     const prevTick = prevPlayheadTickRef.current;
     prevPlayheadTickRef.current = playheadTick;
     if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;

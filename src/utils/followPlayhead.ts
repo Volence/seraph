@@ -46,6 +46,10 @@ export function followScrollLeft(
     // Backward jump (loop wrap / seek-back). If the playhead is still
     // visible, leave the view alone; if it left the view, snap it back to
     // the reposition anchor so the user keeps their place across the wrap.
+    // Exception: a playhead that was ALREADY behind the view before the
+    // jump means the user scrolled ahead — small backward corrections from
+    // interpolation jank must not yank the view away from them.
+    if (prevPlayheadContentPx - scrollLeft < 0) return null;
     if (viewX >= 0 && viewX <= viewWidth) return null;
     return Math.max(0, playheadContentPx - viewWidth * FOLLOW_REPOSITION_FRACTION);
   }

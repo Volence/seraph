@@ -404,9 +404,9 @@ describe("note placement velocity", () => {
   // src-tauri/src/audio/rendered_rms.rs).
   it("draws new notes at full (driver-faithful) velocity 127", async () => {
     const { container } = await renderRoll([]);
-    // DOM order: keys canvas, note canvas, velocity lane canvas.
+    // DOM order: ruler canvas, keys canvas, note canvas, velocity lane canvas.
     const canvases = container.querySelectorAll("canvas");
-    const noteCanvas = canvases[1];
+    const noteCanvas = canvases[2];
     fireEvent.doubleClick(noteCanvas, { clientX: 5, clientY: 50 });
     fireEvent.mouseUp(window, { clientX: 5, clientY: 50 });
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalled());

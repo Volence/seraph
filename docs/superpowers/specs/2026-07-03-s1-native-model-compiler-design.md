@@ -60,6 +60,16 @@ the profile decision.
     `ProjectManager::emit_channel_events`. The overlap diagnostics stay: the
     authoring ambiguity is real, it simply resolves at compile time rather
     than at playback.
+  - **A note with no resolvable instrument contributes NO events** — not a
+    note-on, and not a note-off either. Last-note-priority must not be read as
+    licensing a bare key-off: the key-off is pitch-blind, so an unaccompanied
+    one silences whatever the channel is sounding, which is the same
+    divergence from the other side. On hardware such a note is not
+    serializable at all. It is therefore inert: the channel's event list is
+    the last-note-priority list over the resolvable notes alone. This is
+    ordinary authoring state rather than a corner case — a fresh project seeds
+    one instrument-less track per channel, so notes drawn before a patch is
+    picked land on exactly such a track.
   - Not covered by the above, and deliberately unmodelled in seraph's preview
     so far: the driver skips the chip key-on entirely while a DAC sample owns
     FM6, so an overlap there is not audibly a retrigger; and an armed

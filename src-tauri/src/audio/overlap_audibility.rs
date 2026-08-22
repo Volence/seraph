@@ -42,13 +42,21 @@ fn secs(ticks: u64) -> f64 {
     ticks as f64 / TICKS_PER_SEC
 }
 
-/// Build a real project whose FM1 channel carries `notes` — one note per
-/// AUTHOR-SIDE TRACK, all assigned to `Fm(0)` with the same library voice.
-/// Returns what the playback path is actually handed.
+/// Build a real project whose FM1 channel carries `voiced` + `unvoiced` — one
+/// note per AUTHOR-SIDE TRACK, every track assigned to `Fm(0)`. Tracks for
+/// `voiced` notes carry the library voice; tracks for `unvoiced` notes carry
+/// NO instrument, which is how a fresh project's seeded lanes start and what
+/// an author has while drawing notes before picking a patch. Returns what the
+/// playback path is actually handed.
 ///
 /// One track per note is deliberate: the merge across tracks is the case the
 /// suppression has to get right, and a per-track view cannot see it.
-fn snapshot_for(tag: &str, voice: &str, notes: &[(u64, u64)]) -> SequencerSnapshot {
+fn snapshot_mixed(
+    tag: &str,
+    voice: &str,
+    voiced: &[(u64, u64)],
+    unvoiced: &[(u64, u64)],
+) -> SequencerSnapshot {
     let path = env::temp_dir().join(format!("seraph_test_overlap_{tag}_{}", Uuid::new_v4()));
     let mut registry = DriverRegistry::new();
     registry.register(Box::new(FlamedriverProfile));
@@ -57,9 +65,19 @@ fn snapshot_for(tag: &str, voice: &str, notes: &[(u64, u64)]) -> SequencerSnapsh
         .expect("create project");
     let inst_id = mgr.add_fm_instrument(load_pack_fm(voice));
 
-    let span = notes.iter().map(|(t, d)| t + d).max().unwrap_or(0) + 480;
-    for (i, &(tick, duration_ticks)) in notes.iter().enumerate() {
-        let track_id = mgr.add_track(format!("lane{i}"), ChannelAssignment::Fm(0), Some(inst_id));
+    let span = voiced
+        .iter()
+        .chain(unvoiced)
+        .map(|(t, d)| t + d)
+        .max()
+        .unwrap_or(0)
+        + 480;
+    let all = voiced
+        .iter()
+        .map(|n| (*n, Some(inst_id)))
+        .chain(unvoiced.iter().map(|n| (*n, None)));
+    for (i, ((tick, duration_ticks), inst)) in all.enumerate() {
+        let track_id = mgr.add_track(format!("lane{i}"), ChannelAssignment::Fm(0), inst);
         let region_id = mgr.add_region(track_id, 0, span).expect("add region");
         mgr.add_note(track_id, region_id, tick, PITCH, 127, duration_ticks, None)
             .expect("add note");
@@ -68,6 +86,10 @@ fn snapshot_for(tag: &str, voice: &str, notes: &[(u64, u64)]) -> SequencerSnapsh
     let snapshot = mgr.build_snapshot();
     let _ = std::fs::remove_dir_all(&path);
     snapshot
+}
+
+fn snapshot_for(tag: &str, voice: &str, notes: &[(u64, u64)]) -> SequencerSnapshot {
+    snapshot_mixed(tag, voice, notes, &[])
 }
 
 fn render(tag: &str, voice: &str, notes: &[(u64, u64)], total_secs: f64) -> Vec<f32> {
@@ -227,5 +249,71 @@ fn a_non_overlapping_pair_still_keys_off_between_the_notes() {
          second rms={:.5}) — the two-note render is not what the test assumes",
         body.rms,
         second.rms
+    );
+}
+
+// --------------------------------------------------------------------------
+// 4. A note with no resolvable instrument contributes NO events.
+// --------------------------------------------------------------------------
+
+/// A note whose instrument does not resolve keys nothing on. It must not key
+/// anything OFF either: a bare key-off is pitch-blind, so it silences whatever
+/// the channel happens to be sounding — the very divergence last-note-priority
+/// exists to remove, reached through a different door.
+///
+/// This is ordinary DAW state, not a corner case: `create` seeds one
+/// instrument-less track per channel, so any notes drawn before a patch is
+/// picked land on exactly such a track.
+///
+/// The unvoiced note is placed so its authored end falls STRICTLY INSIDE the
+/// sounding note — the only arrangement in which its stray key-off is
+/// reachable. (If it ended at or after the sounding note's end it would be
+/// last in the merged order and its off would be indistinguishable from the
+/// real one; if a voiced successor followed, suppression would have removed
+/// it already.)
+#[test]
+fn a_note_with_no_instrument_does_not_key_off_a_sounding_note() {
+    const VOICED_DUR: u64 = 960;
+    const UNVOICED: (u64, u64) = (240, 240); // ends at 480, inside [0, 960)
+    let from = secs(UNVOICED.0 + UNVOICED.1) + 0.05;
+    let to = secs(VOICED_DUR);
+    let total = to + 1.0;
+
+    let voiced = [(0u64, VOICED_DUR)];
+    let mixed = render_snapshot_with_edits(
+        snapshot_mixed("unvoiced_mixed", SUSTAIN_VOICE, &voiced, &[UNVOICED]),
+        total,
+        &[],
+    );
+    // Control: the same song WITHOUT the unvoiced note. An unvoiced note
+    // produces no driver events at all, so the two must render identically.
+    let alone = render_snapshot_with_edits(
+        snapshot_mixed("unvoiced_alone", SUSTAIN_VOICE, &voiced, &[]),
+        total,
+        &[],
+    );
+
+    let control = stats_window(&alone, from, to);
+    let control_silence = stats_window(&alone, to + 0.5, total);
+    let headroom = db_ratio(control.rms, control_silence.rms);
+    assert!(
+        headroom > 20.0,
+        "the control's own window is only {headroom:+.1} dB above its post-note silence \
+         (window rms={:.5}, silence rms={:.5}) — the measurement cannot distinguish \
+         sounding from cut short",
+        control.rms,
+        control_silence.rms
+    );
+
+    let m = stats_window(&mixed, from, to);
+    let db = db_ratio(m.rms, control.rms);
+    assert!(
+        db.abs() < 1.0,
+        "with an instrument-less note overlapping it, the sounding note is {db:+.1} dB \
+         off a control render without that note over [{from:.3}s, {to:.3}s) (control \
+         rms={:.5}, mixed rms={:.5}) — a note that keys nothing on still keyed \
+         something off",
+        control.rms,
+        m.rms
     );
 }

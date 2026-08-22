@@ -47,8 +47,9 @@ fn for_each_conflicting_span<T>(
 
 /// One authored note staged for a single hardware channel, before the merged
 /// event list is emitted. `note_on` is `None` when no instrument could be
-/// resolved for the note — nothing is keyed on, so such a note cannot
-/// terminate a predecessor.
+/// resolved for the note (an instrument-less track, which is how every lane a
+/// fresh project seeds starts out). Such a note is INERT — see
+/// `emit_channel_events`.
 struct StagedNote {
     start: u64,
     end: u64,
@@ -79,6 +80,15 @@ struct StagedNote {
 /// suppressing gives a note-on onto a still-keyed channel, which itself
 /// key-offs first (`process_event`, mirroring `do_keyon`). Same two register
 /// actions, same tick, no samples rendered in between.
+///
+/// A note that resolved no instrument is INERT: the emitted list is exactly
+/// what the resolvable notes alone would produce. It emits nothing; it is not
+/// counted as superseding; and it cannot hide a terminating successor from
+/// the scan, because the list is start-sorted, so anything sitting behind a
+/// note that starts past `end` also starts past `end`. Nothing can therefore
+/// be left ringing: every emitted note is either superseded by a successor's
+/// forced key-off or emits its own note-off, and the last resolvable note
+/// always falls into the second case.
 fn emit_channel_events(mut notes: Vec<StagedNote>) -> Vec<SequencerEvent> {
     // Stable, so notes sharing a start tick keep authoring order — the same
     // order the (also stable) event sort below gives their NoteOns, which
@@ -87,9 +97,15 @@ fn emit_channel_events(mut notes: Vec<StagedNote>) -> Vec<SequencerEvent> {
 
     let mut events: Vec<SequencerEvent> = Vec::new();
     for (i, note) in notes.iter().enumerate() {
-        if let Some(ref on) = note.note_on {
-            events.push(on.clone());
-        }
+        // A note that resolved no instrument contributes NOTHING — not a
+        // note-on, and not a note-off either. It keys nothing on, so a
+        // note-off in its name would key off whatever the channel happens to
+        // be sounding (the key-off is pitch-blind), which is the same
+        // divergence last-note-priority removes, reached from the other side.
+        // On hardware such a note produces no events at all: no serialization
+        // would emit a lone key-off.
+        let Some(ref on) = note.note_on else { continue };
+        events.push(on.clone());
         let superseded = notes[i + 1..]
             .iter()
             .take_while(|next| next.start <= note.end)
@@ -2320,14 +2336,66 @@ mod tests {
             "abutting notes resolve through the successor's own forced key-off"
         );
 
-        // A note that resolved no instrument emits no note-on, so it cannot
-        // take the channel over: the predecessor's off still has to fire.
-        let mut silent = staged(240, 720);
-        silent.note_on = None;
+        // --- notes that resolved no instrument are INERT ---
+        //
+        // The emitted list must be exactly what the resolvable notes alone
+        // would produce. Two properties carry that, and both are tested:
+        // an unresolved note emits nothing, and it cannot change any other
+        // note's outcome.
+        fn unvoiced(start: u64, end: u64) -> StagedNote {
+            StagedNote { start, end, note_on: None }
+        }
+
+        // It emits no note-on, so it cannot take the channel over: the
+        // predecessor's own off still has to fire. And it emits no note-off
+        // of its own.
         assert_eq!(
-            shape(&emit_channel_events(vec![staged(0, 480), silent])),
-            vec![(0, true), (480, false), (720, false)],
-            "a successor that keys nothing on cannot terminate its predecessor"
+            shape(&emit_channel_events(vec![staged(0, 480), unvoiced(240, 720)])),
+            vec![(0, true), (480, false)],
+            "a successor that keys nothing on can neither terminate its predecessor \
+             nor emit an off of its own"
+        );
+
+        // The reachable break: an unresolved note ENDING INSIDE a sounding
+        // note. Its off would be pitch-blind and would cut a note it does not
+        // own — the divergence this whole parcel removes, from the other side.
+        assert_eq!(
+            shape(&emit_channel_events(vec![staged(0, 960), unvoiced(240, 480)])),
+            vec![(0, true), (960, false)],
+            "an instrument-less note must not key off the note that is sounding"
+        );
+
+        // Load-bearing for the inertness argument: an unresolved note sitting
+        // BETWEEN a note and the successor that terminates it must not hide
+        // that successor from the scan. (It cannot — the list is start-sorted,
+        // so anything after a note starting past `end` also starts past it —
+        // but the suppression would silently over-emit if that ever changed.)
+        assert_eq!(
+            shape(&emit_channel_events(vec![
+                staged(0, 480),
+                unvoiced(200, 300),
+                staged(240, 720),
+            ])),
+            vec![(0, true), (240, true), (720, false)],
+            "an interleaved unresolved note must not hide the terminating successor"
+        );
+
+        // Stated as the invariant itself: dropping the unresolved notes from
+        // the input cannot change the output.
+        let with_unresolved = vec![
+            unvoiced(0, 1200),
+            staged(0, 480),
+            unvoiced(200, 300),
+            staged(240, 720),
+            unvoiced(700, 780),
+            staged(960, 1440),
+        ];
+        let without: Vec<StagedNote> = vec![staged(0, 480), staged(240, 720), staged(960, 1440)];
+        assert_eq!(
+            shape(&emit_channel_events(with_unresolved)),
+            shape(&emit_channel_events(without)),
+            "unresolved notes must be inert — the event list is the last-note-priority \
+             list over the resolvable notes alone"
         );
     }
 

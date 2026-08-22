@@ -712,6 +712,40 @@ designs target the banked specs (normative); manifest flags carry the gates.
   the next scroll. The marquee's continue-to-commit behavior is PINNED by
   a test so the choice is deliberate rather than incidental.
 
+- 2026-08-22 (cont.): **REGION-SWITCH STALENESS LANDED** (merged; lanes on
+  merged tree: cargo 241/0, vitest 290/290 across 28 files, build clean, no
+  bindings drift). Covers both entries above — the declaration sweep and the
+  gesture-tagging follow-up landed as one parcel. RATIFIED (all agent calls):
+  per-state resets over keyed remount (the subtree holds state that MUST
+  survive — grid selector, DAC key-column width, BottomPanel height — and a
+  remount re-inits two canvases per region open; survivors are now pinned by
+  test); `voiceHint` cleared on switch; `regionId` a REQUIRED canvas prop, not
+  defaulted; marquee continues to commit.
+  **REVIEW NOTE — the miss is the lesson, not the bug.** The first delivery
+  bucketed the in-flight gesture state HARMLESS on the frame "a region switch
+  requires a double-click in the arrangement, so the arrangement's own
+  mousedown→mouseup tears the gesture down first". The window-listener half was
+  true; the premise was not — `ArrangementView`'s Ctrl+D and Ctrl+V change the
+  open region from a **window keydown, with no pointer event at all**. The
+  agent had applied "enumerate the touchers, not the declarers" to state
+  declarations (which is what found the untagged fetch and the out-of-order
+  reply) and then dropped it for reachability, reasoning from one entry path
+  instead of grepping every caller of `onSelectRegions`. Two of the overseer's
+  own corrections were themselves incomplete and the agent corrected them back
+  (resize is ALSO reachable under Ctrl+D — a near-edge mousedown returns before
+  touching the selection, so the G1 guard stays false; and Ctrl+V's missing G1
+  guard is not a defect, since clipboard arbitration is the documented design
+  and the fix belongs in the gesture). Verified firsthand overseer-side before
+  landing: marquee mouseup recomputes hits from the CURRENT notes and view
+  rather than committing the stale preview ref; resize/move writes are all in
+  mousemove, so the guards sit where the writes are.
+  **STANDING BAR, generalized:** a reachability argument is an enumeration
+  problem, and gets the same treatment as any other — count the callers, don't
+  reason from the entry path you happen to have in mind. The touch-input caveat
+  the first delivery volunteered ("goes live if touch input is added") read as
+  a certificate that the one-pointer case had been checked to the same standard;
+  it had not. **A flagged weak point vouches for nothing but itself.**
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

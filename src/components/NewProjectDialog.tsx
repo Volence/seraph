@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { SongMetadata, DriverInfo } from "../types/model";
 import * as ipc from "../api/ipc";
+import { getRecentLocations, mostRecentLocation, rememberLocation } from "../utils/recentLocations";
 import styles from "./NewProjectDialog.module.css";
 
 interface NewProjectDialogProps {
@@ -10,7 +11,10 @@ interface NewProjectDialogProps {
 
 export function NewProjectDialog({ onClose, onCreated }: NewProjectDialogProps) {
   const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
+  // Prefill with the last location a project was created/opened in.
+  const [location, setLocation] = useState(() => mostRecentLocation());
+  const [recentLocations] = useState(() => getRecentLocations());
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
   const [driverId, setDriverId] = useState("");
   const [tempo, setTempo] = useState(120);
@@ -28,7 +32,11 @@ export function NewProjectDialog({ onClose, onCreated }: NewProjectDialogProps) 
 
   async function handleBrowse() {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, title: "Choose Project Location" });
+    const selected = await open({
+      directory: true,
+      title: "Choose Project Location",
+      defaultPath: mostRecentLocation() || undefined,
+    });
     if (selected) setLocation(selected as string);
   }
 
@@ -42,6 +50,7 @@ export function NewProjectDialog({ onClose, onCreated }: NewProjectDialogProps) 
     try {
       const fullPath = `${location}/${name.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
       await ipc.createProject(fullPath, name, driverId, tempo, timeSigNum, timeSigDen);
+      rememberLocation(location);
       const meta = await ipc.getProjectInfo();
       if (meta) onCreated(meta);
     } catch (e) {
@@ -70,13 +79,36 @@ export function NewProjectDialog({ onClose, onCreated }: NewProjectDialogProps) 
         <label className={styles.label}>
           Location
           <div className={styles.browseRow}>
-            <input
-              className={styles.input}
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="/path/to/projects"
-              readOnly
-            />
+            <div className={styles.locationWrap}>
+              <input
+                className={styles.input}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setShowSuggestions(false)}
+                placeholder="/path/to/projects"
+              />
+              {showSuggestions && recentLocations.length > 0 && (
+                <ul className={styles.suggestions} role="listbox" aria-label="Recent locations">
+                  {recentLocations.map((dir) => (
+                    <li
+                      key={dir}
+                      role="option"
+                      aria-selected={dir === location}
+                      className={styles.suggestion}
+                      // mouseDown (not click) so it wins over the input's blur.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setLocation(dir);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      {dir}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <button className={styles.browseBtn} onClick={handleBrowse}>Browse</button>
           </div>
         </label>

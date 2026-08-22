@@ -24,7 +24,7 @@ pub use commands::{
     // Region CRUD
     add_region, update_region, move_region, duplicate_region, delete_region,
     // Note CRUD
-    add_note, update_note, delete_note,
+    add_note, update_note, delete_note, set_note_instrument,
     // Undo / redo
     undo, redo, begin_undo_group, end_undo_group, get_undo_state,
     // Transport
@@ -42,7 +42,8 @@ pub use commands::{
     // Instrument library
     library_list, library_games, library_get_entry, library_rescan, library_warnings,
     library_audition, library_stop_audition,
-    library_add_to_project, library_assign_to_track, library_save_from_project, library_import_files,
+    library_add_to_project, library_assign_to_track, library_ensure_project_instrument,
+    library_save_from_project, library_import_files,
     library_set_tags, library_set_favorite,
     library_roots_get, library_root_add, library_root_remove,
 };

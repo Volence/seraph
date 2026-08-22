@@ -16,6 +16,58 @@ use crate::sequencer::{
 /// once the stack exceeds this.
 pub const MAX_UNDO_DEPTH: usize = 100;
 
+/// One tagged span in a channel-overlap scan: (start_tick, end_tick, tag).
+/// The tag is caller-chosen — a track id for the post-hoc diagnostic
+/// (`build_snapshot`'s `OverlapWarning`s), an effective voice for the
+/// edit-time voice-overlap gate.
+type TaggedSpan<T> = (u64, u64, T);
+
+/// Pairwise interval-intersection sweep shared by `build_snapshot`'s
+/// overlap diagnostics and the voice-overlap edit gate, so both are
+/// correct by the same construction. Sorts `spans` by start tick, then
+/// invokes `emit(earlier, later, conflict_start, conflict_end)` once per
+/// intersecting pair, where the conflict span is the intersection
+/// (later start, earlier end).
+fn for_each_conflicting_span<T>(
+    spans: &mut [TaggedSpan<T>],
+    mut emit: impl FnMut(&TaggedSpan<T>, &TaggedSpan<T>, u64, u64),
+) {
+    spans.sort_by_key(|s| s.0);
+    for i in 0..spans.len() {
+        for j in (i + 1)..spans.len() {
+            if spans[j].0 >= spans[i].1 {
+                break;
+            }
+            let start = spans[j].0;
+            let end = spans[i].1.min(spans[j].1);
+            emit(&spans[i], &spans[j], start, end);
+        }
+    }
+}
+
+/// The BTreeMap key `build_snapshot` groups tracks by — one key per output
+/// channel. The voice-overlap gate groups by the same key so "same channel"
+/// means the same thing in both places.
+fn channel_key(channel: &ChannelAssignment) -> String {
+    match channel {
+        ChannelAssignment::Fm(n) => format!("fm_{n}"),
+        ChannelAssignment::Psg(n) => format!("psg_{n}"),
+        ChannelAssignment::PsgNoise => "psg_noise".to_string(),
+        ChannelAssignment::Dac(n) => format!("dac_{n}"),
+    }
+}
+
+/// Human-readable channel name for diagnostics ("FM1", "PSG2", …), matching
+/// the names `build_snapshot` puts in `OverlapWarning::channel_name`.
+fn channel_display_name(channel: &ChannelAssignment) -> String {
+    match channel {
+        ChannelAssignment::Fm(n) => format!("FM{}", n + 1),
+        ChannelAssignment::Psg(n) => format!("PSG{}", n + 1),
+        ChannelAssignment::PsgNoise => "PSG Noise".to_string(),
+        ChannelAssignment::Dac(n) => format!("DAC{}", n + 1),
+    }
+}
+
 pub struct ProjectManager {
     project_path: Option<PathBuf>,
     metadata: Option<SongMetadata>,
@@ -617,7 +669,7 @@ impl ProjectManager {
         inst: &crate::library::entry::LibraryInstrument,
         hash: &str,
     ) -> Result<Uuid, String> {
-        use crate::library::entry::{content_hash, LibraryInstrument};
+        use crate::library::entry::LibraryInstrument;
 
         let track = self.tracks.iter().find(|t| t.id == track_id)
             .ok_or("track not found")?;
@@ -637,6 +689,39 @@ impl ProjectManager {
         // out of undo scope; undo only restores the binding).
         self.record_song_edit();
 
+        let (id, name) = self.ensure_library_instrument_in_bank(inst, hash);
+
+        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
+            .expect("track existence checked above");
+        track.instrument_id = Some(id);
+        track.name = name;
+        // A track-level swap must win over stale per-note/per-region bindings
+        // (importers stamp instrument_id on every note; build_snapshot gives
+        // those precedence over the track binding).
+        for region in &mut track.regions {
+            region.instrument_id = None;
+            for note in &mut region.notes {
+                note.instrument_id = None;
+            }
+        }
+        Ok(id)
+    }
+
+    /// Add-or-reuse a library voice in the project's instrument bank
+    /// WITHOUT touching any track: a project instrument of the same kind
+    /// whose content hash equals `hash` is reused; otherwise the library
+    /// instrument is added with a fresh id. Returns (id, name). No undo
+    /// snapshot — instrument operations are out of undo scope — but an
+    /// added instrument marks the project dirty. Backs both the
+    /// drag-to-track swap and the piano-roll note-voice drop
+    /// (`set_note_instrument` wants a project instrument id).
+    pub fn ensure_library_instrument_in_bank(
+        &mut self,
+        inst: &crate::library::entry::LibraryInstrument,
+        hash: &str,
+    ) -> (Uuid, String) {
+        use crate::library::entry::{content_hash, LibraryInstrument};
+
         let existing = match inst {
             LibraryInstrument::Fm(_) => self.instruments.fm.iter()
                 .find(|i| content_hash(&LibraryInstrument::Fm((*i).clone())) == hash)
@@ -646,7 +731,7 @@ impl ProjectManager {
                 .map(|i| (i.id, i.name.clone())),
         };
 
-        let (id, name) = match existing {
+        match existing {
             Some(found) => found,
             None => {
                 let id = Uuid::new_v4();
@@ -667,24 +752,10 @@ impl ProjectManager {
                     }
                 };
                 self.dirty_instruments.insert(id);
+                self.dirty = true;
                 (id, name)
             }
-        };
-
-        let track = self.tracks.iter_mut().find(|t| t.id == track_id)
-            .expect("track existence checked above");
-        track.instrument_id = Some(id);
-        track.name = name;
-        // A track-level swap must win over stale per-note/per-region bindings
-        // (importers stamp instrument_id on every note; build_snapshot gives
-        // those precedence over the track binding).
-        for region in &mut track.regions {
-            region.instrument_id = None;
-            for note in &mut region.notes {
-                note.instrument_id = None;
-            }
         }
-        Ok(id)
     }
 
     // --- DAC CRUD ---
@@ -778,13 +849,7 @@ impl ProjectManager {
             if any_solo && !track.solo {
                 continue;
             }
-            let key = match &track.channel {
-                ChannelAssignment::Fm(n) => format!("fm_{n}"),
-                ChannelAssignment::Psg(n) => format!("psg_{n}"),
-                ChannelAssignment::PsgNoise => "psg_noise".to_string(),
-                ChannelAssignment::Dac(n) => format!("dac_{n}"),
-            };
-            channel_map.entry(key).or_default().push(track);
+            channel_map.entry(channel_key(&track.channel)).or_default().push(track);
         }
 
         let driver = self.driver_registry.get(metadata.driver_id.as_str());
@@ -870,29 +935,14 @@ impl ProjectManager {
             });
 
             let mut overlaps = Vec::new();
-            overlap_sources.sort_by_key(|s| s.0);
-            for i in 0..overlap_sources.len() {
-                for j in (i + 1)..overlap_sources.len() {
-                    if overlap_sources[j].0 >= overlap_sources[i].1 {
-                        break;
-                    }
-                    let ch_name = match &channel_type {
-                        ChannelType::Fm(n) => format!("FM{}", n + 1),
-                        ChannelType::Psg(n) => format!("PSG{}", n + 1),
-                        ChannelType::PsgNoise => "PSG Noise".to_string(),
-                        ChannelType::Dac(n) => format!("DAC{}", n + 1),
-                    };
-                    overlaps.push(OverlapWarning {
-                        channel_name: ch_name,
-                        tick_start: overlap_sources[j].0,
-                        tick_end: overlap_sources[i].1.min(overlap_sources[j].1),
-                        track_ids: vec![
-                            overlap_sources[i].2.clone(),
-                            overlap_sources[j].2.clone(),
-                        ],
-                    });
-                }
-            }
+            for_each_conflicting_span(&mut overlap_sources, |earlier, later, start, end| {
+                overlaps.push(OverlapWarning {
+                    channel_name: channel_display_name(&tracks[0].channel),
+                    tick_start: start,
+                    tick_end: end,
+                    track_ids: vec![earlier.2.clone(), later.2.clone()],
+                });
+            });
 
             let volume = tracks[0].volume;
             let pan_byte = match tracks[0].pan {
@@ -1233,16 +1283,171 @@ impl ProjectManager {
         pitch: u8,
         velocity: u8,
         duration_ticks: u64,
+        instrument_id: Option<Uuid>,
     ) -> Result<usize, String> {
         let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
         let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
             .ok_or("region not found")?;
+        // An EXPLICIT per-note voice is validated like set_note_instrument
+        // (kind gate, then voice-overlap gate). `None` keeps the historical
+        // behavior for every existing caller: no gates, note inherits
+        // region/track voice.
+        if let Some(inst_id) = instrument_id {
+            self.check_instrument_kind(inst_id, t_idx, "add a note with")?;
+            let region = &self.tracks[t_idx].regions[r_idx];
+            let span = (region.start_tick + tick, region.start_tick + tick + duration_ticks);
+            self.check_voice_overlap(t_idx, r_idx, &HashSet::new(), Some(inst_id), Some(span))?;
+        }
         self.record_song_edit();
         let region = &mut self.tracks[t_idx].regions[r_idx];
         let idx = region.notes.len();
-        region.notes.push(Note { tick, pitch, velocity, duration_ticks, instrument_id: None, detune: 0, pan_override: None, modulation: None });
+        region.notes.push(Note { tick, pitch, velocity, duration_ticks, instrument_id, detune: 0, pan_override: None, modulation: None });
         Ok(idx)
+    }
+
+    /// Set (or clear, with `None`) the per-note voice override on a batch of
+    /// notes in one region. One undoable edit for the whole batch.
+    ///
+    /// Validate-first, in order: track/region/indices exist; the instrument
+    /// (when `Some`) exists and its kind matches the track's channel kind
+    /// (FM voice ↔ FM channel, PSG envelope ↔ PSG channel, DAC ↔ DAC — the
+    /// same gate as `assign_library_instrument_to_track`); then the
+    /// voice-overlap gate. Only then is the edit recorded and applied.
+    /// `None` clears the override so the notes fall back to the
+    /// region/track default (note > region > track precedence).
+    pub fn set_note_instrument(
+        &mut self,
+        track_id: Uuid,
+        region_id: Uuid,
+        note_indices: &[usize],
+        instrument_id: Option<Uuid>,
+    ) -> Result<(), String> {
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        if note_indices.is_empty() {
+            return Err("no notes selected".into());
+        }
+        let notes_len = self.tracks[t_idx].regions[r_idx].notes.len();
+        if let Some(&bad) = note_indices.iter().find(|&&i| i >= notes_len) {
+            return Err(format!("note index {bad} out of range"));
+        }
+        if let Some(inst_id) = instrument_id {
+            self.check_instrument_kind(inst_id, t_idx, "set")?;
+        }
+        let edited: HashSet<usize> = note_indices.iter().copied().collect();
+        self.check_voice_overlap(t_idx, r_idx, &edited, instrument_id, None)?;
+        self.record_song_edit();
+        let region = &mut self.tracks[t_idx].regions[r_idx];
+        for &i in note_indices {
+            region.notes[i].instrument_id = instrument_id;
+        }
+        Ok(())
+    }
+
+    /// Kind gate shared by `set_note_instrument` and voiced `add_note`:
+    /// the instrument must exist in the bank, and its kind must match the
+    /// track's channel kind — mirroring
+    /// `assign_library_instrument_to_track`'s gate (FM voice ↔ FM channel,
+    /// PSG envelope ↔ PSG/noise channel, DAC sample ↔ DAC channel).
+    fn check_instrument_kind(&self, inst_id: Uuid, t_idx: usize, verb: &str) -> Result<(), String> {
+        let inst_kind = if self.instruments.fm.iter().any(|i| i.id == inst_id) {
+            "FM"
+        } else if self.instruments.psg.iter().any(|i| i.id == inst_id) {
+            "PSG"
+        } else if self.instruments.dac.iter().any(|i| i.id == inst_id) {
+            "DAC"
+        } else {
+            return Err("instrument not found".into());
+        };
+        let track_kind = match self.tracks[t_idx].channel {
+            ChannelAssignment::Fm(_) => "FM",
+            ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => "PSG",
+            ChannelAssignment::Dac(_) => "DAC",
+        };
+        if inst_kind != track_kind {
+            return Err(format!(
+                "cannot {verb} an {inst_kind} voice on a non-{inst_kind} track"
+            ));
+        }
+        Ok(())
+    }
+
+    /// Voice-overlap gate (named rule: "voice-overlap"). Rejects an edit
+    /// that would leave an EDITED note overlapping, on the same output
+    /// channel (`channel_key` — the grouping `build_snapshot` uses), a note
+    /// whose effective voice (note > region > track) is a DIFFERENT
+    /// concrete instrument. Same-voice overlaps keep today's status quo
+    /// (allowed here, surfaced post-hoc by `get_channel_overlaps`), and a
+    /// note with no effective voice is silent, so only Some-vs-Some
+    /// disagreements are conflicts. Pre-existing conflicts between
+    /// untouched notes (imported projects) do not block unrelated edits.
+    ///
+    /// The hypothetical edit: notes at `edited_indices` of
+    /// (`t_idx`, `r_idx`) take `new_voice` as their note-level override
+    /// (falling back region > track when `None`); `extra_span`, when given,
+    /// is a not-yet-inserted note (add_note) carrying `new_voice`.
+    fn check_voice_overlap(
+        &self,
+        t_idx: usize,
+        r_idx: usize,
+        edited_indices: &HashSet<usize>,
+        new_voice: Option<Uuid>,
+        extra_span: Option<(u64, u64)>,
+    ) -> Result<(), String> {
+        let target = &self.tracks[t_idx];
+        let key = channel_key(&target.channel);
+        let target_region_id = target.regions[r_idx].id;
+
+        // (start, end, (effective_voice, is_edited)) for every note on the
+        // channel, with the hypothetical edit applied.
+        let mut spans: Vec<TaggedSpan<(Option<Uuid>, bool)>> = Vec::new();
+        for track in self.tracks.iter().filter(|t| channel_key(&t.channel) == key) {
+            for region in &track.regions {
+                let is_target_region = track.id == target.id && region.id == target_region_id;
+                for (i, note) in region.notes.iter().enumerate() {
+                    let is_edited = is_target_region && edited_indices.contains(&i);
+                    let note_voice = if is_edited { new_voice } else { note.instrument_id };
+                    let effective = note_voice
+                        .or(region.instrument_id)
+                        .or(track.instrument_id);
+                    let start = region.start_tick + note.tick;
+                    spans.push((start, start + note.duration_ticks, (effective, is_edited)));
+                }
+            }
+        }
+        if let Some((start, end)) = extra_span {
+            let effective = new_voice
+                .or(target.regions[r_idx].instrument_id)
+                .or(target.instrument_id);
+            spans.push((start, end, (effective, true)));
+        }
+
+        let mut conflict: Option<(u64, u64)> = None;
+        for_each_conflicting_span(&mut spans, |a, b, start, end| {
+            if conflict.is_some() {
+                return;
+            }
+            let (voice_a, edited_a) = &a.2;
+            let (voice_b, edited_b) = &b.2;
+            if !(edited_a | edited_b) {
+                return;
+            }
+            if let (Some(va), Some(vb)) = (voice_a, voice_b) {
+                if va != vb {
+                    conflict = Some((start, end));
+                }
+            }
+        });
+        match conflict {
+            Some((start, end)) => Err(format!(
+                "voice-overlap: notes with different voices would overlap on {} at ticks {start}-{end}",
+                channel_display_name(&target.channel)
+            )),
+            None => Ok(()),
+        }
     }
 
     pub fn update_note(
@@ -1679,8 +1884,8 @@ mod tests {
         let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
         let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
-        mgr.add_note(track_id, region_id, 480, 64, 80, 480).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
+        mgr.add_note(track_id, region_id, 480, 64, 80, 480, None).unwrap();
 
         let dup_id = mgr.duplicate_region(track_id, region_id, 1920).unwrap();
         assert_ne!(dup_id, region_id, "clone gets a fresh region id");
@@ -1718,7 +1923,7 @@ mod tests {
         let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
         let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
 
         let dup_id = mgr.duplicate_region(track_id, region_id, 1920).unwrap();
         assert_eq!(track(&mgr).regions.len(), 2);
@@ -1749,7 +1954,7 @@ mod tests {
         let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
 
-        let idx = mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        let idx = mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
         assert_eq!(idx, 0);
         assert_eq!(track(&mgr).regions[0].notes.len(), 1);
 
@@ -1770,8 +1975,8 @@ mod tests {
 
         let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
-        mgr.add_note(track_id, region_id, 0, 60, 100, 480).unwrap();
-        mgr.add_note(track_id, region_id, 480, 64, 80, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 480, None).unwrap();
+        mgr.add_note(track_id, region_id, 480, 64, 80, 240, None).unwrap();
 
         let track_count = mgr.list_tracks().len();
         mgr.save().unwrap();
@@ -2175,7 +2380,7 @@ mod tests {
     fn test_undo_redo_note_add_round_trip() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_note_add");
 
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
         assert_eq!(region_notes(&mgr, track_id, region_id).len(), 1);
         assert!(mgr.can_undo());
 
@@ -2202,7 +2407,7 @@ mod tests {
     #[test]
     fn test_undo_redo_note_update_and_delete() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_note_upd");
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
 
         mgr.update_note(track_id, region_id, 0, 480, 64, 90, 120).unwrap();
         assert_eq!(region_notes(&mgr, track_id, region_id)[0].pitch, 64);
@@ -2291,7 +2496,7 @@ mod tests {
     #[test]
     fn test_undo_group_coalesces_to_one_step() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_group");
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
 
         // A drag gesture: one update per mousemove, bracketed by the group.
         mgr.begin_undo_group();
@@ -2315,7 +2520,7 @@ mod tests {
     #[test]
     fn test_undo_group_unbalanced_begin_end_are_safe() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_group_unbal");
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
 
         // Nested begin is a no-op; the inner end closes the (single) group.
         mgr.begin_undo_group();
@@ -2343,12 +2548,12 @@ mod tests {
     #[test]
     fn test_redo_cleared_on_new_mutation() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_redo_clear");
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
         mgr.undo();
         assert!(mgr.can_redo());
 
         // A fresh mutation invalidates the redo branch.
-        mgr.add_note(track_id, region_id, 480, 72, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 480, 72, 100, 240, None).unwrap();
         assert!(!mgr.can_redo(), "new mutation must clear the redo stack");
         let before = region_notes(&mgr, track_id, region_id);
         mgr.redo(); // must be a no-op
@@ -2360,7 +2565,7 @@ mod tests {
     #[test]
     fn test_undo_stack_cap_enforced() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_cap");
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
 
         // Well past the cap (setup already pushed a few snapshots).
         for i in 0..(MAX_UNDO_DEPTH + 50) {
@@ -2391,7 +2596,7 @@ mod tests {
 
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
         mgr.save().unwrap();
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
         assert!(mgr.is_dirty());
         mgr.undo();
         assert!(mgr.is_dirty(), "undo does NOT clear dirty — state differs from disk");
@@ -2463,7 +2668,7 @@ mod tests {
     #[test]
     fn test_failed_mutation_pushes_no_snapshot() {
         let (mut mgr, path, track_id, region_id) = undo_fixture("undo_failed");
-        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
         mgr.save().unwrap();
         assert!(!mgr.is_dirty());
         let depth_probe = mgr.can_undo(); // history exists from setup
@@ -2480,6 +2685,136 @@ mod tests {
         mgr.undo();
         assert!(region_notes(&mgr, track_id, region_id).is_empty(),
             "failed mutations must not have pushed snapshots");
+
+        cleanup(&path);
+    }
+
+    // --- Per-note voice (set_note_instrument / voiced add_note) ---
+
+    /// Fresh project with two FM voices in the bank. Voice A is bound (by
+    /// `add_fm_instrument`'s lane binding) to the seeded FM1 lane, which
+    /// gets one empty region. Returns
+    /// (mgr, path, track_id, region_id, voice_a, voice_b).
+    fn voice_fixture(name: &str) -> (ProjectManager, PathBuf, Uuid, Uuid, Uuid, Uuid) {
+        let path = temp_project_path(name);
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Voices", "flamedriver", 120.0, (4, 4)).unwrap();
+        let mut a = assign_test_fm();
+        a.name = "Voice A".into();
+        let voice_a = mgr.add_fm_instrument(a);
+        let mut b = assign_test_fm();
+        b.name = "Voice B".into();
+        b.algorithm = 2;
+        let voice_b = mgr.add_fm_instrument(b);
+        let track_id = mgr.tracks.iter()
+            .find(|t| t.instrument_id == Some(voice_a))
+            .expect("voice A bound to a lane").id;
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        (mgr, path, track_id, region_id, voice_a, voice_b)
+    }
+
+    #[test]
+    fn test_set_note_instrument_stamps_batch_clears_and_is_one_undo_step() {
+        let (mut mgr, path, track_id, region_id, _a, voice_b) = voice_fixture("voice_set");
+        // Non-overlapping notes: the gate must not interfere.
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240, None).unwrap();
+        mgr.add_note(track_id, region_id, 240, 62, 100, 240, None).unwrap();
+        mgr.add_note(track_id, region_id, 480, 64, 100, 240, None).unwrap();
+
+        mgr.set_note_instrument(track_id, region_id, &[0, 2], Some(voice_b)).unwrap();
+        let notes = region_notes(&mgr, track_id, region_id);
+        assert_eq!(notes[0].instrument_id, Some(voice_b));
+        assert_eq!(notes[1].instrument_id, None, "unselected note untouched");
+        assert_eq!(notes[2].instrument_id, Some(voice_b));
+
+        // The whole batch is ONE undo step.
+        mgr.undo();
+        let notes = region_notes(&mgr, track_id, region_id);
+        assert!(notes.iter().all(|n| n.instrument_id.is_none()),
+            "a single undo reverts the whole batch");
+        mgr.redo();
+
+        // None clears back to the track/region default.
+        mgr.set_note_instrument(track_id, region_id, &[0, 2], None).unwrap();
+        let notes = region_notes(&mgr, track_id, region_id);
+        assert!(notes.iter().all(|n| n.instrument_id.is_none()),
+            "None clears the per-note override");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_set_note_instrument_kind_gate() {
+        let (mut mgr, path, _t, _r, _a, voice_b) = voice_fixture("voice_kind");
+        let psg_track = mgr.add_track("PSG".into(), ChannelAssignment::Psg(0), None);
+        let psg_region = mgr.add_region(psg_track, 0, 1920).unwrap();
+        mgr.add_note(psg_track, psg_region, 0, 60, 100, 240, None).unwrap();
+        mgr.save().unwrap();
+        assert!(!mgr.is_dirty());
+
+        // FM voice on a PSG track: rejected by the kind gate.
+        let err = mgr.set_note_instrument(psg_track, psg_region, &[0], Some(voice_b)).unwrap_err();
+        assert!(err.contains("FM voice"), "error names the kind mismatch: {err}");
+        // Unknown instrument id: rejected before any mutation.
+        let err = mgr.set_note_instrument(psg_track, psg_region, &[0], Some(Uuid::new_v4())).unwrap_err();
+        assert!(err.contains("instrument not found"), "unknown id named: {err}");
+        // Out-of-range index: rejected.
+        let err = mgr.set_note_instrument(psg_track, psg_region, &[5], None).unwrap_err();
+        assert!(err.contains("out of range"), "bad index named: {err}");
+
+        assert!(!mgr.is_dirty(), "failed set_note_instrument must not mark dirty");
+        let notes = region_notes(&mgr, psg_track, psg_region);
+        assert_eq!(notes[0].instrument_id, None, "note untouched after rejections");
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_set_note_instrument_voice_overlap_gate() {
+        let (mut mgr, path, track_id, region_id, voice_a, voice_b) = voice_fixture("voice_overlap");
+        // Two overlapping notes on the same channel (0-480 and 240-720),
+        // both inheriting the track voice (A) — today's allowed status quo.
+        mgr.add_note(track_id, region_id, 0, 60, 100, 480, None).unwrap();
+        mgr.add_note(track_id, region_id, 240, 64, 100, 480, None).unwrap();
+        mgr.save().unwrap();
+
+        // Giving ONE of them a different voice would put A and B on one
+        // channel at ticks 240-480 — rejected by the named rule.
+        let err = mgr.set_note_instrument(track_id, region_id, &[1], Some(voice_b)).unwrap_err();
+        assert!(err.starts_with("voice-overlap:"), "rule is named: {err}");
+        assert!(err.contains("FM1"), "channel is named: {err}");
+        assert!(err.contains("240"), "conflict span start is reported: {err}");
+        assert!(!mgr.is_dirty(), "rejected edit must not mark dirty");
+        assert!(region_notes(&mgr, track_id, region_id).iter().all(|n| n.instrument_id.is_none()));
+
+        // Same-voice overlap keeps the status quo: BOTH notes to B is fine…
+        mgr.set_note_instrument(track_id, region_id, &[0, 1], Some(voice_b)).unwrap();
+        // …and so is an override equal to the other note's effective voice.
+        mgr.set_note_instrument(track_id, region_id, &[0, 1], None).unwrap();
+        mgr.set_note_instrument(track_id, region_id, &[1], Some(voice_a)).unwrap();
+        let notes = region_notes(&mgr, track_id, region_id);
+        assert_eq!(notes[1].instrument_id, Some(voice_a));
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_add_note_carries_voice_and_gates_overlap() {
+        let (mut mgr, path, track_id, region_id, _a, voice_b) = voice_fixture("voice_add");
+        // Explicit voice is stored on the new note.
+        let idx = mgr.add_note(track_id, region_id, 0, 60, 100, 480, Some(voice_b)).unwrap();
+        assert_eq!(region_notes(&mgr, track_id, region_id)[idx].instrument_id, Some(voice_b));
+
+        // An overlapping note inheriting the track voice (A ≠ B) is only
+        // gated when it CARRIES an explicit voice: None keeps today's
+        // behavior (post-hoc overlap warning, no rejection)…
+        mgr.add_note(track_id, region_id, 240, 64, 100, 480, None).unwrap();
+        // …but an explicit differing voice in the same span is rejected.
+        let err = mgr.add_note(track_id, region_id, 700, 65, 100, 480, Some(voice_b)).unwrap_err();
+        assert!(err.starts_with("voice-overlap:"), "rule is named: {err}");
+        // Same explicit voice overlapping the voice-B note (0-120, clear of
+        // the voice-A note at 240) is allowed.
+        mgr.add_note(track_id, region_id, 0, 66, 100, 120, Some(voice_b)).unwrap();
 
         cleanup(&path);
     }

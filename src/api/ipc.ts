@@ -253,6 +253,10 @@ export async function deleteRegion(trackId: string, regionId: string): Promise<v
 
 // --- Note CRUD ---
 
+/** Add a note. `instrumentId` (optional) stamps a per-note voice override
+ *  (note > region > track precedence); an explicit voice is validated
+ *  server-side (kind gate + the "voice-overlap" gate). Omitted/null keeps
+ *  the historical behavior: the note inherits the region/track voice. */
 export async function addNote(
   trackId: string,
   regionId: string,
@@ -260,8 +264,22 @@ export async function addNote(
   pitch: number,
   velocity: number,
   durationTicks: number,
+  instrumentId?: string | null,
 ): Promise<number> {
-  return unwrap(await commands.addNote(trackId, regionId, tick, pitch, velocity, durationTicks));
+  return unwrap(await commands.addNote(trackId, regionId, tick, pitch, velocity, durationTicks, instrumentId ?? null));
+}
+
+/** Set (or clear, with null) the per-note voice on a batch of notes in one
+ *  region — ONE undoable edit. Rejected server-side by the kind gate or the
+ *  "voice-overlap" gate (notes with different effective voices may not
+ *  overlap on one channel). */
+export async function setNoteInstrument(
+  trackId: string,
+  regionId: string,
+  noteIndices: number[],
+  instrumentId: string | null,
+): Promise<void> {
+  unwrap(await commands.setNoteInstrument(trackId, regionId, noteIndices, instrumentId));
 }
 
 export async function updateNote(

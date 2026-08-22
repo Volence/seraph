@@ -395,6 +395,121 @@ describe("PianoRoll refresh on undo/redo", () => {
   });
 });
 
+describe("note edits reload the running sequence (F1)", () => {
+  // Playback consumes the snapshot built at play time, so every COMMITTED
+  // note mutation must trigger reloadSequence — the same mechanism the
+  // region path uses (G30). Like that path, the call is unconditional
+  // (backend reload_snapshot preserves playing/tick/loop and is a cheap
+  // no-op audibly when stopped). Granularity is commit-time only:
+  // mouseup/keypress, never per-mousemove.
+
+  // DOM order: [0] bar ruler, [1] key column, [2] note grid, [3] velocity lane.
+  const noteCanvas = (container: HTMLElement) => container.querySelectorAll("canvas")[2];
+  const velocityCanvas = (container: HTMLElement) => {
+    const canvases = container.querySelectorAll("canvas");
+    return canvases[canvases.length - 1];
+  };
+  // jsdom rects are all zeros, so clientX/clientY map 1:1 to canvas coords.
+  const ROW_H = 14; // melodic rowHeight in PianoRoll.tsx
+  const rowY = (pitch: number) => (FM_MAX - pitch) * ROW_H + ROW_H / 2;
+
+  it("reloads after drawing a new note (mouseup commit)", async () => {
+    const { container } = await renderRoll([]);
+    fireEvent.doubleClick(noteCanvas(container), { clientX: 5, clientY: rowY(60) });
+    fireEvent.mouseUp(window, { clientX: 5, clientY: rowY(60) });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalled());
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("reloads once after a multi-note Delete, after the undo group closes", async () => {
+    await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "Delete" });
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+    const end = vi.mocked(ipc.endUndoGroup).mock.invocationCallOrder[0];
+    const reload = vi.mocked(ipc.reloadSequence).mock.invocationCallOrder[0];
+    expect(reload).toBeGreaterThan(end);
+  });
+
+  it("reloads after a keyboard transpose", async () => {
+    await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("does NOT reload when a transpose is blocked at the range edge", async () => {
+    await renderRoll([note(0, FM_MAX)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ipc.reloadSequence).not.toHaveBeenCalled();
+  });
+
+  it("reloads after an arrow nudge", async () => {
+    await renderRoll([note(480, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("reloads after Ctrl+V paste", async () => {
+    await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    await waitFor(() => expect(ipc.addNote).toHaveBeenCalled());
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("reloads after Ctrl+D duplicate", async () => {
+    vi.mocked(ipc.addNote).mockResolvedValue(1);
+    await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "d", ctrlKey: true });
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("reloads after Ctrl+X cut", async () => {
+    await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.keyDown(window, { key: "x", ctrlKey: true });
+    await waitFor(() => expect(ipc.deleteNote).toHaveBeenCalled());
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("reloads after a velocity-lane click commit", async () => {
+    const { container } = await renderRoll([note(0, 60)]);
+    // Note at tick 0 renders from x=0; mid-lane click sets its velocity.
+    fireEvent.mouseDown(velocityCanvas(container), { clientX: 5, clientY: 30 });
+    await waitFor(() => expect(ipc.updateNote).toHaveBeenCalled());
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("a note-move drag reloads ONCE at mouseup, never per mousemove", async () => {
+    const { container } = await renderRoll([note(0, 60)]);
+    const canvas = noteCanvas(container);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(60), button: 0 });
+    // Two mousemoves = two per-move updateNote calls; still zero reloads.
+    fireEvent.mouseMove(window, { clientX: 55, clientY: rowY(60) });
+    fireEvent.mouseMove(window, { clientX: 105, clientY: rowY(60) });
+    await waitFor(() => expect(ipc.updateNote).toHaveBeenCalled());
+    expect(ipc.reloadSequence).not.toHaveBeenCalled();
+    fireEvent.mouseUp(window, { clientX: 105, clientY: rowY(60) });
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalledTimes(1));
+  });
+
+  it("a plain click-select gesture (no mutation) does not reload", async () => {
+    const { container } = await renderRoll([note(0, 60)]);
+    const canvas = noteCanvas(container);
+    fireEvent.mouseDown(canvas, { clientX: 5, clientY: rowY(60), button: 0 });
+    fireEvent.mouseUp(window, { clientX: 5, clientY: rowY(60) });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ipc.updateNote).not.toHaveBeenCalled();
+    expect(ipc.reloadSequence).not.toHaveBeenCalled();
+  });
+});
+
 describe("note placement velocity", () => {
   // Velocity is TL-denominated in the engine: the sequencer adds
   // (127 - velocity) straight to every FM carrier TL (0.75 dB/step), so 127

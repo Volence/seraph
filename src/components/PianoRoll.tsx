@@ -155,6 +155,10 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
     // 0.75 dB per step down) — place at full so new notes match audition.
     await ipc.addNote(region.trackId, region.regionId, tick, pitch, 127, duration);
     refresh();
+    // Playback consumes a play-time snapshot: without a reload the running
+    // transport never hears this edit (F1). Commit-granularity only, same
+    // unconditional call as the region path (G30).
+    await ipc.reloadSequence();
   }
 
   async function handleNoteClick(index: number, additive: boolean) {
@@ -182,11 +186,13 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   async function handleNoteResize(index: number, newDurationTicks: number) {
     const note = notes[index];
     if (!note) return;
+    gestureMutatedRef.current = true;
     await ipc.updateNote(region.trackId, region.regionId, index, note.tick, note.pitch, note.velocity, newDurationTicks);
     refresh();
   }
 
   async function handleNotesMove(moves: { index: number; tick: number; pitch: number }[]) {
+    if (moves.length > 0) gestureMutatedRef.current = true;
     for (const m of moves) {
       const note = notes[m.index];
       if (!note) continue;
@@ -197,15 +203,33 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
 
   // Drag gestures (note move/resize) fire one updateNote per mousemove;
   // bracketing mousedown→mouseup in an undo group coalesces the whole drag
-  // into a single undo step.
-  const handleGestureStart = useCallback(() => { ipc.beginUndoGroup(); }, []);
-  const handleGestureEnd = useCallback(() => { ipc.endUndoGroup(); }, []);
+  // into a single undo step. The mutated flag makes the gesture-end reload
+  // (F1) fire only when the drag actually committed edits — a plain
+  // click-select is bracketed too and must not churn the sequence
+  // (reload_snapshot does silence_all + reprogram).
+  const gestureMutatedRef = useRef(false);
+  const handleGestureStart = useCallback(() => {
+    gestureMutatedRef.current = false;
+    ipc.beginUndoGroup();
+  }, []);
+  const handleGestureEnd = useCallback(async () => {
+    await ipc.endUndoGroup();
+    if (gestureMutatedRef.current) {
+      gestureMutatedRef.current = false;
+      // Mouseup-granularity reload so the running transport hears the
+      // committed move/resize (F1) — never per-mousemove.
+      await ipc.reloadSequence();
+    }
+  }, []);
 
   async function handleVelocityChange(index: number, velocity: number) {
     const note = notes[index];
     if (!note) return;
     await ipc.updateNote(region.trackId, region.regionId, index, note.tick, note.pitch, velocity, note.durationTicks);
     refresh();
+    // The velocity lane commits one edit per click (no drag-paint yet, G17)
+    // — one reload per commit (F1).
+    await ipc.reloadSequence();
   }
 
   useEffect(() => {
@@ -235,6 +259,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
               await ipc.endUndoGroup();
             }
             refresh();
+            // Keypress-granularity commit: reload so the running transport
+            // hears the transpose (F1).
+            await ipc.reloadSequence();
           })();
         }
       }
@@ -252,6 +279,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
         }
         setSelectedNotes(new Set());
         refresh();
+        // Deleted notes must stop sounding on the next loop pass (F1).
+        await ipc.reloadSequence();
       };
 
       if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && selectedNotes.size > 0) {
@@ -275,6 +304,9 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
               await ipc.endUndoGroup();
             }
             refresh();
+            // Keypress-granularity commit: reload so the running transport
+            // hears the nudge (F1).
+            await ipc.reloadSequence();
           })();
         }
       }
@@ -323,6 +355,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
               await refresh();
               // Pasted notes become the new selection.
               setSelectedNotes(new Set(newIndices));
+              // One paste = one commit = one reload (F1).
+              await ipc.reloadSequence();
             })();
           }
         }
@@ -355,6 +389,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           }
           await refresh();
           setSelectedNotes(new Set(newIndices));
+          // One duplicate = one commit = one reload (F1).
+          await ipc.reloadSequence();
         })();
       }
     }

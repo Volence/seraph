@@ -1115,9 +1115,12 @@ designs target the banked specs (normative); manifest flags carry the gates.
   auto-clearing notice in the piano-roll header.
 - 2026-08-22: **ONE-GESTURE NOTE ENTRY + RIGHT-CLICK ERASE SHIPPED** (F6, the
   audit's #5; G13/G14 closed). Branch `feat/note-entry-grammar`, commits
-  `9f2dc66` (feature+tests) and this doc entry. Lanes: cargo 259/0 (untouched),
-  vitest 331/331 across 30 files (+27 new), `npm run build` clean 0 warnings,
-  no `src/bindings.ts` diff (frontend-only parcel).
+  `9f2dc66` (feature+tests) and this doc entry; merged `8359f75`. **Lanes on
+  the MERGED tree** (the numbers that count — this parcel and the defect sweep
+  landed the same day): cargo **263/0**, vitest **336/336** across 31 files,
+  `npm run build` clean 0 warnings, no `src/bindings.ts` drift. (Branch-side
+  figures were cargo 259/0 and vitest 331/331 across 30 files, off `ecb2fcd`
+  before the sweep landed.)
   **COMPLETES the banked Ableton ruling rather than forking it:** double-click
   draw survives as the no-mode default; one-gesture entry is a MODE, exactly as
   `2026-08-21-daw-comparator-idioms.md` §1 describes. Grammar now: *no mode* —
@@ -1171,6 +1174,58 @@ designs target the banked specs (normative); manifest flags carry the gates.
   reads clearly in the header; a paint-drag over a running transport is audible
   on the next pass and sounds at audition loudness; painted-run preview
   rendering (jsdom has no 2D context, so no test can see it).
+
+- 2026-08-22 (cont.): **OVERSEER LANDING NOTE — both parcels merged and pushed**
+  (`69873d6` sweep, `8359f75` F6; `origin/main` verified moved by `ls-remote`
+  after each). Only the queue doc conflicted (two appended entries, both kept);
+  `PianoRoll.tsx` auto-merged and was checked FEATURE-WISE rather than trusted
+  textually — the sweep's paste-rejection `.catch`/`showVoiceHint` and F6's
+  `drawMode`/`handleNotesPaint`/`handleNoteErase` both verified present in the
+  merged file, since a clean textual merge of two parcels editing one component
+  is not evidence that both behaviours survived.
+  **RATIFIED — all 10 of F6's flagged calls**, plus the sweep's three (the
+  `TransportPublish` plumbing, console-only region-paste errors, the delegating
+  `resetClipboardForTest` alias). Two were verified firsthand rather than taken
+  on the agent's word, because the whole design rests on them: `add_note`
+  **pushes** (`project/manager.rs:1409`) so a painted run cannot invalidate a
+  live selection, and `delete_note` uses `Vec::remove` (`:1597`) so erase must
+  remap later indices — which is exactly what each does. The `B` binding was
+  confirmed collision-free with a CONTROL grep (enumerating every existing
+  `key === "…"` handler) rather than from an empty result, since an empty grep
+  and a broken grep are indistinguishable.
+  **ONE DELIBERATE DEVIATION FROM THE BANKED OWNER RULING, surfaced not buried:**
+  in Draw Mode a left-click on an existing note still selects/moves it; Ableton
+  would DELETE it. Ratified provisionally because a dedicated right-click erase
+  is already bound, so click-to-delete under a paint gesture is a data-loss trap
+  with no compensating gain. **Owner may overturn at the by-ear gate** — it is a
+  one-line change if they want literal Ableton behaviour.
+  **REVIEW FINDING, fixed before landing:** `TransportPublish`'s doc comment
+  claimed the Release/Acquire flag ordering made the published loop range
+  consistent. It does for unarmed→armed and for disarming, but NOT for an
+  armed→re-armed range change: a reader can acquire a stale `true` flag and
+  relaxed-load `(new_start, old_end)`. Open on every drag of a loop edge. Ruled
+  AGAINST building a seqlock — nothing reads those fields (enumerated) and
+  concurrency machinery for a field with no reader is gold-plating; the comment
+  now states the real guarantee and names the window. **Close it before wiring
+  `loopStart`/`loopEnd` to anything.**
+  **AUDIT DRIFT BOOKED (found while verifying, deliberately not acted on):**
+  two feel-audit findings have partly aged out. **F16** — `NewProjectDialog`'s
+  Location field is no longer `readOnly` and recents exist (LOCATION MEMORY
+  parcel), so "forced Browse, no recents" is now half true. **F19/F20** — "no
+  Esc anywhere" is wrong: three `key === "Escape"` handlers exist on main.
+  Neither verdict was rewritten; re-ground both before funding a parcel off
+  them. This is the same perishability the citation re-grounding pass addressed
+  from the other side — the findings' PROSE ages as well as their line numbers.
+  **CROSS-REPO, no action owed:** the aeon overseer closed the sticky pan-gate
+  mute finding (`Sfx_UnpauseRestore` handles it; both callers of the mute sweep
+  accounted for) and pushed a stale-citation fix at aeon `b16ec612`, verified
+  reachable at their `origin/master` from this side. Checked whether the hazard
+  class has a seraph analogue: it does not. `silence_all`
+  (`sequencer/mod.rs:564-578`) never touches `$B4`, all five cache-reset sites
+  reset `last_fm_patch` and `last_fm_pan` together, `reload_snapshot` preserves
+  both together, and every mutation of `playing`/the loop bounds is
+  command-driven. Seraph gets the driver's repair for free: `stop`/`seek`
+  invalidate the pan shadow, so the next note-on re-asserts pan.
 
 ## EXECUTION HANDOFF (cold start — read this first)
 

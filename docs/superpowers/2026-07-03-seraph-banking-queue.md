@@ -400,6 +400,27 @@ designs target the banked specs (normative); manifest flags carry the gates.
   chips, drag-to-track wipe confirm), `fix/play-start-memory` (item 7
   ruling, transportMemory pure-function redesign).
 
+- 2026-08-21 (cont.): **WAVE 3B PARCEL 1 SHIPPED — live-edit audibility +
+  silent-lane cues (audit F1+F2)** (merged; lanes on merged tree: cargo
+  237/0, vitest 228/228 across 23 files, build clean, no bindings drift).
+  F1: every piano-roll note commit point (draw, delete/cut, transpose,
+  nudge, paste, Ctrl+D, velocity click, move/resize via gesture-end hook)
+  now reloads the running sequence — G30 pattern, unconditional, with a
+  gestureMutatedRef so click-selects don't churn; undo/redo already
+  reloaded (verified). F2: instrument-less lanes get a dimmed name + "no
+  voice" pill on TrackHeader and a "silent — no voice assigned" badge in
+  the piano-roll header (tooltips state the fix); F2c: deleting an
+  instrument resets lanes named exactly after it to the channel-layout
+  default name (`default_lane_name()` derives from the driver's
+  ChannelLayout; user renames preserved via name-inequality heuristic —
+  exact-match renames also reset, accepted edge). RATIFIED: unconditional
+  reload (matches region path); rename heuristic; unknown-driver keeps old
+  name. TAGGED for owner gate + BOOKED BACKEND FOLLOW-UP: reload_snapshot
+  does silence_all+reprogram, so a note commit mid-loop momentarily cuts
+  sustained notes on other channels (same cost region ops already pay) —
+  if objectionable by ear, a targeted per-channel reprogram is the fix.
+  Remaining in flight: `feat/note-voice-set`, `fix/play-start-memory`.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

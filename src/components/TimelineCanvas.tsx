@@ -79,6 +79,11 @@ export function TimelineCanvas({
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
   dragRef.current = drag;
+  // A drag that passed the movedEnough slop already did its work on mouseup,
+  // but the browser still synthesizes a click from the same press/release —
+  // which used to reach onRegionClick and re-select/re-open the dragged
+  // region. Set on such a mouseup, checked-and-cleared by handleClick.
+  const didDragRef = useRef(false);
   const ticksPerBar = ticksPerBeat * beatsPerBar;
 
   function pixelToTick(px: number): number {
@@ -398,6 +403,7 @@ export function TimelineCanvas({
       const endY = e.clientY - rect.top;
 
       const movedEnough = Math.abs(endX - d.startX) > 4 || Math.abs(endY - d.startY) > 4;
+      if (movedEnough) didDragRef.current = true;
 
       if (d.mode === "select" && movedEnough) {
         const tickLeft = pixelToTick(Math.min(d.startX, endX));
@@ -461,6 +467,12 @@ export function TimelineCanvas({
   }, [drag, ticksPerPixel, scrollLeft, ticksPerBar, tracks, trackHeight, onSelectRegions, onRegionMove, onRegionResize]);
 
   function handleClick(e: React.MouseEvent) {
+    // Swallow the click the browser synthesizes after a completed drag
+    // (one-shot: the very next plain click selects normally).
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
     if (drag) return;
     const canvas = canvasRef.current;
     if (!canvas) return;

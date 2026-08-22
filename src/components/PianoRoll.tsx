@@ -7,7 +7,8 @@ import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
-import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes } from "../utils/pianoRollEdit";
+import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes } from "../utils/pianoRollEdit";
+import { copyNotes, getNoteClipboard, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
 import styles from "./PianoRoll.module.css";
@@ -17,6 +18,8 @@ interface PianoRollProps {
   onClose: () => void;
   playing: boolean;
   projectMeta: SongMetadata;
+  /** The white seek cursor (absolute song ticks); anchors Ctrl+V paste. */
+  seekTick: number;
 }
 
 const GRID_OPTIONS: { label: string; divisor: number }[] = [
@@ -47,7 +50,7 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
   64: "Power Kick",
 };
 
-export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollProps) {
+export function PianoRoll({ region, onClose, playing, projectMeta, seekTick }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
@@ -219,21 +222,94 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
           })();
         }
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedNotes.size > 0) {
+      // Shared by Delete/Backspace and Ctrl+X: grouped multi-delete
+      // (one gesture = one undo step), descending so indices stay valid.
+      const deleteSelection = async () => {
         const sorted = Array.from(selectedNotes).sort((a, b) => b - a);
-        (async () => {
-          // One multi-delete = one undo step: group the batch.
-          await ipc.beginUndoGroup();
-          try {
-            for (const idx of sorted) {
-              await ipc.deleteNote(region.trackId, region.regionId, idx);
-            }
-          } finally {
-            await ipc.endUndoGroup();
+        await ipc.beginUndoGroup();
+        try {
+          for (const idx of sorted) {
+            await ipc.deleteNote(region.trackId, region.regionId, idx);
           }
-          setSelectedNotes(new Set());
-          refresh();
-        })();
+        } finally {
+          await ipc.endUndoGroup();
+        }
+        setSelectedNotes(new Set());
+        refresh();
+      };
+
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && selectedNotes.size > 0) {
+        e.preventDefault();
+        const direction = e.key === "ArrowRight" ? 1 : -1;
+        // Plain arrow = the grid selector's snap step; Ctrl/Cmd = 1-tick fine nudge.
+        const step = e.ctrlKey || e.metaKey ? 1 : gridSnapTicks;
+        // Blocked (null) when any selected note would cross tick 0 or the
+        // region end: block-whole-move, matching the transpose convention.
+        const moves = nudgeNotes(notes, selectedNotes, direction * step, region.durationTicks);
+        if (moves) {
+          (async () => {
+            // One nudge keypress = one undo step: group the batch.
+            await ipc.beginUndoGroup();
+            try {
+              for (const m of moves) {
+                const n = notes[m.index];
+                await ipc.updateNote(region.trackId, region.regionId, m.index, m.tick, n.pitch, n.velocity, n.durationTicks);
+              }
+            } finally {
+              await ipc.endUndoGroup();
+            }
+            refresh();
+          })();
+        }
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedNotes.size > 0) {
+        deleteSelection();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedNotes.size > 0) {
+        e.preventDefault();
+        copyNotes(notes, selectedNotes);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "x" && selectedNotes.size > 0) {
+        e.preventDefault();
+        // Cut = copy + grouped multi-delete.
+        copyNotes(notes, selectedNotes);
+        deleteSelection();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "v" && lastCopiedKind() === "notes") {
+        const clip = getNoteClipboard();
+        if (clip.length > 0) {
+          e.preventDefault();
+          // Paste-anchor rule (Ableton-ish default): notes land relative to
+          // the EARLIEST copied note, anchored at the seek cursor when it
+          // falls inside the open region, else at tick 0 of the region.
+          const cursorInRegion = seekTick >= region.startTick
+            && seekTick < region.startTick + region.durationTicks;
+          const anchor = cursorInRegion ? seekTick - region.startTick : 0;
+          const plan = planNotePaste(clip, anchor, region.durationTicks);
+          if (plan.skipped > 0) {
+            // Loud, not silent: dropped notes would have started past the
+            // region end.
+            console.warn(`paste: skipped ${plan.skipped} note(s) past the region end`);
+          }
+          if (plan.placements.length > 0) {
+            (async () => {
+              const newIndices: number[] = [];
+              // One paste = one undo step: group the addNote batch.
+              await ipc.beginUndoGroup();
+              try {
+                for (const p of plan.placements) {
+                  const newIdx = await ipc.addNote(region.trackId, region.regionId, p.tick, p.pitch, p.velocity, p.durationTicks);
+                  newIndices.push(newIdx);
+                }
+              } finally {
+                await ipc.endUndoGroup();
+              }
+              await refresh();
+              // Pasted notes become the new selection.
+              setSelectedNotes(new Set(newIndices));
+            })();
+          }
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
         e.preventDefault();
@@ -268,7 +344,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta }: PianoRollPr
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedNotes, notes, minPitch, maxPitch, region.trackId, region.regionId, refresh]);
+  }, [selectedNotes, notes, minPitch, maxPitch, region.trackId, region.regionId, region.startTick, region.durationTicks, gridSnapTicks, seekTick, refresh]);
 
   const fmPreviewTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>);
 

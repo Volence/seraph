@@ -294,6 +294,14 @@ async moveRegion(srcTrackId: string, regionId: string, dstTrackId: string, start
     else return { status: "error", error: e  as any };
 }
 },
+async duplicateRegion(trackId: string, regionId: string, atStartTick: number) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("duplicate_region", { trackId, regionId, atStartTick }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async deleteRegion(trackId: string, regionId: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("delete_region", { trackId, regionId }) };

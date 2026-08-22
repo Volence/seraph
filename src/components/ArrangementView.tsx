@@ -11,6 +11,7 @@ import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT, isEditableTarget } from "../utils/keyboard";
 import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { copyRegions, getRegionClipboard, lastCopiedKind } from "../utils/clipboard";
 import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
 import styles from "./ArrangementView.module.css";
 
@@ -167,10 +168,106 @@ export function ArrangementView({
           refresh();
         })();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "d" && selectedRegions.length > 0) {
+        // G1 mirror: while the piano roll owns a note selection, Ctrl+D
+        // keeps meaning duplicate-notes — never the enclosing region.
+        if (pianoRollNoteSelectionActive()) return;
+        e.preventDefault();
+        (async () => {
+          const newSel: SelectedRegion[] = [];
+          // One gesture = one undo step: group the duplicate batch.
+          await ipc.beginUndoGroup();
+          try {
+            for (const r of selectedRegions) {
+              // Each duplicate lands immediately after its source.
+              const newStart = r.startTick + r.durationTicks;
+              const newId = await ipc.duplicateRegion(r.trackId, r.regionId, newStart);
+              newSel.push({ ...r, regionId: newId, startTick: newStart });
+            }
+          } finally {
+            await ipc.endUndoGroup();
+          }
+          await ipc.reloadSequence();
+          await refresh();
+          // The duplicates become the selection.
+          onSelectRegions(newSel);
+        })();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedRegions.length > 0) {
+        // Same G1 scoping: a note selection owns copy too.
+        if (pianoRollNoteSelectionActive()) return;
+        e.preventDefault();
+        // Snapshot ids + payload: the payload keeps paste working even if
+        // the source regions are deleted before Ctrl+V.
+        copyRegions(selectedRegions.flatMap((r) => {
+          const track = tracks.find((t) => t.id === r.trackId);
+          const region = track?.regions.find((rg) => rg.id === r.regionId);
+          if (!region) return [];
+          return [{
+            trackId: r.trackId,
+            regionId: r.regionId,
+            payload: {
+              startTick: region.startTick,
+              durationTicks: region.durationTicks,
+              notes: region.notes,
+            },
+          }];
+        }));
+      }
+      // Paste arbitration: the module clipboard's lastCopiedKind() decides
+      // whether Ctrl+V means notes (piano roll) or regions (here).
+      if ((e.ctrlKey || e.metaKey) && e.key === "v" && lastCopiedKind() === "regions") {
+        const clip = getRegionClipboard();
+        if (clip.length === 0) return;
+        e.preventDefault();
+        // Paste anchor: the seek cursor, snapped DOWN to the bar (the same
+        // bar snap regions use when dragged); the earliest copied region
+        // lands there and the rest keep their relative offsets, each on the
+        // track it was copied from.
+        const oneBar = grid.ticksPerBar(projectMeta);
+        const anchor = Math.floor(seekTick / oneBar) * oneBar;
+        const base = Math.min(...clip.map((c) => c.payload.startTick));
+        (async () => {
+          const newSel: SelectedRegion[] = [];
+          // One paste = one undo step: group the batch.
+          await ipc.beginUndoGroup();
+          try {
+            for (const c of clip) {
+              const newStart = anchor + (c.payload.startTick - base);
+              let newId: string;
+              try {
+                // Server-side deep clone when the source still exists…
+                newId = await ipc.duplicateRegion(c.trackId, c.regionId, newStart);
+              } catch {
+                // …else replay the copied payload (source was deleted).
+                newId = await ipc.addRegion(c.trackId, newStart, c.payload.durationTicks);
+                for (const n of c.payload.notes) {
+                  await ipc.addNote(c.trackId, newId, n.tick, n.pitch, n.velocity, n.durationTicks);
+                }
+              }
+              const track = tracks.find((t) => t.id === c.trackId);
+              newSel.push({
+                trackId: c.trackId,
+                trackName: track?.name ?? "",
+                regionId: newId,
+                channelType: track ? channelType(track) : "fm",
+                startTick: newStart,
+                durationTicks: c.payload.durationTicks,
+              });
+            }
+          } finally {
+            await ipc.endUndoGroup();
+          }
+          await ipc.reloadSequence();
+          await refresh();
+          // The pasted regions become the selection.
+          onSelectRegions(newSel);
+        })();
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedRegions, onSelectRegions, refresh]);
+  }, [selectedRegions, onSelectRegions, refresh, tracks, seekTick, projectMeta]);
 
   function handleRegionDoubleClick(trackId: string, regionId: string) {
     const track = tracks.find((t) => t.id === trackId);

@@ -1157,6 +1157,24 @@ impl ProjectManager {
         Ok(())
     }
 
+    /// Deep-clone a region (fresh id, notes copied) onto the SAME track at
+    /// `at_start_tick`. Backs both region duplicate (Ctrl+D) and region paste.
+    pub fn duplicate_region(&mut self, track_id: Uuid, region_id: Uuid, at_start_tick: u64) -> Result<Uuid, String> {
+        // Validate every lookup BEFORE recording/mutating (update_note's
+        // pattern): a bad id must not push an undo snapshot.
+        let t_idx = self.tracks.iter().position(|t| t.id == track_id)
+            .ok_or("track not found")?;
+        let r_idx = self.tracks[t_idx].regions.iter().position(|r| r.id == region_id)
+            .ok_or("region not found")?;
+        self.record_song_edit();
+        let mut clone = self.tracks[t_idx].regions[r_idx].clone();
+        clone.id = Uuid::new_v4();
+        clone.start_tick = at_start_tick;
+        let id = clone.id;
+        self.tracks[t_idx].regions.push(clone);
+        Ok(id)
+    }
+
     pub fn delete_region(&mut self, track_id: Uuid, region_id: Uuid) -> Result<(), String> {
         let t_idx = self.tracks.iter().position(|t| t.id == track_id)
             .ok_or("track not found")?;
@@ -1522,6 +1540,75 @@ mod tests {
 
         mgr.delete_region(track_id, region_id).unwrap();
         assert!(track(&mgr).regions.is_empty());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_duplicate_region_deep_clones_notes() {
+        let path = temp_project_path("dup_region");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Dup Test", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+        mgr.add_note(track_id, region_id, 480, 64, 80, 480).unwrap();
+
+        let dup_id = mgr.duplicate_region(track_id, region_id, 1920).unwrap();
+        assert_ne!(dup_id, region_id, "clone gets a fresh region id");
+
+        let t = track(&mgr);
+        assert_eq!(t.regions.len(), 2);
+        let dup = t.regions.iter().find(|r| r.id == dup_id).expect("clone present");
+        assert_eq!(dup.start_tick, 1920, "clone placed at the given start tick");
+        assert_eq!(dup.duration_ticks, 1920, "duration carried over");
+        assert_eq!(dup.notes.len(), 2, "clone carries the notes");
+        assert_eq!((dup.notes[0].pitch, dup.notes[0].velocity), (60, 100));
+        assert_eq!((dup.notes[1].tick, dup.notes[1].duration_ticks), (480, 480));
+
+        // Deep clone: editing the copy must not touch the original.
+        mgr.update_note(track_id, dup_id, 0, 0, 72, 100, 240).unwrap();
+        let t = track(&mgr);
+        let orig = t.regions.iter().find(|r| r.id == region_id).unwrap();
+        assert_eq!(orig.notes[0].pitch, 60, "original untouched by editing the clone");
+
+        // Validate-first (update_note's pattern): bad ids error out without
+        // mutating anything.
+        assert!(mgr.duplicate_region(track_id, Uuid::new_v4(), 0).is_err());
+        assert!(mgr.duplicate_region(Uuid::new_v4(), region_id, 0).is_err());
+        assert_eq!(track(&mgr).regions.len(), 2);
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_undo_removes_duplicated_region() {
+        let path = temp_project_path("dup_region_undo");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Dup Undo", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.add_track("FM1".into(), ChannelAssignment::Fm(0), None);
+        let track = |mgr: &ProjectManager| mgr.list_tracks().iter().find(|t| t.id == track_id).unwrap().clone();
+        let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
+        mgr.add_note(track_id, region_id, 0, 60, 100, 240).unwrap();
+
+        let dup_id = mgr.duplicate_region(track_id, region_id, 1920).unwrap();
+        assert_eq!(track(&mgr).regions.len(), 2);
+
+        // duplicate_region must record_song_edit() BEFORE mutating: one undo
+        // step removes exactly the clone, leaving the original intact.
+        mgr.undo();
+        let t = track(&mgr);
+        assert_eq!(t.regions.len(), 1, "undo removed the clone");
+        assert_eq!(t.regions[0].id, region_id, "the surviving region is the original");
+        assert_eq!(t.regions[0].notes.len(), 1, "original notes intact");
+
+        mgr.redo();
+        let t = track(&mgr);
+        assert_eq!(t.regions.len(), 2, "redo restores the clone");
+        assert!(t.regions.iter().any(|r| r.id == dup_id));
 
         cleanup(&path);
     }

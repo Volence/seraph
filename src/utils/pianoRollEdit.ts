@@ -51,6 +51,32 @@ export function notesIntersectingRect(notes: Note[], rect: MarqueeRect): number[
  * [minPitch, maxPitch], so intervals between selected notes stay intact.
  * An empty selection is also `null` (nothing to move).
  */
+/**
+ * Nudge every selected note horizontally by `deltaTicks`. Returns the new
+ * tick per selected index, or `null` when the move is blocked: matching the
+ * transpose convention, the whole move is refused if ANY selected note would
+ * cross tick 0 or its end would pass `regionDurationTicks`, so relative
+ * rhythms between selected notes stay intact. Empty selection => `null`.
+ */
+export function nudgeNotes(
+  notes: Note[],
+  selected: Iterable<number>,
+  deltaTicks: number,
+  regionDurationTicks: number,
+): { index: number; tick: number }[] | null {
+  const indices = Array.from(selected).sort((a, b) => a - b);
+  if (indices.length === 0) return null;
+  const moves: { index: number; tick: number }[] = [];
+  for (const index of indices) {
+    const n = notes[index];
+    if (!n) return null;
+    const tick = n.tick + deltaTicks;
+    if (tick < 0 || tick + n.durationTicks > regionDurationTicks) return null;
+    moves.push({ index, tick });
+  }
+  return moves;
+}
+
 export function transposeNotes(
   notes: Note[],
   selected: Iterable<number>,

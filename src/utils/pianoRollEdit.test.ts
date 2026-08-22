@@ -5,6 +5,7 @@ import {
   PITCH_RANGES,
   notesIntersectingRect,
   transposeNotes,
+  nudgeNotes,
   type MarqueeRect,
 } from "./pianoRollEdit";
 
@@ -102,5 +103,54 @@ describe("transposeNotes", () => {
 
   it("returns null for an empty selection", () => {
     expect(transposeNotes([note(0, 60)], new Set(), 1, fmLo, fmHi)).toBeNull();
+  });
+});
+
+describe("nudgeNotes", () => {
+  const REGION = 1920; // region length in ticks
+
+  it("moves every selected note by the delta, leaving others alone", () => {
+    const notes = [note(0, 60), note(480, 64), note(960, 67)];
+    expect(nudgeNotes(notes, new Set([0, 2]), 120, REGION)).toEqual([
+      { index: 0, tick: 120 },
+      { index: 2, tick: 1080 },
+    ]);
+  });
+
+  it("moves left with a negative delta", () => {
+    const notes = [note(480, 60)];
+    expect(nudgeNotes(notes, new Set([0]), -120, REGION)).toEqual([
+      { index: 0, tick: 360 },
+    ]);
+  });
+
+  it("allows a move that lands exactly on the bounds", () => {
+    // Left edge: tick 120 - 120 = 0 is legal.
+    expect(nudgeNotes([note(120, 60)], new Set([0]), -120, REGION)).toEqual([
+      { index: 0, tick: 0 },
+    ]);
+    // Right edge: note end 1800 + 120 = 1920 == region end is legal.
+    expect(nudgeNotes([note(1700, 60)], new Set([0]), 120, REGION)).toEqual([
+      { index: 0, tick: 1820 },
+    ]);
+  });
+
+  it("blocks the whole move when ANY note would cross tick 0 (rhythms stay intact)", () => {
+    const notes = [note(0, 60), note(480, 64)];
+    expect(nudgeNotes(notes, new Set([0, 1]), -120, REGION)).toBeNull();
+  });
+
+  it("blocks the whole move when ANY note end would pass the region end", () => {
+    // note(1820).end = 1920: +1 tick overflows the region.
+    const notes = [note(0, 60), note(1820, 64)];
+    expect(nudgeNotes(notes, new Set([0, 1]), 1, REGION)).toBeNull();
+  });
+
+  it("returns null for an empty selection", () => {
+    expect(nudgeNotes([note(0, 60)], new Set(), 120, REGION)).toBeNull();
+  });
+
+  it("returns null for a stale index", () => {
+    expect(nudgeNotes([note(0, 60)], new Set([5]), 120, REGION)).toBeNull();
   });
 });

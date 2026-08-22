@@ -93,6 +93,59 @@ describe("TimelineCanvas single-click region select (G6)", () => {
   });
 });
 
+describe("TimelineCanvas drag does not click through", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const region = { id: "region-1", startTick: 0, durationTicks: 5000, notes: [] };
+
+  it("a completed region drag-move must not fire onRegionClick afterwards", () => {
+    // After a real drag (past the 4px slop), the browser still synthesizes a
+    // click on mouseup — which re-selected/re-opened the dragged region
+    // (booked defect). The move must commit and the click must be swallowed.
+    const track = makeTrack({ regions: [region] });
+    const canvas = renderCanvas([track]);
+
+    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 10 });
+    fireEvent.mouseMove(window, { clientX: 200, clientY: 10 });
+    fireEvent.mouseUp(window, { clientX: 200, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 200, clientY: 10 });
+
+    expect(handlers.onRegionMove).toHaveBeenCalled();
+    expect(handlers.onRegionClick).not.toHaveBeenCalled();
+  });
+
+  it("a completed marquee drag must not click-select a region it ends over", () => {
+    const track = makeTrack({ regions: [region] });
+    const canvas = renderCanvas([track]);
+
+    // Start in the empty lane below, marquee up-left onto the region.
+    fireEvent.mouseDown(canvas, { clientX: 300, clientY: 70 });
+    fireEvent.mouseMove(window, { clientX: 100, clientY: 10 });
+    fireEvent.mouseUp(window, { clientX: 100, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 100, clientY: 10 });
+
+    expect(handlers.onRegionClick).not.toHaveBeenCalled();
+  });
+
+  it("the swallow is one-shot: the next plain click still selects", () => {
+    const track = makeTrack({ regions: [region] });
+    const canvas = renderCanvas([track]);
+
+    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 10 });
+    fireEvent.mouseMove(window, { clientX: 200, clientY: 10 });
+    fireEvent.mouseUp(window, { clientX: 200, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 200, clientY: 10 });
+    expect(handlers.onRegionClick).not.toHaveBeenCalled();
+
+    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 10 });
+    fireEvent.mouseUp(window, { clientX: 100, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 100, clientY: 10 });
+    expect(handlers.onRegionClick).toHaveBeenCalledWith(track.id, region.id, false);
+  });
+});
+
 describe("TimelineCanvas double-click", () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -226,6 +226,16 @@ export async function moveRegion(
   unwrap(await commands.moveRegion(srcTrackId, regionId, dstTrackId, startTick));
 }
 
+/** Deep-clone a region on its own track at the given start tick; resolves
+ *  with the new region's id. One undoable edit server-side. */
+export async function duplicateRegion(
+  trackId: string,
+  regionId: string,
+  atStartTick: number,
+): Promise<string> {
+  return unwrap(await commands.duplicateRegion(trackId, regionId, atStartTick));
+}
+
 export async function deleteRegion(trackId: string, regionId: string): Promise<void> {
   unwrap(await commands.deleteRegion(trackId, regionId));
 }

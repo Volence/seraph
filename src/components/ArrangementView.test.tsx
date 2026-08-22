@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ArrangementView } from "./ArrangementView";
 import * as ipc from "../api/ipc";
 import { ticksPerBar } from "../utils/grid";
+import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { resetClipboardForTest } from "../utils/clipboard";
 import type { SongMetadata, Track } from "../types/model";
 
 vi.mock("../api/ipc");
@@ -150,6 +152,113 @@ describe("ArrangementView", () => {
 
       await waitFor(() => expect(ipc.updateRegion).toHaveBeenCalled());
       await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+    });
+  });
+
+  describe("region duplicate + clipboard", () => {
+    const oneBar = ticksPerBar(meta);
+    const notes = [{ tick: 0, pitch: 60, velocity: 100, durationTicks: 240 }];
+    const region = { id: "region-1", startTick: 0, durationTicks: oneBar, notes };
+    const trackWithRegion: Track = { ...fmTrack, regions: [region] };
+    const selected = {
+      trackId: fmTrack.id,
+      trackName: fmTrack.name,
+      regionId: region.id,
+      channelType: "fm" as const,
+      startTick: 0,
+      durationTicks: oneBar,
+    };
+
+    beforeEach(() => {
+      resetClipboardForTest();
+      setPianoRollNoteSelectionActive(false);
+      vi.mocked(ipc.listTracks).mockResolvedValue([trackWithRegion]);
+      vi.mocked(ipc.duplicateRegion).mockResolvedValue("region-dup");
+    });
+
+    it("Ctrl+D duplicates each selected region immediately after itself", async () => {
+      const onSelectRegions = vi.fn();
+      renderView({ selectedRegions: [selected], onSelectRegions });
+      await screen.findByText("Bass Lane");
+
+      fireEvent.keyDown(window, { key: "d", ctrlKey: true });
+
+      await waitFor(() =>
+        expect(ipc.duplicateRegion).toHaveBeenCalledWith(fmTrack.id, region.id, oneBar),
+      );
+      await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+      // The duplicates become the selection.
+      await waitFor(() =>
+        expect(onSelectRegions).toHaveBeenCalledWith([
+          expect.objectContaining({ regionId: "region-dup", startTick: oneBar }),
+        ]),
+      );
+      // One gesture = one undo step.
+      expect(ipc.beginUndoGroup).toHaveBeenCalledTimes(1);
+      expect(ipc.endUndoGroup).toHaveBeenCalledTimes(1);
+    });
+
+    it("Ctrl+D defers to the piano roll while it owns a note selection (G1 mirror)", async () => {
+      renderView({ selectedRegions: [selected] });
+      await screen.findByText("Bass Lane");
+      setPianoRollNoteSelectionActive(true);
+
+      fireEvent.keyDown(window, { key: "d", ctrlKey: true });
+
+      await new Promise((r) => setTimeout(r, 20));
+      expect(ipc.duplicateRegion).not.toHaveBeenCalled();
+    });
+
+    it("Ctrl+C then Ctrl+V pastes at the bar-snapped seek cursor", async () => {
+      const onSelectRegions = vi.fn();
+      // seekTick 2000 with 1440-tick bars snaps down to 1440.
+      renderView({ selectedRegions: [selected], onSelectRegions, seekTick: 2000 });
+      await screen.findByText("Bass Lane");
+
+      fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+
+      const snapped = Math.floor(2000 / oneBar) * oneBar;
+      expect(snapped).toBe(oneBar); // the case must actually exercise snapping
+      await waitFor(() =>
+        expect(ipc.duplicateRegion).toHaveBeenCalledWith(fmTrack.id, region.id, snapped),
+      );
+      await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(onSelectRegions).toHaveBeenCalledWith([
+          expect.objectContaining({ regionId: "region-dup", startTick: snapped }),
+        ]),
+      );
+    });
+
+    it("region copy defers to the piano roll while it owns a note selection", async () => {
+      renderView({ selectedRegions: [selected] });
+      await screen.findByText("Bass Lane");
+      setPianoRollNoteSelectionActive(true);
+      fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      setPianoRollNoteSelectionActive(false);
+      fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+      await new Promise((r) => setTimeout(r, 20));
+      // Nothing was copied, so nothing pastes.
+      expect(ipc.duplicateRegion).not.toHaveBeenCalled();
+      expect(ipc.addRegion).not.toHaveBeenCalled();
+    });
+
+    it("paste replays the copied payload when the source region is gone", async () => {
+      renderView({ selectedRegions: [selected], seekTick: 0 });
+      await screen.findByText("Bass Lane");
+
+      fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      // The source region was deleted after the copy: server-side clone fails.
+      vi.mocked(ipc.duplicateRegion).mockRejectedValue("region not found");
+      fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+
+      await waitFor(() =>
+        expect(ipc.addRegion).toHaveBeenCalledWith(fmTrack.id, 0, oneBar),
+      );
+      await waitFor(() =>
+        expect(ipc.addNote).toHaveBeenCalledWith(fmTrack.id, "region-new", 0, 60, 100, 240),
+      );
     });
   });
 

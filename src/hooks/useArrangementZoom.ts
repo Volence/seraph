@@ -24,6 +24,8 @@ export function useArrangementZoom(meta: GridMeta): ZoomState {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const ticksPerBarRef = useRef(ticksPerBar);
   ticksPerBarRef.current = ticksPerBar;
+  const scrollLeftRef = useRef(scrollLeft);
+  scrollLeftRef.current = scrollLeft;
 
   // Non-passive wheel listener on the scrollable body to block native scroll during Ctrl+zoom
   useEffect(() => {
@@ -57,13 +59,19 @@ export function useArrangementZoom(meta: GridMeta): ZoomState {
   );
 
   // Ruler vertical-drag zoom: clamp like the wheel path, then adjust
-  // scrollLeft so the grabbed tick stays under the pointer.
+  // scrollLeft so the grabbed tick stays under the pointer. The inner set
+  // uses a PLAIN value (via scrollLeftRef, fresh each render) — StrictMode
+  // double-invokes updaters, and a plain value stays idempotent where a
+  // functional update would double-apply the scroll shift.
   const zoomAtBy = useCallback((anchorPx: number, factor: number) => {
     setTicksPerPixel((prevTpp) => {
       const next = Math.max(MIN_TICKS_PER_PIXEL, Math.min(prevTpp * factor, ticksPerBarRef.current));
-      setScrollLeft((prevScroll) =>
-        zoomAroundPixel({ ticksPerPixel: prevTpp, scrollLeft: prevScroll }, anchorPx, next).scrollLeft,
+      const view = zoomAroundPixel(
+        { ticksPerPixel: prevTpp, scrollLeft: scrollLeftRef.current },
+        anchorPx,
+        next,
       );
+      setScrollLeft(view.scrollLeft);
       return next;
     });
   }, []);

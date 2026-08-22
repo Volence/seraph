@@ -424,7 +424,12 @@ export function ArrangementView({
             zoom.setScrollLeft(v);
           }}
           onLoopDrag={onPreviewLoopSet}
-          onZoom={zoom.zoomAtBy}
+          onZoom={(anchorPx, factor) => {
+            // Zoom moves the view too — suspend follow-playhead like any
+            // other manual scroll (G28).
+            lastManualScrollRef.current = performance.now();
+            zoom.zoomAtBy(anchorPx, factor);
+          }}
         />
       </div>
       <div className={styles.body} ref={zoom.bodyRef}>

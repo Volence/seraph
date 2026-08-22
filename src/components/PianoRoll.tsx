@@ -97,9 +97,11 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
     setTicksPerPixel((prev) => {
       const minTpp = ticksPerBeat / 480;
       const clamped = Math.max(minTpp, Math.min(prev * factor, ticksPerBar * 2));
-      setPianoScrollLeft((prevScroll) =>
-        zoomAroundPixel({ ticksPerPixel: prev, scrollLeft: prevScroll }, centerX, clamped).scrollLeft,
-      );
+      // Plain-value inner set: StrictMode double-invokes updaters, and a
+      // plain value stays idempotent where a functional update would
+      // double-apply the scroll shift.
+      const view = zoomAroundPixel({ ticksPerPixel: prev, scrollLeft: pianoScrollLeft }, centerX, clamped);
+      setPianoScrollLeft(view.scrollLeft);
       return clamped;
     });
   }

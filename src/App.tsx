@@ -13,6 +13,7 @@ import { LibraryPanel } from "./components/LibraryPanel";
 import { recordPlayStart, recordStop, noteSeek, consumeStopDoubleTap, resetTransportMemory } from "./utils/transportMemory";
 import { mostRecentLocation, parentDirectory, rememberLocation } from "./utils/recentLocations";
 import { defaultPreviewLoop, type PreviewLoopRange } from "./utils/previewLoop";
+import { resetClipboard } from "./utils/clipboard";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -286,6 +287,9 @@ export default function App() {
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
       setSelectedRegions([]);
+      // A different project: the module clipboard's note instrumentIds and
+      // region track/region ids belong to the project just closed.
+      resetClipboard();
     } catch (e) {
       console.error("Open failed:", e);
     }
@@ -298,6 +302,8 @@ export default function App() {
     setShowNewProject(false);
     setSelectedInstrument(null);
     setSelectedRegions([]);
+    // Same project boundary as handleOpenProject — see resetClipboard's note.
+    resetClipboard();
   }
 
   async function handleExport() {
@@ -327,6 +333,9 @@ export default function App() {
     setProjectMeta(meta);
     setSelectedInstrument(null);
     setSelectedRegions([]);
+    // Import closes the old project and opens the imported one — same
+    // boundary as open/new.
+    resetClipboard();
     setShowImportDialog(false);
     if (warnings.length > 0) {
       setImportWarnings(warnings);

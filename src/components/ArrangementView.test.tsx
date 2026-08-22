@@ -263,6 +263,29 @@ describe("ArrangementView", () => {
         expect(ipc.addNote).toHaveBeenCalledWith(fmTrack.id, "region-new", 0, 60, 100, 240, null),
       );
     });
+
+    it("a paste whose backend calls all reject is reported, not left unhandled", async () => {
+      // Both branches fail — the shape of a clipboard carried over from a
+      // different project: the ids name nothing here, and the replay fallback
+      // is rejected too. Before the .catch this surfaced ONLY as an unhandled
+      // promise rejection (vitest fails the run on those, which is the other
+      // half of this gate).
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      renderView({ selectedRegions: [selected], seekTick: 0 });
+      await screen.findByText("Bass Lane");
+
+      fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      // …Once: vi.clearAllMocks() between tests clears calls but NOT
+      // implementations, so a sticky rejection would leak into later cases.
+      vi.mocked(ipc.duplicateRegion).mockRejectedValueOnce("region not found");
+      vi.mocked(ipc.addRegion).mockRejectedValueOnce("track not found");
+      fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+
+      await waitFor(() =>
+        expect(error).toHaveBeenCalledWith("Region paste failed:", "track not found"),
+      );
+      error.mockRestore();
+    });
   });
 
   it("empty-lane double-click adds a one-bar region, selects it, reloads the sequence", async () => {

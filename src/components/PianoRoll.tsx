@@ -458,7 +458,14 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
               setSelectedNotes(new Set(newIndices));
               // One paste = one commit = one reload (F1).
               await ipc.reloadSequence();
-            })();
+            })().catch((err) => {
+              // add_note validates an explicit voice strictly (kind gate,
+              // overlap rule, unknown instrument id — e.g. a clipboard
+              // carried over from another project), so a paste CAN reject.
+              // Unhandled, that surfaced only as an unhandled rejection.
+              showVoiceHint(`Paste failed: ${err}`);
+              console.error("Paste failed:", err);
+            });
           }
         }
       }

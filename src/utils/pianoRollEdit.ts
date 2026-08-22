@@ -45,6 +45,53 @@ export function notesIntersectingRect(notes: Note[], rect: MarqueeRect): number[
 }
 
 /**
+ * Convert a marquee drag in view coordinates into a musical-space rect.
+ * Points may be given in any order (drags go in all four directions);
+ * x is view px (scrollLeft-relative), y is canvas/content px. Rows are drawn
+ * top-down from maxPitch, so the rect's top edge maps to the high pitch and
+ * every row the rect touches is included.
+ */
+export function marqueeRectFromView(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  scrollLeft: number,
+  ticksPerPixel: number,
+  maxPitch: number,
+  rowHeight: number,
+): MarqueeRect {
+  const x1 = Math.min(ax, bx);
+  const x2 = Math.max(ax, bx);
+  const y1 = Math.min(ay, by);
+  const y2 = Math.max(ay, by);
+  return {
+    tickMin: (x1 + scrollLeft) * ticksPerPixel,
+    tickMax: (x2 + scrollLeft) * ticksPerPixel,
+    pitchMin: maxPitch - Math.floor(y2 / rowHeight),
+    pitchMax: maxPitch - Math.floor(y1 / rowHeight),
+  };
+}
+
+/**
+ * The set of note indices that should render highlighted while a marquee
+ * drag is in flight — a live preview of what mouseup will select. Additive
+ * (Shift) keeps the existing selection highlighted and adds the hits; plain
+ * marquee previews a replacement, so only the hits highlight.
+ */
+export function marqueePreviewSelection(
+  selected: ReadonlySet<number>,
+  hits: readonly number[],
+  additive: boolean,
+): Set<number> {
+  const preview = new Set(hits);
+  if (additive) {
+    for (const i of selected) preview.add(i);
+  }
+  return preview;
+}
+
+/**
  * Transpose every selected note by `delta` semitones. Returns the new pitch
  * per selected index, or `null` when the move is blocked: standard DAW
  * behavior blocks the whole move if ANY selected note would leave

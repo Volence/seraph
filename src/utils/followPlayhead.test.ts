@@ -46,6 +46,50 @@ describe("followScrollLeft", () => {
     expect(followScrollLeft(500, 0, -5)).toBeNull();
   });
 
+  describe("backward playhead jumps (loop wrap / seek-back)", () => {
+    it("snaps the view back when the playhead wraps behind the left edge", () => {
+      // Loop wrap: view is at the loop end (scrollLeft 4000), the playhead
+      // jumps from content px 4900 back to the loop start at 500. The view
+      // must page back so the playhead sits at the reposition anchor.
+      const next = followScrollLeft(500, 4000, viewWidth, 4900);
+      expect(next).toBe(Math.max(0, 500 - viewWidth * FOLLOW_REPOSITION_FRACTION));
+    });
+
+    it("clamps the wrap target at zero for early loop starts", () => {
+      // Loop start near tick 0: reposition anchor would be negative.
+      expect(followScrollLeft(20, 4000, viewWidth, 4900)).toBe(0);
+    });
+
+    it("snaps when the playhead jumps backward but lands right of the view", () => {
+      // User is inspecting early bars (scrollLeft 0) while the loop runs in
+      // bars far to the right: wrap from 9000 to 5000 is still off-screen.
+      const next = followScrollLeft(5000, 0, viewWidth, 9000);
+      expect(next).toBe(5000 - viewWidth * FOLLOW_REPOSITION_FRACTION);
+    });
+
+    it("leaves the view alone when a backward jump stays visible", () => {
+      // Wrap landed inside the current view: nothing to fix.
+      expect(followScrollLeft(4200, 4000, viewWidth, 4900)).toBeNull();
+    });
+
+    it("ignores backward jitter while the playhead is already behind the view", () => {
+      // The user scrolled ahead (playhead behind the left edge). A small
+      // backward correction from interpolation jank must not yank the view:
+      // only a jump from a visible/ahead playhead counts as a wrap.
+      expect(followScrollLeft(3000, 4000, viewWidth, 3050)).toBeNull();
+    });
+
+    it("keeps the scrolled-ahead behavior for forward motion", () => {
+      // Playhead moving forward while behind the view (user scrolled ahead):
+      // still left alone, exactly as without the prev argument.
+      expect(followScrollLeft(110, 4000, viewWidth, 100)).toBeNull();
+    });
+
+    it("ignores degenerate widths on backward jumps too", () => {
+      expect(followScrollLeft(500, 4000, 0, 4900)).toBeNull();
+    });
+  });
+
   it("exposes sane constants", () => {
     expect(FOLLOW_EDGE_FRACTION).toBeGreaterThan(0);
     expect(FOLLOW_EDGE_FRACTION).toBeLessThan(1);

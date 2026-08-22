@@ -70,6 +70,19 @@ async getProjectInfo() : Promise<Result<SongMetadata | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Edit the song-level tempo / time signature after creation. Returns the
+ * updated metadata; marks the project dirty (persisted on next save).
+ * NOT undoable in v1 — metadata sits outside the track undo snapshot.
+ */
+async updateProjectMetadata(tempo: number, timeSigNum: number, timeSigDen: number) : Promise<Result<SongMetadata, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_project_metadata", { tempo, timeSigNum, timeSigDen }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listDrivers() : Promise<Result<DriverInfo[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_drivers") };

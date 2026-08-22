@@ -321,6 +321,7 @@ export default function App() {
     <div className={styles.app}>
       <TopBar
         projectMeta={projectMeta}
+        onProjectMetaChange={setProjectMeta}
         onNewProject={handleNewProject}
         onOpenProject={handleOpenProject}
         onSave={handleSave}

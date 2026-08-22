@@ -213,6 +213,21 @@ pub fn get_project_info(state: State<'_, ProjectState>) -> Result<Option<SongMet
     Ok(mgr.metadata().cloned())
 }
 
+/// Edit the song-level tempo / time signature after creation. Returns the
+/// updated metadata; marks the project dirty (persisted on next save).
+/// NOT undoable in v1 — metadata sits outside the track undo snapshot.
+#[tauri::command]
+#[specta::specta]
+pub fn update_project_metadata(
+    state: State<'_, ProjectState>,
+    tempo: f64,
+    time_sig_num: u8,
+    time_sig_den: u8,
+) -> Result<SongMetadata, String> {
+    let mut mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    mgr.update_project_metadata(tempo, (time_sig_num, time_sig_den))
+}
+
 // --- Driver Info ---
 
 #[derive(serde::Serialize, specta::Type)]

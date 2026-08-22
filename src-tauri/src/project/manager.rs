@@ -373,6 +373,39 @@ impl ProjectManager {
         &self.driver_registry
     }
 
+    /// Update the song-level tempo / time signature. Validate-first (a
+    /// rejected edit changes nothing); persisted by the next `save()` since
+    /// `save()` rewrites project.json from `self.metadata`.
+    ///
+    /// Tempo bounds mirror project creation (NewProjectDialog clamps
+    /// 20-300 BPM): the sequencer itself tolerates any positive tempo
+    /// (`ticks_per_sample = tempo/60 * tpb / sample_rate`), so creation's
+    /// range is the binding contract, and it sits comfortably inside what
+    /// SMPS export's `compute_tempo_params` search can represent.
+    pub fn update_project_metadata(
+        &mut self,
+        tempo: f64,
+        time_signature: (u8, u8),
+    ) -> Result<SongMetadata, String> {
+        if !tempo.is_finite() || !(20.0..=300.0).contains(&tempo) {
+            return Err(format!("tempo must be between 20 and 300 BPM (got {tempo})"));
+        }
+        let (num, den) = time_signature;
+        if !(1..=16).contains(&num) {
+            return Err(format!("time signature numerator must be 1-16 (got {num})"));
+        }
+        if !matches!(den, 2 | 4 | 8 | 16) {
+            return Err(format!("time signature denominator must be 2, 4, 8 or 16 (got {den})"));
+        }
+        let meta = self.metadata.as_mut().ok_or("no project open")?;
+        // NOTE: metadata sits outside the undo snapshot (tracks only) — this
+        // edit marks dirty but is NOT undoable in v1.
+        meta.tempo = tempo;
+        meta.time_signature = time_signature;
+        self.dirty = true;
+        Ok(self.metadata.as_ref().unwrap().clone())
+    }
+
     pub fn song(&self) -> Option<Song> {
         self.metadata.as_ref().map(|meta| Song {
             metadata: meta.clone(),
@@ -1349,6 +1382,65 @@ mod tests {
         assert!(mgr.list_tracks().iter().all(|t| t.instrument_id.is_none()));
 
         cleanup(&path);
+    }
+
+    #[test]
+    fn test_update_project_metadata_validates_marks_dirty_and_persists() {
+        let path = temp_project_path("update_meta");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Meta", "flamedriver", 120.0, (4, 4)).unwrap();
+        assert!(!mgr.is_dirty(), "fresh project starts clean");
+
+        // Valid update: applied, returned, dirty.
+        let meta = mgr.update_project_metadata(150.0, (3, 8)).unwrap();
+        assert_eq!(meta.tempo, 150.0);
+        assert_eq!(meta.time_signature, (3, 8));
+        assert_eq!(mgr.metadata().unwrap().tempo, 150.0);
+        assert!(mgr.is_dirty(), "metadata edit marks the project dirty");
+
+        // Persisted through save → project.json → reopen.
+        mgr.save().unwrap();
+        let mut mgr2 = ProjectManager::new(test_registry());
+        let song = mgr2.open(&path).unwrap();
+        assert_eq!(song.metadata.tempo, 150.0);
+        assert_eq!(song.metadata.time_signature, (3, 8));
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_update_project_metadata_rejects_invalid_values() {
+        let path = temp_project_path("update_meta_invalid");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Meta", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        // Tempo bounds mirror project creation (NewProjectDialog: 20-300).
+        assert!(mgr.update_project_metadata(19.9, (4, 4)).is_err());
+        assert!(mgr.update_project_metadata(300.1, (4, 4)).is_err());
+        assert!(mgr.update_project_metadata(f64::NAN, (4, 4)).is_err());
+        // Numerator 1-16.
+        assert!(mgr.update_project_metadata(120.0, (0, 4)).is_err());
+        assert!(mgr.update_project_metadata(120.0, (17, 4)).is_err());
+        // Denominator 2/4/8/16 only.
+        assert!(mgr.update_project_metadata(120.0, (4, 3)).is_err());
+        assert!(mgr.update_project_metadata(120.0, (4, 32)).is_err());
+
+        // Validate-first: a rejected edit changes nothing and stays clean.
+        assert_eq!(mgr.metadata().unwrap().tempo, 120.0);
+        assert_eq!(mgr.metadata().unwrap().time_signature, (4, 4));
+        assert!(!mgr.is_dirty(), "rejected edit must not mark dirty");
+
+        // Boundary values are accepted.
+        assert!(mgr.update_project_metadata(20.0, (1, 2)).is_ok());
+        assert!(mgr.update_project_metadata(300.0, (16, 16)).is_ok());
+
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_update_project_metadata_requires_open_project() {
+        let mut mgr = ProjectManager::new(test_registry());
+        assert!(mgr.update_project_metadata(120.0, (4, 4)).is_err());
     }
 
     #[test]

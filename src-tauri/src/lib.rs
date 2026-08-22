@@ -21,6 +21,7 @@ use ipc::{
     play_fm_test_tone, play_psg_test_tone, stop_all_sound,
     // Project management
     create_project, open_project, save_project, close_project, get_project_info,
+    update_project_metadata,
     // Driver info
     list_drivers, get_driver_info,
     // FM instruments
@@ -81,6 +82,7 @@ fn build_specta() -> Builder<tauri::Wry> {
         save_project,
         close_project,
         get_project_info,
+        update_project_metadata,
         list_drivers,
         get_driver_info,
         add_fm_instrument,

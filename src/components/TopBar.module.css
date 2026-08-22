@@ -40,6 +40,40 @@
   white-space: nowrap;
 }
 
+.editable {
+  cursor: pointer;
+}
+
+.editable:hover {
+  color: var(--text-primary);
+  text-decoration: underline dotted;
+}
+
+.metaEdit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metaInput {
+  width: 48px;
+  font-size: 12px;
+  padding: 2px 4px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.metaSelect {
+  font-size: 12px;
+  padding: 2px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
 .driverBadge {
   font-size: 11px;
   padding: 2px 6px;

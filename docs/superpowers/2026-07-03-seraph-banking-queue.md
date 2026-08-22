@@ -460,6 +460,38 @@ designs target the banked specs (normative); manifest flags carry the gates.
   ordered. SECOND DEFECT in scope: the piano-roll header read "Bars 1-3"
   for a 4-bar region — verify the header's range math independently.
 
+- 2026-08-22: **ITEM 5 SHIPPED — set voice on selected notes (S4 Shape A)**
+  (merged; lanes on merged tree: cargo 241/0, vitest 270/270 across 26
+  files, build clean, bindings regenerated+committed, no drift). New
+  `set_note_instrument` IPC (validate-first: track/region/indices, kind
+  gate mirroring assign_library_instrument_to_track, THEN voice-overlap
+  gate, THEN record_song_edit; one undo step per batch; None clears to
+  region/track default). **Correct-by-construction overlap gate:**
+  `for_each_conflicting_span` refactored out of build_snapshot's sweep —
+  ONE authority now serving both the post-hoc OverlapWarning diagnostic and
+  the edit-time rejection; groups by the same `channel_key`. `add_note`
+  gained optional instrument_id; clipboard paste + region payload-replay
+  preserve per-note voices (kind-gated). UI: drag a library voice onto the
+  piano-roll note canvas with notes selected sets their voice (kind-gated,
+  no-selection = hint only, never silent whole-track retarget); notes whose
+  voice differs from the track default draw in a deterministic per-voice
+  color (`src/utils/voiceColor.ts`, derived from instrument id) with a
+  patch chip; TrackHeader drop now CONFIRMS before wiping mid-song voice
+  changes (`countVoiceOverrides`) — closes the silent data-loss path.
+  RATIFIED (7 agent calls): conflict = both effective voices Some and
+  unequal (None = silent, no conflict); gate fires only on pairs involving
+  an EDITED note (imported projects with pre-existing conflicts stay
+  editable); gate ignores mute/solo; extra `library_ensure_project_instrument`
+  IPC (drag payload carries a library hash, set_note_instrument takes a
+  project instrument id); add_note validates an explicit voice strictly;
+  errors surface as an auto-clearing inline notice in the piano-roll header
+  (no toast system exists — first error surface, flagged as the seam);
+  backend clear-on-assign kept (confirm is frontend-side). TAG for owner
+  gate: drag-drop ergonomics + audible per-note voice switching.
+  **WAVE 3/3B COMPLETE except the ruler-scale + header-range bugs
+  (`fix/pianoroll-ruler-scale`, in flight).** Next audit pick per owner:
+  F3/#4 live knob-tweak audibility (shares the F1 reload seam).
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

@@ -181,6 +181,33 @@ designs target the banked specs (normative); manifest flags carry the gates.
   — both Wave 1 agents were killed mid-flight by a session usage limit and
   resumed in their worktrees; parcel B completed post-resume.
 
+- 2026-08-21 (cont.): **WAVE 1 PARCEL A SHIPPED — UX safety/transport/playhead**
+  (merged `fc4ffc2` + cross-feature test-mock fix `9b07410`; lanes on merged
+  tree: cargo 226/0, vitest 91/91 across 15 files, build clean, no bindings
+  drift). Fixed: G1 Delete scoping (piano-roll note selection defers region
+  delete via src/utils/noteSelection.ts; Backspace now also deletes notes —
+  ratified); G2 input guards on all window-level key handlers (Ctrl+S
+  deliberately above the guard — ratified); G5 velocity-lane alignment
+  (key-column width lifted + VelocityLane offset, tracks DAC resize); G30
+  reloadSequence on region move/resize/delete (commits are mouseup-only, no
+  debounce needed); G28/G22 follow-playhead scroll (80%→10% paging,
+  2s manual-scroll suspend, arrangement + piano roll); G29 seek-cursor sync
+  on stop (seekTick lifted to App, generation counter vs stale syncs; Home
+  button same-class fix); G37 stop semantics per owner ruling
+  (STOP_DOUBLE_TAP_MS=400, window consumed on use, new play clears pending —
+  both ratified). G6 DOES NOT REPRODUCE (React 18 microtask flush; regression
+  tests kept) — but the probe found a real adjacent defect, BOOKED DEFERRED:
+  after a region drag-move, the browser click reaches onRegionClick and
+  re-selects/opens the region (needs a did-drag ref). Landing note: parcel A
+  merged after undo/redo — conflict resolution unioned both features in
+  App.tsx/ArrangementView/PianoRoll/keyboard.ts; the add/add App.test.tsx was
+  split (undo suite keeps App.test.tsx, safety suite → App.safety.test.tsx);
+  merged App needed cross-feature IPC mocks in all three App suites
+  (`9b07410`). OWNER GATE OPEN (visual/audible, cumulative): velocity bars
+  under notes (melodic + DAC resize), live follow-scroll both views, undo
+  coalescing feel (one Ctrl+Z per drag), dirty dot + close confirm, stop
+  double-tap, marquee + transpose, seeded roster + measure creation.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

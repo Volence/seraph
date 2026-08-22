@@ -407,6 +407,7 @@ export default function App() {
           playing={playing}
           projectMeta={projectMeta!}
           seekTick={seekTick}
+          onSeek={handleSeek}
           onSavedToLibrary={() => setLibraryRefresh((n) => n + 1)}
         />
       )}

@@ -55,7 +55,7 @@ function setupTracks(notes: Note[]): { region: SelectedRegion } {
 async function renderRoll(notes: Note[], seekTick = 0) {
   const { region } = setupTracks(notes);
   const utils = render(
-    <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={seekTick} />,
+    <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={seekTick} onSeek={vi.fn()} />,
   );
   // Flush the initial refresh() so the notes state (and the keydown
   // handler's re-registration against it) has definitely landed before
@@ -118,7 +118,7 @@ describe("velocity lane alignment (G5)", () => {
       };
     })();
     const { container } = render(
-      <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={0} />,
+      <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={0} onSeek={vi.fn()} />,
     );
     await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
     await act(async () => {});
@@ -127,7 +127,8 @@ describe("velocity lane alignment (G5)", () => {
     expect(velocityLaneContainer(container).style.marginLeft).toBe(`${DAC_KEYS_WIDTH}px`);
 
     // Drag the key-column resize handle 50px right; the lane offset follows.
-    const keysContainer = container.querySelectorAll("canvas")[0].parentElement as HTMLElement;
+    // Canvas order: [0] bar ruler, [1] key column, [2] note grid.
+    const keysContainer = container.querySelectorAll("canvas")[1].parentElement as HTMLElement;
     const handle = keysContainer.querySelector("div") as HTMLElement;
     expect(handle).not.toBeNull();
     fireEvent.mouseDown(handle, { clientX: 100 });
@@ -382,7 +383,7 @@ describe("PianoRoll refresh on undo/redo", () => {
   it("closes when the open region no longer exists after a revert", async () => {
     const { region } = setupTracks([note(0, 60)]);
     const onClose = vi.fn();
-    render(<PianoRoll region={region} onClose={onClose} playing={false} projectMeta={meta} seekTick={0} />);
+    render(<PianoRoll region={region} onClose={onClose} playing={false} projectMeta={meta} seekTick={0} onSeek={vi.fn()} />);
     await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
     await act(async () => {});
     // The revert removed the region (e.g. undo of add_region).

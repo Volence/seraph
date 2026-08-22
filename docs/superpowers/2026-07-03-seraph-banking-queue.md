@@ -226,6 +226,35 @@ designs target the banked specs (normative); manifest flags carry the gates.
   becomes moot when S4's NoteInspector extends update_note). Parcel D
   (loop/snap/tempo/track-ops, branch feat/loop-snap-tempo) still in flight.
 
+- 2026-08-21 (cont.): **WAVE 2 PARCEL D SHIPPED — loop/snap/tempo/track-ops**
+  (merged `f195e32`; lanes on merged tree: cargo 231/0, vitest 153/153 across
+  19 files, build clean, no bindings drift). Preview loop: drag the ruler's
+  upper half sets a bar-snapped loop range drawn as a bracket (lower half
+  keeps scroll/seek; zero-move click = one-bar loop at that bar); `l`/loop
+  button re-arm the LAST range (both hardcoded bars-1–4 sites gone; App is
+  the single loop owner). Arrangement snap selector Bar/Beat/Off via
+  grid.snapUnit (loop drag + region create/move/resize honor it; create
+  duration default stays one bar). New `update_project_metadata` IPC
+  (tempo 20–300, num 1–16, den 2/4/8/16); TopBar inline tempo/time-sig edit;
+  FLAGGED: metadata is outside the undo snapshot — dirty but NOT undoable in
+  v1 (commented at the mutation site). Track rename (double-click name) +
+  delete (hover ✕ + confirm) in TrackHeader; no reorder (S4 ChannelRack owns
+  ordering). All six design choices ratified (ruler split, snap-coupled loop
+  min, degenerate-click loop, one-bar create default, 20–300 BPM bounds,
+  loop ownership moved to App). **WAVE 2 COMPLETE. UX-basics arc: 6 parcels
+  landed today** (compose path, marquee/transpose, undo/dirty,
+  safety/transport/playhead, clipboard/nudge/duplicate, loop/snap/tempo).
+  Remaining audit backlog (Wave 3 candidates, owner to prioritize): G17
+  multi-note velocity paint, G16 vertical zoom, G19 stable note IDs, G21
+  region auto-extend on note drag, G36 QWERTY step entry (owner call open),
+  G35 metronome, G7 instrument rename/delete UI (dead Sidebar), G31/32 zoom
+  polish + wheel-axis fix, G39/40 keymap panel + Ctrl+N/O, G41
+  get_playback_state honesty, song-end/loop-point modeling (design Q,
+  touches export + SMPS loop points). CUMULATIVE OWNER GATE still open
+  (visual/audible pass across all six parcels — checklist in the parcel A
+  entry plus: loop bracket + audible loop cycling, snap modes, tempo edit,
+  rename/delete, clipboard paste anchor, nudge feel).
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

@@ -424,6 +424,7 @@ export function ArrangementView({
             zoom.setScrollLeft(v);
           }}
           onLoopDrag={onPreviewLoopSet}
+          onZoom={zoom.zoomAtBy}
         />
       </div>
       <div className={styles.body} ref={zoom.bodyRef}>

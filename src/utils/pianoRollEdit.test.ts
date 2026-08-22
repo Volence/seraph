@@ -8,6 +8,8 @@ import {
   marqueePreviewSelection,
   transposeNotes,
   nudgeNotes,
+  MIN_REGION_VIEW_PX,
+  maxPianoRollTicksPerPixel,
   type MarqueeRect,
 } from "./pianoRollEdit";
 
@@ -208,5 +210,27 @@ describe("marqueePreviewSelection", () => {
 
   it("leaves the selection alone for an additive drag over nothing", () => {
     expect(marqueePreviewSelection(new Set([0, 3]), [], true)).toEqual(new Set([0, 3]));
+  });
+});
+
+describe("maxPianoRollTicksPerPixel", () => {
+  // Derived bar length (the helper is meta-agnostic; callers pass ticksPerBar(meta)).
+  const BAR = 480 * 4;
+
+  it("caps zoom-out so the region always spans the minimum view width", () => {
+    // 4-bar region: at the cap, durationTicks / maxTpp == MIN_REGION_VIEW_PX.
+    const maxTpp = maxPianoRollTicksPerPixel(4 * BAR, BAR);
+    expect((4 * BAR) / maxTpp).toBe(MIN_REGION_VIEW_PX);
+  });
+
+  it("long regions may zoom out proportionally further", () => {
+    expect(maxPianoRollTicksPerPixel(512 * BAR, BAR)).toBe(
+      128 * maxPianoRollTicksPerPixel(4 * BAR, BAR),
+    );
+  });
+
+  it("sub-bar regions fall back to one bar spanning the minimum width", () => {
+    const maxTpp = maxPianoRollTicksPerPixel(BAR / 4, BAR);
+    expect(BAR / maxTpp).toBe(MIN_REGION_VIEW_PX);
   });
 });

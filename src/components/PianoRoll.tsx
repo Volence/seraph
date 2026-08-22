@@ -9,7 +9,7 @@ import { VelocityLane } from "./VelocityLane";
 import * as ipc from "../api/ipc";
 import * as grid from "../utils/grid";
 import { SONG_REVERTED_EVENT } from "../utils/keyboard";
-import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes } from "../utils/pianoRollEdit";
+import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, transposeNotes, nudgeNotes, maxPianoRollTicksPerPixel } from "../utils/pianoRollEdit";
 import { copyNotes, getNoteClipboard, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
@@ -97,13 +97,32 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   const [pianoScrollLeft, setPianoScrollLeft] = useState(0);
   const channelColor = CHANNEL_COLORS[region.channelType] || "#888";
 
+  // The PianoRoll instance persists across region switches (BottomPanel
+  // renders it in place), so zoom/scroll state would otherwise go stale:
+  // opening a small region after a zoomed-out large one left ticksPerPixel
+  // near a bar per pixel — the ruler drew hundreds of one-pixel bars while
+  // the note grid silently hid the broken scale. A different region is a
+  // different document: refit the view to it.
+  useEffect(() => {
+    setTicksPerPixel(defaultTpp);
+    setPianoScrollLeft(0);
+    // defaultTpp is derived from the region each render; refit only on
+    // region identity change, never on incidental prop churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [region.regionId]);
+
   // Shared zoom seam: clamp, then keep the tick under `centerX` fixed.
   // Used by wheel zoom (fixed steps) and the ruler's vertical drag
   // (continuous factors).
   function applyZoomFactor(centerX: number, factor: number) {
     setTicksPerPixel((prev) => {
       const minTpp = ticksPerBeat / 480;
-      const clamped = Math.max(minTpp, Math.min(prev * factor, ticksPerBar * 2));
+      // Zoom-out floor is REGION-derived (region always spans at least
+      // MIN_REGION_VIEW_PX): the old flat `ticksPerBar * 2` allowed 0.5px
+      // bars, which is how the ruler once drew ~1281 one-pixel bars over a
+      // 4-bar region while the grid silently hid the broken scale.
+      const maxTpp = maxPianoRollTicksPerPixel(region.durationTicks, ticksPerBar);
+      const clamped = Math.max(minTpp, Math.min(prev * factor, maxTpp));
       // Plain-value inner set: StrictMode double-invokes updaters, and a
       // plain value stays idempotent where a functional update would
       // double-apply the scroll shift.

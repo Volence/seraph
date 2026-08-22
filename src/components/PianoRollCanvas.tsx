@@ -10,6 +10,13 @@ import { voiceColor } from "../utils/voiceColor";
 import styles from "./PianoRollCanvas.module.css";
 
 interface PianoRollCanvasProps {
+  /** Identity of the region being edited. A region switch does NOT remount
+   *  this component, and a switch needs no pointer event (ArrangementView's
+   *  Ctrl+D / Ctrl+V change the open region from a window keydown), so a
+   *  drag can outlive the document it began on with the button still down.
+   *  Each mutating gesture is tagged with this value at mousedown and
+   *  refuses to commit once it no longer matches. */
+  regionId: string;
   notes: Note[];
   minPitch: number;
   maxPitch: number;
@@ -55,6 +62,7 @@ function isBlackKey(pitch: number): boolean {
 }
 
 export function PianoRollCanvas({
+  regionId,
   notes,
   minPitch,
   maxPitch,
@@ -84,8 +92,19 @@ export function PianoRollCanvas({
 }: PianoRollCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<{ noteIndex: number; startX: number; origDuration: number } | null>(null);
+  // Read at EVENT time, so a live gesture always compares against the region
+  // that is open right now rather than the one its effect closed over.
+  const regionIdRef = useRef(regionId);
+  regionIdRef.current = regionId;
+  /** True while the gesture tagged `began` still belongs to the open region.
+   *  A mutating gesture that outlived its region must commit nothing: its
+   *  note indices and view coordinates describe a different document. */
+  function stillSameRegion(began: string): boolean {
+    return began === regionIdRef.current;
+  }
+  const [drag, setDrag] = useState<{ regionId: string; noteIndex: number; startX: number; origDuration: number } | null>(null);
   const [moveDrag, setMoveDrag] = useState<{
+    regionId: string;
     startX: number;
     startY: number;
     anchorTick: number;
@@ -93,7 +112,7 @@ export function PianoRollCanvas({
     // selection when the pressed note was already selected).
     targets: { index: number; tick: number; pitch: number }[];
   } | null>(null);
-  const drawingRef = useRef<{ startTick: number; pitch: number; endTick: number } | null>(null);
+  const drawingRef = useRef<{ regionId: string; startTick: number; pitch: number; endTick: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const panRef = useRef<{ startX: number; startY: number; startScrollLeft: number; startScrollTop: number } | null>(null);
@@ -317,7 +336,7 @@ export function PianoRollCanvas({
     if (hit && hit.nearEdge) {
       e.preventDefault();
       onGestureStart?.();
-      setDrag({ noteIndex: hit.index, startX: e.clientX, origDuration: notes[hit.index].durationTicks });
+      setDrag({ regionId, noteIndex: hit.index, startX: e.clientX, origDuration: notes[hit.index].durationTicks });
       return;
     }
 
@@ -339,6 +358,7 @@ export function PianoRollCanvas({
           ? [...selectedNotes, hit.index]
           : [hit.index];
       setMoveDrag({
+        regionId,
         startX: e.clientX,
         startY: e.clientY,
         anchorTick: notes[hit.index].tick,
@@ -386,7 +406,7 @@ export function PianoRollCanvas({
     const snapped = Math.floor(clickTick / gridSnapTicks) * gridSnapTicks;
     if (clickPitch >= minPitch && clickPitch <= maxPitch) {
       e.preventDefault();
-      drawingRef.current = { startTick: snapped, pitch: clickPitch, endTick: snapped + gridSnapTicks };
+      drawingRef.current = { regionId, startTick: snapped, pitch: clickPitch, endTick: snapped + gridSnapTicks };
       setIsDrawing(true);
       onAudition(clickPitch);
     }
@@ -481,6 +501,13 @@ export function PianoRollCanvas({
     function handleMouseMove(e: MouseEvent) {
       const canvas = canvasRef.current;
       if (!canvas || !drawingRef.current) return;
+      if (!stillSameRegion(drawingRef.current.regionId)) {
+        // Drop the in-progress note rather than keep previewing one that
+        // will never commit — the preview is the only feedback the user has.
+        drawingRef.current = null;
+        draw();
+        return;
+      }
       canvas.style.cursor = "crosshair";
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -495,7 +522,10 @@ export function PianoRollCanvas({
 
     function handleMouseUp() {
       const dr = drawingRef.current;
-      if (dr) {
+      // Nothing masks this one — the draw gesture never reads `notes`, so an
+      // uncommitted note would land in whatever region replaced the one it
+      // was aimed at, at coordinates picked in that region's view.
+      if (dr && stillSameRegion(dr.regionId)) {
         const duration = Math.max(gridSnapTicks, dr.endTick - dr.startTick);
         onNoteAdd(dr.startTick, dr.pitch, duration);
       }
@@ -519,6 +549,11 @@ export function PianoRollCanvas({
 
     function handleMouseMove(e: MouseEvent) {
       if (!drag) return;
+      // The region switched under a live resize: `noteIndex` now points at a
+      // different document's note, and origDuration came from the old one.
+      // Refuse the write but keep the gesture alive so mouseup still closes
+      // the undo group it opened.
+      if (!stillSameRegion(drag.regionId)) return;
       const canvas = canvasRef.current;
       if (canvas) canvas.style.cursor = "ew-resize";
       const deltaX = e.clientX - drag.startX;
@@ -552,6 +587,12 @@ export function PianoRollCanvas({
 
     function handleMouseMove(e: MouseEvent) {
       if (!moveDrag || moveDrag.targets.length === 0) return;
+      // Same refusal as the resize path: `targets` holds indices and
+      // positions captured in the region this drag began on. PianoRoll's
+      // `loaded` tag masks this only until the new region's notes arrive —
+      // after that, an in-range index writes the old region's tick/pitch
+      // onto a note of the new one, once per mousemove.
+      if (!stillSameRegion(moveDrag.regionId)) return;
       const canvas = canvasRef.current;
       if (canvas) canvas.style.cursor = "grabbing";
       const deltaX = e.clientX - moveDrag.startX;

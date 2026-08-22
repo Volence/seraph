@@ -652,6 +652,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           onDrop={handleVoiceDrop}
         >
         <PianoRollCanvas
+          regionId={region.regionId}
           notes={notes}
           minPitch={minPitch}
           maxPitch={maxPitch}

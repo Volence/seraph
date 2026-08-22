@@ -27,6 +27,11 @@ const GRID = 100; // gridSnapTicks
 // note 2: ticks 1000..1100 (px 100..110), pitch 100
 const NOTES = [note(100, 100, 200), note(500, 90, 100), note(1000, 100, 100)];
 
+// Identity of the edited region. Gestures are tagged with it at mousedown
+// and refuse to commit once it changes under them (region switches do not
+// remount this component); these tests never switch, so one value serves.
+const REGION_ID = "region-1";
+
 const rowY = (pitch: number) => (FM_MAX - pitch) * ROW_H + ROW_H / 2;
 
 const handlers = {
@@ -45,6 +50,7 @@ const handlers = {
 function renderCanvas(selected: Set<number> = new Set()) {
   const { container } = render(
     <PianoRollCanvas
+      regionId={REGION_ID}
       notes={NOTES}
       minPitch={FM_MIN}
       maxPitch={FM_MAX}
@@ -184,6 +190,7 @@ describe("PianoRollCanvas follow-playhead suppression", () => {
   function renderPlaying(playheadTick: number, suppressFollow: boolean) {
     render(
       <PianoRollCanvas
+        regionId={REGION_ID}
         notes={NOTES}
         minPitch={FM_MIN}
         maxPitch={FM_MAX}

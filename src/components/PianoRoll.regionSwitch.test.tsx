@@ -5,6 +5,7 @@ import { PianoRoll } from "./PianoRoll";
 import * as ipc from "../api/ipc";
 import { resetClipboardForTest } from "../utils/clipboard";
 import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
+import { PITCH_RANGES } from "../utils/pianoRollEdit";
 import type { Note, SelectedRegion, SongMetadata, Track } from "../types/model";
 
 vi.mock("../api/ipc");
@@ -30,6 +31,12 @@ vi.mock("@tauri-apps/api/event", () => ({
  *  - replies can land OUT OF ORDER: a reply for the region the user just
  *    left must not overwrite the open region's notes, and must not fire the
  *    close-on-missing path (which would close the region just opened).
+ *
+ *  - a MOUSE GESTURE in flight when the switch lands keeps writing, through
+ *    indices captured in the region it began on. A region switch needs no
+ *    pointer event at all: ArrangementView's window keydown handler calls
+ *    onSelectRegions from Ctrl+D and Ctrl+V, so nothing tears the gesture
+ *    down (see the describe block for the per-path reachability derivation).
  *
  * The pins at the bottom fix the other side of the ledger: state that is
  * SUPPOSED to survive a switch (the module clipboard, the grid selector).
@@ -261,6 +268,160 @@ describe("region switch does not edit through the previous region's notes", () =
     await flush();
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("a mouse gesture in flight when the region switches", () => {
+  /**
+   * REACHABILITY, derived from source (not from "a switch needs a click").
+   * Every caller that changes which region is open:
+   *   pointer-driven — ArrangementView.handleRegionDoubleClick,
+   *     handleRegionCreate, TimelineCanvas region click/shift-click and its
+   *     own marquee, App's onSelectInstrument (clears -> unmount);
+   *   KEYBOARD-driven, no pointer event at all —
+   *     ArrangementView Ctrl+D duplicate ("the duplicates become the
+   *       selection"), gated by `if (pianoRollNoteSelectionActive()) return`;
+   *     ArrangementView Ctrl+V region paste ("the pasted regions become the
+   *       selection"), gated ONLY by `lastCopiedKind() === "regions"`;
+   *     ArrangementView Delete -> onSelectRegions([]) -> unmount (safe: the
+   *       gesture's window listeners are torn down with the component).
+   * The pointer paths are safe for a different reason than I first claimed:
+   * their own mousedown->mouseup fires the gesture's window-level mouseup
+   * first. The KEYBOARD paths have no such event, so the gesture stays live
+   * across the switch with the button still down.
+   *
+   * Which gesture is reachable under which key:
+   *  - note MOVE drag: mousedown selects the note, so G1 is true and Ctrl+D
+   *    is blocked — but Ctrl+V carries no G1 gate, so it IS reachable.
+   *  - RESIZE drag (near-edge mousedown) does NOT select: with an empty
+   *    selection G1 is false, so BOTH Ctrl+D and Ctrl+V reach it.
+   *  - DRAW (double-click) does not touch the selection: same as resize.
+   *  - MARQUEE commits its selection only on mouseup, so with an empty
+   *    starting selection G1 is false: both keys reach it.
+   * The switch mechanism is irrelevant to what happens next, so these tests
+   * drive it the way App does — a new `region` prop on the same instance.
+   */
+
+  // Derived from the component, not pinned: melodic rowHeight, the FM pitch
+  // ceiling that fixes row 0, the default zoom, and the default grid snap
+  // (GRID_OPTIONS[4] = 1/16 of a bar).
+  const ROW_H = 14;
+  const MAX_PITCH = PITCH_RANGES.fm[1];
+  const BAR = meta.ticksPerBeat * meta.timeSignature[0];
+  const TPP = Math.min(REGION_DURATION / 800, (BAR * 8) / 800);
+  const SNAP = BAR / 16;
+  const rowY = (pitch: number) => (MAX_PITCH - pitch) * ROW_H + ROW_H / 2;
+  /** DOM order: [0] bar ruler, [1] key column, [2] note grid, [3] velocity. */
+  const noteCanvas = (c: HTMLElement) => c.querySelectorAll("canvas")[2];
+
+  // Region A's first note spans ticks 0..240 => 0..25px at TPP. A press at
+  // x=5 is inside it and >6px from the right edge, so it starts a MOVE;
+  // x=22 is within EDGE_THRESHOLD of the edge, so it starts a RESIZE.
+  const NOTE_A0_W = NOTES_A[0].durationTicks / TPP;
+  const MOVE_X = 5;
+  const RESIZE_X = Math.round(NOTE_A0_W) - 3;
+
+  async function openRegion1() {
+    vi.mocked(ipc.listTracks).mockResolvedValue(BOTH_REGIONS);
+    const utils = render(roll("region-1"));
+    await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
+    await flush();
+    return utils;
+  }
+
+  it("a note-move drag stops writing when the region switches under it", async () => {
+    const { container, rerender } = await openRegion1();
+    const canvas = noteCanvas(container);
+
+    fireEvent.mouseDown(canvas, { clientX: MOVE_X, clientY: rowY(NOTES_A[0].pitch), button: 0 });
+    fireEvent.mouseMove(window, { clientX: MOVE_X + 50, clientY: rowY(NOTES_A[0].pitch) });
+    // Baseline: the drag DOES write while its own region is open, so the
+    // guard below is scoped to the switch and not a blanket disable.
+    const movedTick = Math.round((50 * TPP) / SNAP) * SNAP;
+    await waitFor(() =>
+      expect(ipc.updateNote).toHaveBeenCalledWith(
+        "track-1", "region-1", 0, movedTick, NOTES_A[0].pitch, NOTES_A[0].velocity, NOTES_A[0].durationTicks,
+      ),
+    );
+
+    vi.mocked(ipc.updateNote).mockClear();
+    rerender(roll("region-2"));
+    await flush(); // region-2's notes land: the index is now IN RANGE for B
+
+    // Still dragging, button down. Without the guard this writes region A's
+    // note 0 position onto region B's note 0 — index 0, tick from A's drag,
+    // pitch 60 — over a note that lives at tick 1920, pitch 72.
+    fireEvent.mouseMove(window, { clientX: MOVE_X + 100, clientY: rowY(NOTES_A[0].pitch) });
+    await flush();
+    expect(ipc.updateNote).not.toHaveBeenCalled();
+
+    fireEvent.mouseUp(window);
+  });
+
+  it("a note-resize drag stops writing when the region switches under it", async () => {
+    const { container, rerender } = await openRegion1();
+    const canvas = noteCanvas(container);
+
+    fireEvent.mouseDown(canvas, { clientX: RESIZE_X, clientY: rowY(NOTES_A[0].pitch), button: 0 });
+    fireEvent.mouseMove(window, { clientX: RESIZE_X + 50, clientY: rowY(NOTES_A[0].pitch) });
+    const grownDuration =
+      Math.round((NOTES_A[0].durationTicks + 50 * TPP) / SNAP) * SNAP;
+    await waitFor(() =>
+      expect(ipc.updateNote).toHaveBeenCalledWith(
+        "track-1", "region-1", 0, NOTES_A[0].tick, NOTES_A[0].pitch, NOTES_A[0].velocity, grownDuration,
+      ),
+    );
+
+    vi.mocked(ipc.updateNote).mockClear();
+    rerender(roll("region-2"));
+    await flush();
+
+    // Without the guard: region B's note 0 is resized to a duration derived
+    // from region A's note.
+    fireEvent.mouseMove(window, { clientX: RESIZE_X + 100, clientY: rowY(NOTES_A[0].pitch) });
+    await flush();
+    expect(ipc.updateNote).not.toHaveBeenCalled();
+
+    fireEvent.mouseUp(window);
+  });
+
+  it("a note being drawn is not committed into the region that replaced it", async () => {
+    const { container, rerender } = await openRegion1();
+    const canvas = noteCanvas(container);
+
+    // Empty row (region A has 60/64/67, region B has 72/74/76/77).
+    const DRAW_PITCH = 62;
+    fireEvent.doubleClick(canvas, { clientX: MOVE_X, clientY: rowY(DRAW_PITCH) });
+
+    rerender(roll("region-2"));
+    await flush();
+
+    // This gesture never reads `notes`, so nothing masks it: the mouseup
+    // would add a note to region B at coordinates picked in region A's view.
+    fireEvent.mouseUp(window);
+    await flush();
+    expect(ipc.addNote).not.toHaveBeenCalled();
+  });
+
+  it("still commits a marquee begun before the switch — it selects what it visibly covers", async () => {
+    // Deliberately NOT guarded, unlike the three above: a marquee writes
+    // nothing, and draw() renders the band from the very same view pixels
+    // that marqueeRectFromView converts, so what the user sees over region
+    // B is exactly what gets selected. Refusing it would leave a visible
+    // rubber band that does nothing.
+    const { container, rerender, findByText } = await openRegion1();
+    const canvas = noteCanvas(container);
+
+    // Start on empty space, well right of region A's notes.
+    fireEvent.mouseDown(canvas, { clientX: 400, clientY: rowY(80), button: 0 });
+
+    rerender(roll("region-2"));
+    await flush();
+
+    // Sweep back across every one of region B's notes.
+    fireEvent.mouseMove(window, { clientX: 150, clientY: rowY(70) });
+    fireEvent.mouseUp(window, { clientX: 150, clientY: rowY(70) });
+    expect(await findByText(`${NOTES_B.length} notes`)).toBeInTheDocument();
   });
 });
 

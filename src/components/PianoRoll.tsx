@@ -135,7 +135,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       return;
     }
     setNotes(r.notes);
-    setHasInstrument(track.instrumentId != null);
+    // (`r` existing implies `track` exists; optional chain keeps tsc happy.)
+    setHasInstrument(track?.instrumentId != null);
   }, [region.trackId, region.regionId]);
 
   useEffect(() => { refresh(); }, [refresh]);

@@ -338,6 +338,28 @@ designs target the banked specs (normative); manifest flags carry the gates.
   playhead jumps never scroll, loop or not (followScrollLeft returns to
   forward-only). Marquee preview work stands.
 
+- 2026-08-21 (cont.): **QUIET-VOICE DIAGNOSIS LANDED — item 3 was a seraph
+  bug, not the voice** (merged + cross-parcel test fix `468072e`; lanes on
+  merged tree: cargo 235/0, vitest 212/212 across 23 files, build clean, no
+  bindings drift). Voice 151 is FINE (algo 5, all carrier TLs 0 — loudest of
+  five comparators by rendered RMS; the zyrinx extractor forces carrier TL 0
+  so no pack voice can be quiet-by-data). ROOT CAUSE: velocity/track-volume
+  are TL-denominated engine-wide (sequencer adds `(127−vol)+(127−vel)` to
+  carrier TLs, 0.75 dB/step; audition applies none), but two stray literals
+  assumed MIDI-100: PianoRoll placed notes at vel 100 and manager seeded/
+  added tracks at vol 100 → every hand-placed FM note ~35 dB under audition.
+  FIX: both defaults → 127 (comments carry the unit convention). DURABLE
+  HARNESS: `src-tauri/src/audio/rendered_rms.rs` renders the real chain
+  (Sequencer→AudioEngine→Nuked-OPN2) and gates playback-vs-audition <0.5 dB
+  (shown red at −34.6 dB under sabotage) — first standing enforcement of the
+  "rendered audio, never register proxies" bar. PARKED for owner: (a)
+  existing saved projects are NOT auto-healed (old notes keep vel 100 /
+  tracks vol 100 — raise manually or ask for a one-shot migration); (b)
+  design Q: TL-linear curve gives FM ~95 dB control range vs PSG ~30 dB —
+  perceptual curve would need SMPS import's fm_effective_velocity co-updated;
+  (c) zyrinx song import places notes at vel 100 (−20 dB) and drops
+  channel-volume events — possibly intentional headroom, untouched.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

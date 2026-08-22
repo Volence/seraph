@@ -70,3 +70,29 @@
   flex: 1;
   overflow: hidden;
 }
+
+/* Library-voice drop target wrapping the note canvas. */
+.noteDropZone {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.voiceDropActive {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* Non-modal inline notice (drop hints, voice-overlap rejections). */
+.voiceHint {
+  font-size: 11px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}

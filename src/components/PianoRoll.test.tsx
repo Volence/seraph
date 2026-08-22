@@ -3,11 +3,19 @@ import { render, waitFor, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/dom";
 import { PianoRoll } from "./PianoRoll";
 import * as ipc from "../api/ipc";
+import * as library from "../api/library";
 import { OCTAVE_SEMITONES, PITCH_RANGES } from "../utils/pianoRollEdit";
 import { resetClipboardForTest } from "../utils/clipboard";
 import type { Note, SelectedRegion, SongMetadata, Track } from "../types/model";
 
 vi.mock("../api/ipc");
+// Keep the real LIBRARY_DRAG_TYPE constant (the drop handlers key off it);
+// mock only the async API surface.
+vi.mock("../api/library", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/library")>()),
+  libraryEnsureProjectInstrument: vi.fn(),
+  libraryAssignToTrack: vi.fn(),
+}));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }));
@@ -425,5 +433,66 @@ describe("note placement velocity", () => {
     await waitFor(() => expect(ipc.addNote).toHaveBeenCalled());
     const call = vi.mocked(ipc.addNote).mock.calls[0];
     expect(call[4]).toBe(127);
+  });
+});
+
+describe("library voice drop on the note canvas", () => {
+  // DOM order: ruler canvas, keys canvas, note canvas, velocity lane canvas.
+  function noteCanvas(container: HTMLElement): Element {
+    return container.querySelectorAll("canvas")[2];
+  }
+
+  /** DataTransfer stub matching LibraryPanel's drag source: JSON payload
+   *  under LIBRARY_DRAG_TYPE plus the kind-suffixed compatibility type. */
+  function libraryDrag(kind: string, hash = "hash-1") {
+    return {
+      types: [library.LIBRARY_DRAG_TYPE, `${library.LIBRARY_DRAG_TYPE}-${kind}`],
+      getData: (t: string) =>
+        t === library.LIBRARY_DRAG_TYPE ? JSON.stringify({ hash, kind }) : "",
+      dropEffect: "none",
+      effectAllowed: "copy",
+    };
+  }
+
+  it("drop with NO selection sets nothing and shows a hint", async () => {
+    const { container, findByText } = await renderRoll([note(0, 60)]);
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm") });
+    expect(await findByText(/select notes/i)).toBeInTheDocument();
+    expect(library.libraryEnsureProjectInstrument).not.toHaveBeenCalled();
+    expect(ipc.setNoteInstrument).not.toHaveBeenCalled();
+  });
+
+  it("drop with a selection resolves the hash and sets the voice on the selected notes", async () => {
+    vi.mocked(library.libraryEnsureProjectInstrument).mockResolvedValue("inst-9");
+    vi.mocked(ipc.setNoteInstrument).mockResolvedValue(undefined);
+    const { container } = await renderRoll([note(0, 60), note(480, 64)]);
+    selectAll();
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm", "hash-7") });
+    await waitFor(() =>
+      expect(ipc.setNoteInstrument).toHaveBeenCalledWith("track-1", "region-1", [0, 1], "inst-9"),
+    );
+    expect(library.libraryEnsureProjectInstrument).toHaveBeenCalledWith("hash-7");
+    await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
+  });
+
+  it("a wrong-kind drop is rejected without touching the backend", async () => {
+    const { container, findByText } = await renderRoll([note(0, 60)]);
+    selectAll();
+    // PSG voice onto an FM roll.
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("psg") });
+    expect(await findByText(/FM voices/)).toBeInTheDocument();
+    expect(library.libraryEnsureProjectInstrument).not.toHaveBeenCalled();
+    expect(ipc.setNoteInstrument).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a backend voice-overlap rejection non-modally in the header", async () => {
+    vi.mocked(library.libraryEnsureProjectInstrument).mockResolvedValue("inst-9");
+    vi.mocked(ipc.setNoteInstrument).mockRejectedValue(
+      "voice-overlap: notes with different voices would overlap on FM1 at ticks 240-480",
+    );
+    const { container, findByText } = await renderRoll([note(0, 60)]);
+    selectAll();
+    fireEvent.drop(noteCanvas(container), { dataTransfer: libraryDrag("fm") });
+    expect(await findByText(/voice-overlap/)).toBeInTheDocument();
   });
 });

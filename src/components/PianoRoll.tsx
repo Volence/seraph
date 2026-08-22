@@ -24,6 +24,9 @@ interface PianoRollProps {
   seekTick: number;
   /** Ruler click: seek to this absolute song tick (App owns the cursor). */
   onSeek: (tick: number) => void;
+  /** Preview loop armed: suppress follow-playhead (owner ruling — looping
+   *  playback must not move the view). */
+  loopEnabled?: boolean;
 }
 
 const GRID_OPTIONS: { label: string; divisor: number }[] = [
@@ -54,7 +57,7 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
   64: "Power Kick",
 };
 
-export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek }: PianoRollProps) {
+export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
   const [gridIdx, setGridIdx] = useState(4);
@@ -465,6 +468,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
           onZoom={handleZoom}
           playheadTick={playheadTick}
           playing={playing}
+          suppressFollow={loopEnabled}
         />
       </div>
       <VelocityLane

@@ -5,7 +5,7 @@ import {
   marqueeRectFromView,
   marqueePreviewSelection,
 } from "../utils/pianoRollEdit";
-import { followScrollLeft, FOLLOW_SUSPEND_MS } from "../utils/followPlayhead";
+import { followScrollLeft, followAllowed } from "../utils/followPlayhead";
 import styles from "./PianoRollCanvas.module.css";
 
 interface PianoRollCanvasProps {
@@ -35,6 +35,9 @@ interface PianoRollCanvasProps {
   onZoom: (delta: number, centerX: number) => void;
   playheadTick: number;
   playing: boolean;
+  /** Suppress follow-playhead paging entirely (set while a preview loop is
+   *  active — owner ruling: a looping playback must not move the view). */
+  suppressFollow?: boolean;
 }
 
 const EDGE_THRESHOLD = 6;
@@ -70,6 +73,7 @@ export function PianoRollCanvas({
   onZoom,
   playheadTick,
   playing,
+  suppressFollow = false,
 }: PianoRollCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -98,33 +102,16 @@ export function PianoRollCanvas({
   const canvasHeight = totalNotes * rowHeight;
   // Manual scrolls (wheel, pan) suspend follow-playhead briefly (G28).
   const lastManualScrollRef = useRef(-Infinity);
-  // Previous playhead tick, so follow can tell a loop wrap (backward jump)
-  // from the user having scrolled ahead. Ticks, not px: zoom-invariant.
-  const prevPlayheadTickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!playing) {
-      prevPlayheadTickRef.current = null;
-      return;
-    }
-    // playheadTick is region-relative and may be negative while the loop
-    // runs before this region; keep tracking it so a wrap to a point left
-    // of the region still reads as a backward jump (the follow target is
-    // clamped to 0 = region start).
-    const prevTick = prevPlayheadTickRef.current;
-    prevPlayheadTickRef.current = playheadTick;
-    if (performance.now() - lastManualScrollRef.current < FOLLOW_SUSPEND_MS) return;
+    if (playheadTick < 0) return;
+    if (!followAllowed(playing, suppressFollow, lastManualScrollRef.current, performance.now())) return;
     const container = containerRef.current;
     if (!container) return;
     const viewWidth = container.getBoundingClientRect().width;
-    const next = followScrollLeft(
-      playheadTick / ticksPerPixel,
-      scrollLeft,
-      viewWidth,
-      prevTick !== null ? prevTick / ticksPerPixel : null,
-    );
+    const next = followScrollLeft(playheadTick / ticksPerPixel, scrollLeft, viewWidth);
     if (next !== null) onScrollLeftChange(next);
-  }, [playheadTick, playing, ticksPerPixel, scrollLeft, onScrollLeftChange]);
+  }, [playheadTick, playing, suppressFollow, ticksPerPixel, scrollLeft, onScrollLeftChange]);
 
   function pixelToTick(px: number): number {
     return (px + scrollLeft) * ticksPerPixel;

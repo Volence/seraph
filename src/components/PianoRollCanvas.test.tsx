@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import { fireEvent } from "@testing-library/dom";
 import { PianoRollCanvas } from "./PianoRollCanvas";
 import type { Note } from "../types/model";
 import { PITCH_RANGES } from "../utils/pianoRollEdit";
+import { FOLLOW_REPOSITION_FRACTION } from "../utils/followPlayhead";
 
 // jsdom canvases have no 2d context and getBoundingClientRect() is all
 // zeros, so drawing is a no-op and event clientX/clientY map 1:1 onto
@@ -159,5 +160,60 @@ describe("PianoRollCanvas note clicks and drags", () => {
     fireEvent.mouseUp(window, { clientX: 5, clientY: rowY(95) });
     // tick 50 snaps down to 0; one grid unit long
     expect(handlers.onNoteAdd).toHaveBeenCalledWith(0, 95, GRID);
+  });
+});
+
+describe("PianoRollCanvas follow-playhead suppression", () => {
+  // jsdom rects are all zeros, which disables follow (viewWidth 0), so give
+  // every element a real width for this describe only.
+  const VIEW_W = 1000;
+  let rectSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, top: 0, left: 0, bottom: 0, right: VIEW_W,
+      width: VIEW_W, height: 400,
+      toJSON: () => ({}),
+    } as DOMRect);
+  });
+
+  afterEach(() => {
+    rectSpy.mockRestore();
+  });
+
+  function renderPlaying(playheadTick: number, suppressFollow: boolean) {
+    render(
+      <PianoRollCanvas
+        notes={NOTES}
+        minPitch={FM_MIN}
+        maxPitch={FM_MAX}
+        durationTicks={40000}
+        ticksPerPixel={TPP}
+        scrollLeft={0}
+        rowHeight={ROW_H}
+        gridSnapTicks={GRID}
+        channelColor="#4a9eff"
+        selectedNotes={new Set()}
+        playheadTick={playheadTick}
+        playing={true}
+        suppressFollow={suppressFollow}
+        {...handlers}
+      />,
+    );
+  }
+
+  // Playhead px = tick / TPP; past the follow edge of VIEW_W so follow fires.
+  const PAST_EDGE_TICK = VIEW_W * TPP * 0.9;
+  const EXPECTED_TARGET = PAST_EDGE_TICK / TPP - VIEW_W * FOLLOW_REPOSITION_FRACTION;
+
+  it("pages forward while playing when follow is not suppressed (harness sanity)", () => {
+    renderPlaying(PAST_EDGE_TICK, false);
+    expect(handlers.onScrollLeftChange).toHaveBeenCalledWith(EXPECTED_TARGET);
+  });
+
+  it("never scrolls while suppressFollow is set (preview loop active)", () => {
+    // Owner ruling: while looping, the view moves only by user input.
+    renderPlaying(PAST_EDGE_TICK, true);
+    expect(handlers.onScrollLeftChange).not.toHaveBeenCalled();
   });
 });

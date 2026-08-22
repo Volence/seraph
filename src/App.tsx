@@ -408,6 +408,7 @@ export default function App() {
           projectMeta={projectMeta!}
           seekTick={seekTick}
           onSeek={handleSeek}
+          loopEnabled={loopEnabled}
           onSavedToLibrary={() => setLibraryRefresh((n) => n + 1)}
         />
       )}

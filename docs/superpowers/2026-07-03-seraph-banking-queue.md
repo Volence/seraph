@@ -890,6 +890,85 @@ designs target the banked specs (normative); manifest flags carry the gates.
   `import/smps_mapper.rs:1062` (+2 `unused_assignments` in the same unit) —
   visible only in the `cfg(test)` build, not in `cargo build`.
 
+- 2026-08-22 (cont.): **OVERLAP FIDELITY — preview now matches the driver**
+  (merged; lanes on the merged tree: cargo **259/0**, vitest **304/304** across
+  30 files, build clean, **0 warnings**, no bindings drift). Research artifact
+  landed separately at `2c6f79c`
+  (`docs/research/2026-08-22-memra-note-termination.md`).
+  **OWNER FRAMING MADE IT DECIDABLE.** Asked whether overlapping-note behaviour
+  should be a taste call, the owner answered that seraph should sound like the
+  Genesis — i.e. the driver-in-the-loop guarantee decides, not preference. That
+  converted an open design question into a groundable one.
+  **GROUNDED AT aeon `1ee8f8e6`** (aeon's default branch is **master**, not
+  main), read via `git show <sha>:<path>` — never the sibling directory path,
+  which is the aeon overseer's live working tree. Independently confirmed by the
+  aeon overseer from their side.
+  **THE DRIVER HAS NO NOTE-OFF EVENT AND NO NOTE IDENTITY.** One `sc_note` byte,
+  one `SCF_KEYED` bit, 60-byte `SeqChannel` × 11 routes; no note-off opcode in
+  the 32-entry `$E0-$FF` table (`seq_opcode_tab.emp:44-83`). Termination has four
+  producers: `MEV_REST` ($80), `MEV_NOTEFILL` ($ED), the next note-on, and a PSG
+  vol-env `$83` full-rest contour byte. **`sc_dur_count` ends the WAIT, not the
+  note** — the most misleading part for a sequencer model.
+  **A NOTE-ON ONTO A SOUNDING CHANNEL FORCES A KEY-OFF FIRST, so overlaps
+  RE-ATTACK** — `Fm_NoteOnFreqExact.do_keyon` does `bit SCF_KEYED_B` /
+  `call nz, Fm_NoteOff` before the `$28` key-on (`sound_fm.emp:1092-1099`), gated
+  on *keyed*, not on pitch, because `$28` is edge-triggered. This is the OPPOSITE
+  of the bare-chip behaviour and the overseer initially got it backwards; PSG
+  re-attacks too, via `Psg_EnvCursorReset`. Cite by SYMBOL as well as line — aeon
+  line numbers drift (a live instance found the same day: aeon's own
+  `2026-08-07-mdsdrv` doc cites `:982-983` for lines now at `:1046-1047`).
+  **VERDICT: seraph DIVERGED.** Hardware = last-note-priority, effective duration
+  `min(authored, next onset)`; no event exists at the truncation tick at all.
+  Precision correction worth keeping: the off is not "unrepresentable" (a `Rest`
+  there is emittable and would truncate in ROM too) — it is that **no note
+  identity exists**, so no monophonic serialization would emit it.
+  **FIX IS AT EVENT CONSTRUCTION ONLY.** New `emit_channel_events` suppresses the
+  note-off when a successor note-on supersedes it. `process_event` is UNCHANGED
+  and its unconditional key-off is *correct* modelling of a pitch-blind driver —
+  the pitch-guard idea floated earlier was rejected as a nicer-sounding fiction.
+  `SequencerEvent::NoteOff::pitch` removed (it only ever supported the absent
+  identity). `OverlapWarning`s retained deliberately: the ambiguity is real, it
+  resolves at compile time rather than at playback.
+  **OVERSEER CHECK THAT MATTERED (the uncited joint):** suppressing the off is
+  only faithful if seraph's OWN note-on forces a key-off when keyed — it does
+  (`sequencer/mod.rs:332-334`), structurally the same shape as `do_keyon`. Had it
+  not, the fix would have turned a wrongly-truncated note into a wrongly-TIED one
+  — diverging in the opposite direction and sounding *smoother*, i.e. the failure
+  would have been mistaken for success.
+  **SECOND DEFECT FOUND IN REVIEW, same class, different door:** a note whose
+  instrument fails to resolve emitted **no note-on and a bare note-off**,
+  silencing a note it did not own. Pre-existing, and the *default* state of every
+  lane — `default_tracks_for_layout` seeds one instrument-less track per channel
+  and `resolve_instrument_data` bails at `:1193`. Now contributes no events at all.
+  **THE AGENT CORRECTED THE OVERSEER'S ENUMERATION AND WAS RIGHT:** both cases the
+  overseer walked had the unvoiced note ending at/after the sounding note, where
+  the stray off is harmless — the reachable break needs it ending strictly INSIDE
+  (`A(0..960)` + unvoiced `X(240..480)` → A cut at 0.5s, rendered rms 0.00000).
+  Adopting the overseer's cases unchecked would have tested arrangements that pass
+  either way. The agent replaced case enumeration with a **property** (unresolved
+  notes are inert: the emitted list equals what the resolvable notes alone
+  produce, in three legs incl. "no successor is ever hidden from the `take_while`
+  window"), which does not depend on anyone's imagination being complete.
+  **RED-FIRST, RENDERED AUDIO, all expectations control renders:** the re-attack
+  test was proven red by implementing the OPPOSITE divergence (dropping the
+  successor's note-on to force a tie) — and because the usual sustaining voice
+  separates tie from re-attack by only 0.28 dB, it uses a decaying voice and
+  **asserts that >6 dB separation itself** before asserting on the render under
+  test, so it fails loudly rather than passing vacuously. Non-regression test
+  (non-overlapping pair still keys off) was red by forcing "never key off".
+  **RATIFIED:** successor must actually emit a note-on to supersede; suppress at
+  `end == next.start` (key-off-then-key-on vs. key-on-that-keys-off-first are the
+  same two register actions at the same tick, and `advance` drains events before
+  rendering, so no sample boundary separates them either).
+  **S1 SPEC CLOSED:** last-note-priority is now normative, with carve-outs stating
+  that FM6/DAC and portamento are unmodelled and that an unresolved note
+  contributes no events.
+  **STILL UNMODELLED (own parcel, not claimed):** the FM6/DAC key-on skip while a
+  sample owns ch6 (no audible retrigger, `sound_fm.emp:1084-1091`) and armed
+  portamento (attack at the slid pitch).
+  **OWNER GATE OPEN (by-ear):** overlapping notes on one channel must now
+  re-attack rather than drop out.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

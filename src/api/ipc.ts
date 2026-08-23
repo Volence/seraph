@@ -209,6 +209,20 @@ export async function listTracks(): Promise<Track[]> {
   return unwrap(await commands.listTracks());
 }
 
+/**
+ * One track's instrument binding, without the song attached.
+ *
+ * `listTracks` serializes every track, region and note; the piano roll's
+ * audition path needs only this one field and runs on every note press,
+ * every grid double-click, every keys-column click and once per new pitch of
+ * a Draw-Mode paint drag (F26). Fresh on every call by design — the binding
+ * changes from surfaces the roll never hears about, so a cache here would
+ * audition the previous voice.
+ */
+export async function getTrackInstrument(trackId: string): Promise<string | null> {
+  return unwrap(await commands.getTrackInstrument(trackId));
+}
+
 // --- Region CRUD ---
 
 export async function addRegion(

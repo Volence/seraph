@@ -769,6 +769,33 @@ pub fn list_tracks(state: State<'_, ProjectState>) -> Result<Vec<crate::model::s
     Ok(mgr.list_tracks().to_vec())
 }
 
+/// One track's instrument binding, as a bare id — nothing else crosses.
+///
+/// The piano roll's audition path needs exactly this and nothing more, and it
+/// runs on the interactive path: every note press, every grid double-click,
+/// every keys-column click, and once per new pitch of a Draw-Mode paint drag.
+/// Reaching it through `list_tracks` serialized the whole track/region/note
+/// tree — the entire song — to read one field, per keystroke (F26).
+///
+/// Deliberately a fresh read rather than a frontend cache: the binding changes
+/// from surfaces the piano roll never hears about (a library drop on the track
+/// header, an unbind, a track delete), so anything cached here would audition
+/// the previous voice until something unrelated happened to refetch.
+///
+/// An unknown track id is `Ok(None)`, not an error: the caller's question is
+/// "what should this audition play", and "nothing" is a valid answer for a
+/// track that was deleted out from under an open roll.
+#[tauri::command]
+#[specta::specta]
+pub fn get_track_instrument(
+    state: State<'_, ProjectState>,
+    track_id: String,
+) -> Result<Option<String>, String> {
+    let uuid = Uuid::parse_str(&track_id).map_err(|e| format!("invalid UUID: {e}"))?;
+    let mgr = state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
+    Ok(mgr.track_instrument_id(uuid).map(|id| id.to_string()))
+}
+
 // --- Undo / Redo (song edits) ---
 
 /// Combined undo/redo/dirty state for the frontend (Save indicator,

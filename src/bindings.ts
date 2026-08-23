@@ -283,6 +283,32 @@ async listTracks() : Promise<Result<Track[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * One track's instrument binding, as a bare id — nothing else crosses.
+ * 
+ * The piano roll's audition path needs exactly this and nothing more, and it
+ * runs on the interactive path: every note press, every grid double-click,
+ * every keys-column click, and once per new pitch of a Draw-Mode paint drag.
+ * Reaching it through `list_tracks` serialized the whole track/region/note
+ * tree — the entire song — to read one field, per keystroke (F26).
+ * 
+ * Deliberately a fresh read rather than a frontend cache: the binding changes
+ * from surfaces the piano roll never hears about (a library drop on the track
+ * header, an unbind, a track delete), so anything cached here would audition
+ * the previous voice until something unrelated happened to refetch.
+ * 
+ * An unknown track id is `Ok(None)`, not an error: the caller's question is
+ * "what should this audition play", and "nothing" is a valid answer for a
+ * track that was deleted out from under an open roll.
+ */
+async getTrackInstrument(trackId: string) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_track_instrument", { trackId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async addRegion(trackId: string, startTick: number, durationTicks: number) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("add_region", { trackId, startTick, durationTicks }) };

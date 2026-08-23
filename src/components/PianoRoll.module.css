@@ -72,6 +72,20 @@
   padding: 2px 6px;
 }
 
+/* Per-note DAC sample picker (F25): the DAC lane's counterpart to dragging a
+   library voice onto the selected notes — the library has no DAC kind, so
+   the drop gesture can never serve this lane. */
+.sampleSelect {
+  font-size: 11px;
+  padding: 2px 6px;
+  max-width: 180px;
+  flex-shrink: 0;
+}
+
+.sampleSelect:disabled {
+  opacity: 0.55;
+}
+
 .closeBtn {
   width: 24px;
   height: 24px;

@@ -1298,6 +1298,20 @@ impl ProjectManager {
         &self.tracks
     }
 
+    /// One track's instrument binding — the ONE field the piano roll's
+    /// audition path reads out of the track list (F26). Same answer
+    /// `list_tracks().iter().find(...).and_then(|t| t.instrument_id)` gives;
+    /// exists so the interactive path can ask for it without serializing
+    /// every region and note in the song across IPC. `None` for an unknown
+    /// track id as well as for an unbound one — both mean "this audition has
+    /// nothing to play".
+    pub fn track_instrument_id(&self, track_id: Uuid) -> Option<Uuid> {
+        self.tracks
+            .iter()
+            .find(|t| t.id == track_id)
+            .and_then(|t| t.instrument_id)
+    }
+
     // --- Region CRUD ---
 
     pub fn add_region(&mut self, track_id: Uuid, start_tick: u64, duration_ticks: u64) -> Result<Uuid, String> {
@@ -3004,6 +3018,52 @@ mod tests {
             .expect("voice A bound to a lane").id;
         let region_id = mgr.add_region(track_id, 0, 1920).unwrap();
         (mgr, path, track_id, region_id, voice_a, voice_b)
+    }
+
+    /// F26: the narrow read the audition path uses must answer EXACTLY what
+    /// the fat `list_tracks` read it replaces answered — at every point the
+    /// binding can change, not just at rest. The expectation is DERIVED from
+    /// `list_tracks` on each line rather than written out, so the two cannot
+    /// drift apart without this failing.
+    #[test]
+    fn test_track_instrument_id_agrees_with_list_tracks_through_every_rebind() {
+        let (mut mgr, path, track_id, _region_id, voice_a, voice_b) =
+            voice_fixture("track_instrument_narrow_read");
+
+        /// What the frontend used to compute out of the whole track list.
+        fn via_list_tracks(mgr: &ProjectManager, track_id: Uuid) -> Option<Uuid> {
+            mgr.list_tracks()
+                .iter()
+                .find(|t| t.id == track_id)
+                .and_then(|t| t.instrument_id)
+        }
+
+        // Bound at rest (the fixture binds voice A to this lane).
+        assert_eq!(mgr.track_instrument_id(track_id), via_list_tracks(&mgr, track_id));
+        assert_eq!(mgr.track_instrument_id(track_id), Some(voice_a));
+
+        // Rebound to another voice — the case a cached id would get wrong.
+        let t = mgr.tracks.iter().position(|t| t.id == track_id).unwrap();
+        mgr.tracks[t].instrument_id = Some(voice_b);
+        assert_eq!(mgr.track_instrument_id(track_id), via_list_tracks(&mgr, track_id));
+        assert_eq!(mgr.track_instrument_id(track_id), Some(voice_b));
+
+        // Unbound — the silent-lane state.
+        mgr.tracks[t].instrument_id = None;
+        assert_eq!(mgr.track_instrument_id(track_id), via_list_tracks(&mgr, track_id));
+        assert_eq!(mgr.track_instrument_id(track_id), None);
+
+        // Deleted out from under an open piano roll: "nothing to play", not
+        // an error and not a stale id.
+        mgr.tracks[t].instrument_id = Some(voice_a);
+        mgr.delete_track(track_id).unwrap();
+        assert_eq!(mgr.track_instrument_id(track_id), via_list_tracks(&mgr, track_id));
+        assert_eq!(mgr.track_instrument_id(track_id), None);
+
+        // An id that never existed is also None, never a panic.
+        assert_eq!(mgr.track_instrument_id(Uuid::new_v4()), None);
+
+        cleanup(&path);
     }
 
     #[test]

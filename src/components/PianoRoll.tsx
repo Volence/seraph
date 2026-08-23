@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Note, SelectedRegion, SongMetadata } from "../types/model";
+import type { DacInstrument, Note, SelectedRegion, SongMetadata } from "../types/model";
 import { usePlaybackPosition } from "../hooks/usePlaybackPosition";
 import { PianoRollKeys, MELODIC_KEYS_WIDTH, DAC_KEYS_WIDTH } from "./PianoRollKeys";
 import { PianoRollCanvas } from "./PianoRollCanvas";
@@ -47,6 +47,18 @@ const CHANNEL_COLORS: Record<string, string> = {
   dac: "#ff8844",
 };
 
+/**
+ * Row labels for the DAC lane. These are NOT a pitch→sample mapping the
+ * engine honours: the sequencer's `ChannelType::Dac` arm plays the note's
+ * RESOLVED voice and ignores pitch entirely (`src-tauri/src/sequencer/mod.rs`),
+ * so what a DAC note actually plays is its per-note voice (note > region >
+ * track). The names are the S3 convention the SMPS importer writes — it
+ * stamps `pitch = 36 + (sample_byte - 0x81)` alongside a per-note
+ * `instrument_id` (`src-tauri/src/import/smps_mapper.rs`) — so a row is a
+ * truthful label for imported S3 content and an arbitrary one for
+ * from-scratch content. The Sample picker below is what actually selects
+ * a sample; that mismatch is the surviving half of F7.
+ */
 const DAC_SAMPLE_NAMES: Record<number, string> = {
   36: "Snare S3", 37: "High Tom", 38: "Mid Tom S3", 39: "Low Tom S3",
   40: "Floor Tom S3", 41: "Kick S3", 42: "Muffled Snare", 43: "Crash Cymbal",
@@ -233,12 +245,36 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // --- DAC per-note sample picker (F25) ---
+  // The project's DAC samples, TAGGED with the region they were fetched for,
+  // for the same reason `loaded` is: this component is not remounted across a
+  // region switch, and a melodic region must never show a DAC picker holding
+  // the previous drum lane's list.
+  const [dacBank, setDacBank] = useState<{ regionId: string; samples: DacInstrument[] } | null>(null);
+  const dacSamples = dacBank?.regionId === region.regionId ? dacBank.samples : [];
+  const refreshDacSamples = useCallback(async () => {
+    if (!isDac) return;
+    let samples: DacInstrument[];
+    try {
+      samples = await ipc.listDacInstruments();
+    } catch {
+      // An IPC rejection must not take the roll down with it; the picker
+      // simply offers nothing until the next fetch succeeds.
+      samples = [];
+    }
+    // Same out-of-order guard as `refresh`: a reply for a region the user
+    // already left must not populate the picker of the one now open.
+    if (openRegionIdRef.current !== region.regionId) return;
+    setDacBank({ regionId: region.regionId, samples: samples ?? [] });
+  }, [isDac, region.regionId]);
+  useEffect(() => { refreshDacSamples(); }, [refreshDacSamples]);
+
   // Undo/redo replaced the tracks server-side — re-fetch immediately.
   useEffect(() => {
-    const onReverted = () => { refresh(); };
+    const onReverted = () => { refresh(); refreshDacSamples(); };
     window.addEventListener(SONG_REVERTED_EVENT, onReverted);
     return () => window.removeEventListener(SONG_REVERTED_EVENT, onReverted);
-  }, [refresh]);
+  }, [refresh, refreshDacSamples]);
 
   // Publish whether this piano roll owns a note selection, so the
   // arrangement's window-level Delete handler defers to us (G1). Cleared on
@@ -561,19 +597,38 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
 
   const fmPreviewTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>);
 
+  /**
+   * Audition one pitch on this lane.
+   *
+   * This is the most-run interactive path in the roll — note press, grid
+   * double-click, keys-column click, and once per new pitch of a Draw-Mode
+   * paint drag — and it used to open with `ipc.listTracks()`, serializing
+   * the whole track/region/note tree across IPC to read ONE field: the
+   * track's instrument binding (F26). `getTrackInstrument` asks for exactly
+   * that field.
+   *
+   * It stays a live read rather than a value cached off `refresh()`. The
+   * binding changes from surfaces this component never hears about — a
+   * library drop or unbind on `TrackHeader`, a track delete, an
+   * `assign_library_instrument_to_track` from the library panel — and none
+   * of them notify the piano roll (the only cross-component signal that
+   * exists is `SONG_REVERTED_EVENT`, which undo/redo alone dispatches). A
+   * cache would audition the previous voice until something unrelated
+   * happened to refetch, which is exactly the staleness class `e01f6d1`
+   * swept out of this file.
+   */
   async function handleAudition(pitch: number) {
-    const tracks = await ipc.listTracks();
-    const track = tracks.find((t) => t.id === region.trackId);
-    if (!track?.instrumentId) return;
+    const trackVoiceId = await ipc.getTrackInstrument(region.trackId);
+    if (!trackVoiceId) return;
     if (region.channelType === "fm") {
       clearTimeout(fmPreviewTimer.current);
-      await ipc.previewFmInstrument(track.instrumentId, pitch);
+      await ipc.previewFmInstrument(trackVoiceId, pitch);
       fmPreviewTimer.current = setTimeout(() => { ipc.stopFmPreview(); }, 500);
     } else if (region.channelType === "psg") {
-      await ipc.previewPsgInstrument(track.instrumentId, pitch);
+      await ipc.previewPsgInstrument(trackVoiceId, pitch);
     } else {
       const dacNote = notes.find(n => n.pitch === pitch && n.instrumentId);
-      const dacInstId = dacNote?.instrumentId ?? track.instrumentId;
+      const dacInstId = dacNote?.instrumentId ?? trackVoiceId;
       if (dacInstId) await ipc.previewDac(dacInstId);
     }
   }
@@ -605,7 +660,16 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       return;
     }
     if (kind !== region.channelType) {
-      showVoiceHint(`Only ${region.channelType.toUpperCase()} voices can be dropped on this lane`);
+      // The library holds FM patches and PSG envelopes only
+      // (`LibraryInstrument` has exactly those two variants), so on a DAC
+      // lane this branch is the ONLY outcome a drop can have. Saying "only
+      // DAC voices can be dropped here" would point at a thing that does not
+      // exist; point at the picker that does. (F25.)
+      showVoiceHint(
+        isDac
+          ? "DAC samples aren't library voices — use the Sample picker in this header"
+          : `Only ${region.channelType.toUpperCase()} voices can be dropped on this lane`,
+      );
       return;
     }
     if (selectedNotes.size === 0) {
@@ -628,6 +692,59 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
       // Backend gate rejection (kind / voice-overlap) — non-modal notice.
       showVoiceHint(String(err));
       console.error("Set note voice failed:", err);
+    }
+  }
+
+  /**
+   * The per-note voice shared by every selected note, as a `<select>` value:
+   * `""` = they all inherit the lane default, a uuid = they all carry that
+   * override, `MIXED_VOICE` = they disagree (or nothing is selected).
+   */
+  const MIXED_VOICE = " mixed";
+  const selectedVoiceValue = (() => {
+    if (selectedNotes.size === 0) return MIXED_VOICE;
+    let seen: string | null | undefined;
+    for (const i of selectedNotes) {
+      const n = notes[i];
+      if (!n) continue;
+      const v = n.instrumentId ?? null;
+      if (seen === undefined) seen = v;
+      else if (seen !== v) return MIXED_VOICE;
+    }
+    if (seen === undefined) return MIXED_VOICE;
+    return seen ?? "";
+  })();
+
+  /**
+   * Set (or clear) the DAC sample on the selected notes. The one authoring
+   * gesture for per-note DAC voices: `handleVoiceDrop` cannot serve this lane
+   * because the library has no DAC kind at all (F25). Backend surface is
+   * unchanged — `set_note_instrument` already kind-gates DAC and already
+   * runs the voice-overlap gate.
+   */
+  async function handleDacSamplePick(value: string) {
+    if (value === MIXED_VOICE) return;
+    if (selectedNotes.size === 0) {
+      showVoiceHint("Select notes first — the Sample picker sets the sample on the selected notes");
+      return;
+    }
+    const instId = value === "" ? null : value;
+    try {
+      await ipc.setNoteInstrument(
+        region.trackId,
+        region.regionId,
+        Array.from(selectedNotes).sort((a, b) => a - b),
+        instId,
+      );
+      await refresh();
+      await ipc.reloadSequence();
+      // Hear what was just picked, the way clicking a drum row auditions it.
+      if (instId) await ipc.previewDac(instId);
+    } catch (err) {
+      // Backend gate rejection — most often voice-overlap, which on DAC means
+      // the two notes would need the one sample channel at the same time.
+      showVoiceHint(String(err));
+      console.error("Set DAC sample failed:", err);
     }
   }
 
@@ -668,6 +785,30 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
         )}
         {selInfo && <span className={styles.noteInfo}>{selInfo}</span>}
         {voiceHint && <span className={styles.voiceHint}>{voiceHint}</span>}
+        {isDac && (
+          <select
+            className={styles.sampleSelect}
+            aria-label="DAC sample for selected notes"
+            value={selectedVoiceValue}
+            disabled={selectedNotes.size === 0}
+            title={
+              selectedNotes.size === 0
+                ? "Select notes first, then pick the sample they play. Row names are the S3 import convention — the sample a DAC note plays is its own voice, not its row."
+                : "Sets the sample the selected notes play. The DAC channel plays ONE sample at a time, so notes that overlap must share a sample."
+            }
+            // Newly imported samples appear without reopening the region.
+            onFocus={() => { refreshDacSamples(); }}
+            onChange={(e) => { handleDacSamplePick(e.target.value); }}
+          >
+            <option value={MIXED_VOICE} disabled>
+              {selectedNotes.size === 0 ? "Sample (select notes)" : "Sample (mixed)"}
+            </option>
+            <option value="">Lane default</option>
+            {dacSamples.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
         <button
           className={`${styles.drawBtn} ${drawMode ? styles.drawBtnActive : ""}`}
           onClick={() => setDrawMode((v) => !v)}

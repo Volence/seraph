@@ -1,24 +1,13 @@
 {
-  "focus": "On F27 — the drum-vs-FM6 clash. Two agents grounding what the chip really does and what it would cost to fix.",
-  "inFlight": [
-    {
-      "what": "Establishing what the real drivers do with the DAC/FM6 steal, so the fix is grounded rather than assumed",
-      "where": "branch research/f27-driver-truth",
-      "agent": true
-    },
-    {
-      "what": "Mapping every place in Seraph the clash shows up — preview, exports, and the authoring gate — with costs per fix",
-      "where": "branch research/f27-exposure-map",
-      "agent": true
-    }
-  ],
+  "focus": "Booted fresh. Nothing running — last night's two F27 investigations died at rotation without delivering. Waiting on your pick.",
+  "inFlight": [],
   "blockedOnOwner": [
     {
       "what": "Three by-ear checks nothing here can answer: does the picked DAC sample sound right and immediately, does a hand-built kick/hat/snare kit play back as authored, does auditioning feel faster while painting a run",
       "since": "2026-08-22"
     },
     {
-      "what": "S0's driver list first-hand — it reached this repo relayed, hedged, and it makes S0 materially bigger than the banked plan",
+      "what": "S0's driver list first-hand — it reached this repo relayed and hedged, and it makes S0 materially bigger than the banked plan",
       "since": "2026-08-22"
     },
     {
@@ -26,21 +15,14 @@
       "since": "2026-08-21"
     }
   ],
-  "nextBoundary": "Both investigations back and judged, and the fix choice put to you with real numbers.",
+  "nextBoundary": "You pick what this lane opens; nothing is mid-flight, so a rotation costs nothing right now.",
   "queue": [
     {
       "id": "F27",
       "title": "Seraph lets a drum and the FM6 track sound together; the real chip cannot",
-      "state": "doing",
+      "state": "next",
       "size": "M",
       "blockedBy": null
-    },
-    {
-      "id": "S0",
-      "title": "Sound-driver capability manifest — the thing that gates every later Seraph piece",
-      "state": "next",
-      "size": "L",
-      "blockedBy": "which drivers it targets — needs your word, not a relay"
     },
     {
       "id": "README-7",
@@ -57,12 +39,12 @@
       "blockedBy": null
     },
     {
-      "id": "S3",
-      "title": "Play a song through the real driver and A/B it against the preview",
+      "id": "S0",
+      "title": "Sound-driver capability manifest — the thing that gates every later Seraph piece",
       "state": "open",
       "size": "L",
-      "blockedBy": "S0"
+      "blockedBy": "which drivers it targets — needs your word, not a relay"
     }
   ],
-  "updatedAt": "2026-08-23T07:45:32Z"
+  "updatedAt": "2026-08-23T07:53:21Z"
 }

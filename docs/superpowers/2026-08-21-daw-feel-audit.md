@@ -13,6 +13,23 @@ Classification: **missing** (capability absent) / **clunky** (possible but labor
 **discoverability** (possible but nothing reveals it) / **feedback** (works but the user
 can't tell). Severity = centrality to a composing session: **critical / high / med / low**.
 
+> ### ⚠ RE-GROUNDING PASS 2 — 2026-08-22 (branch `docs/reground-feel-audit`, base `3d72793`)
+>
+> Everything below the "Findings table" heading was re-checked row by row against
+> `main` at `3d72793`. **Read the `Status (2026-08-22)` column before funding
+> anything off this document** — six rows changed verdict and three had a false
+> premise. The Top-10 was re-ranked; the play-test script was rewritten (it was
+> instructing the owner to confirm behaviour that four merged parcels had already
+> fixed, which would have burned a gate that cannot be re-run cheaply).
+>
+> **The Scenario A–G prose, the keyboard-centricity pass and the shortcut
+> inventory below still carry their ORIGINAL `file:line` citations from
+> 2026-08-21.** Those coordinates were never re-grounded and most have drifted;
+> treat them as historical provenance, not as addresses. What HAS been re-checked
+> in the prose is its *claims* — see **"Prose drift (Scenarios A–G + keyboard
+> pass)"** immediately before the findings table for the enumerated list of prose
+> statements that are now false, each with a symbol-level correction.
+
 ---
 
 ## Scenario A — Cold start to first sound
@@ -218,6 +235,126 @@ only (`App.tsx:244`) — dead under CapsLock/Shift. No keymap/help panel (G39 bo
 
 ---
 
+## Prose drift (Scenarios A–G + keyboard pass) — enumerated 2026-08-22
+
+The prose above was written on 2026-08-21 and was explicitly excluded from the
+first citation re-grounding. Its `file:line` coordinates are stale as
+coordinates; the list below is every **claim** in it that is now false or
+narrowed. Claims not listed here were re-checked and still hold, except where
+marked *(carried forward — not re-verified)*.
+
+**Scenario A**
+
+- *"the Location field is `readOnly` — typing a path is not allowed"* — **FALSE**.
+  `NewProjectDialog`'s location `<input>` has a plain `onChange` and is prefilled
+  from `mostRecentLocation()`, with a recent-locations suggestion listbox and a
+  `defaultPath`-seeded `handleBrowse` (`049721b`, `87bc14f`). See F16.
+- *"No Enter-to-create, no Esc-to-cancel (no keydown handlers in the dialog)"* —
+  **still true**, verified with a control: zero `onKeyDown`/`keydown` in
+  `NewProjectDialog.tsx`, `AddTrackDialog.tsx`, `ImportDialog.tsx`,
+  `LibraryRootsDialog.tsx`, while the same grep shape finds `onClick` in all four.
+- *"the full seeded lane roster — every lane instrument-less"* — **still true**
+  (`ProjectManager::default_tracks_for_layout` builds every lane with
+  `instrument_id: None`), **but no longer silent about it**: unbound lanes now
+  render a `no voice` badge and a de-emphasised name (F2).
+- *"first pitched sound of your own ≈ action 8"* — **narrowed**. Draw Mode (`B`,
+  or the header `Draw` button) makes a single left-click place a note, so the
+  grid double-click is no longer the only entry gesture (F6, `8359f75`).
+
+**Scenario B**
+
+- *"`PianoRoll.tsx` contains zero `reloadSequence` calls"* — **FALSE**, and this
+  was the audit's own #1. `PianoRoll.tsx` now calls `ipc.reloadSequence()` on
+  **every** mutating commit; all thirteen mutation paths were enumerated (F1).
+- *"right-click is suppressed and does nothing — no erase"* — **FALSE**.
+  `PianoRollCanvas.handleMouseDown`'s `e.button === 2` branch erases the note
+  under the cursor in both modes. The container's `handleContextMenu` is still
+  `preventDefault`-only, but that is now suppression of the browser menu, not
+  absence of a verb (F6).
+- *"A 16-step drum pattern = 16 double-clicks"* — **FALSE**. One Draw-Mode drag
+  paints the run as one gesture, one undo step, one reload.
+- *"no UI or IPC can author [per-note samples] (`add_note` has no instrument
+  param)"* — **FALSE**. `add_note` takes an optional `instrument_id`,
+  `set_note_instrument` exists as IPC, `build_snapshot` resolves
+  `note.instrument_id` through `resolve_instrument_data_by_id`, and the piano
+  roll has a drop gesture for it (`abb22a9`). **But see the new finding F25** —
+  that gesture cannot reach a DAC lane, which is the only lane F7 was about.
+- *"drag auditions only the initial press"* — **narrowed**: a Draw-Mode paint run
+  auditions on each new pitch (`paintCellUnderPointer`). Move-drag across
+  pitches is still silent (F9).
+
+**Scenario C**
+
+- *"Deselecting regions needs a target … no Esc"* — **still true** for regions
+  (`TimelineCanvas.handleClick` acts only on a hit; the marquee's `handleMouseUp`
+  calls `onSelectRegions` only when `hits.length > 0`), but see the F19/F20
+  correction: Esc is not absent from the app, only from these surfaces.
+- *"Paste that overflows the region end drops notes with only a `console.warn`"* —
+  **still true for the overflow skip**; a paste that the backend *rejects* now
+  surfaces in-app through `showVoiceHint` (F24).
+
+**Scenario D**
+
+- *"WAV export renders a fixed user-supplied duration (default 60 s)"* — **FALSE
+  in the user's favour of the wrong direction**: `TopBar.handleExportWav` calls
+  `ipc.exportWav(path, 60)` with a hardcoded literal. There is no duration input
+  anywhere in the app. The finding is slightly *worse* than written (F12).
+- *"Arrangement Ctrl+wheel zoom is not cursor-anchored"* — **still true**
+  (`useArrangementZoom`'s `handleWheel` rescales `ticksPerPixel` and never
+  touches `scrollLeft`), but the sibling `zoomAtBy` (ruler vertical-drag zoom)
+  *is* anchored via `zoomAroundPixel`. The seam exists; the wheel path just
+  doesn't use it (F11).
+
+**Scenario E**
+
+- *"knobs write `updateFmInstrument` only — no reload"* — **FALSE**. Both
+  `FmEditor` and `PsgEditor` call `scheduleReloadSequence` (`7f59c18`). The audit
+  had only inspected `FmEditor`; `PsgEditor` had the same hole and was fixed in
+  the same parcel.
+- *"`InstrumentBrowser` … is mounted nowhere (only `Sidebar.tsx` imports it;
+  nothing imports `Sidebar`)"* — **still true**, re-verified with an unfiltered
+  grep: `Sidebar` is referenced only inside `Sidebar.tsx` itself. G7 still open.
+
+**Scenario F**
+
+- *"per-track slider fires `updateTrack` + `reloadSequence` per input event …
+  machine-guns the audio"* — **FALSE**. `TrackHeader.handleVolume` still commits
+  per event (deliberate) but reloads through the `scheduleReloadSequence`
+  coalescer, and `reload_snapshot` no longer calls `silence_all` (F13, `7f59c18`).
+- Metering claims (no master meter, meters zeroed when stopped, master volume
+  resets per launch) — **all still true**, verified (F14).
+
+**Scenario G**
+
+- *"there is no client-side persistence at all (no localStorage/sessionStorage
+  anywhere — verified by grep)"* — **FALSE**. `src/utils/recentLocations.ts` is
+  the app's first `localStorage` user (key `seraph.recentProjectLocations.v1`).
+  It stores project *locations* only, so every view-state item F15 lists is still
+  lost on reopen — but the "no persistence seam exists" premise is dead, and the
+  queue has already designated this module as the seam F15 should extend.
+- *"there is no recent-projects list"* — **still true**. `App.handleOpenProject`
+  seeds the OS picker's `defaultPath` from the MRU; it does not offer a list of
+  recent *projects* to open, and `MainArea`'s welcome screen still shows two bare
+  buttons.
+
+**Keyboard-centricity pass**
+
+- *"no Esc anywhere"* / *"Drags and marquees have no Esc-cancel either"* — the
+  second clause is true, the first is **FALSE** and was false when written. Three
+  `key === "Escape"` handlers exist: `TrackHeader.handleRenameKeyDown`,
+  `TopBar.handleMetaKeyDown`, and `LibraryPanel`'s inline tag-edit `onKeyDown` —
+  all three of which this document's OWN inventory table already lists under
+  "Inline edit fields". The load-bearing claim (*"no dialog in the app handles
+  Escape or Enter"*) is **still true and re-verified with a control**.
+- The inventory is **missing one shortcut**: `B` (plain, no modifiers) toggles
+  Draw Mode, handled in `PianoRoll`'s `handleKeyDown` (`8359f75`).
+- *"the loop toggle matches `e.key === "l"` only — dead under CapsLock/Shift"* —
+  **still true** (`App.tsx` `handleKeyDown`).
+- Completeness note: the inventory was re-derived from a full enumeration of
+  every `onKeyDown`/`"keydown"` site in `src/` (11 non-test sites, 6 distinct
+  handlers). No QWERTY pitch map exists in any of them — that absence is now
+  established by enumeration rather than by an empty grep (F5).
+
 ## Findings table
 
 > **Citations re-grounded 2026-08-22 on `fix/booked-defect-sweep` (base
@@ -230,95 +367,247 @@ only (`App.tsx:244`) — dead under CapsLock/Shift. No keymap/help panel (G39 bo
 > revision. Note the earlier prose sections still cite `file:line` and were NOT
 > re-grounded; and `src-tauri/src/commands.rs` never existed — the module is
 > `src-tauri/src/ipc/commands.rs`.
+>
+> **Second pass 2026-08-22, `docs/reground-feel-audit` (base `3d72793`):** every
+> row below re-checked against the code, not against this document. The symbol
+> discipline is preserved — **no line numbers were added, and every symbol named
+> in a still-open row was confirmed to exist at `3d72793`** rather than inherited
+> from the first pass. `Status` says what is true today; `Sev` carries the
+> proposed severity with the old one struck where it moved. Every row is marked
+> **[V]** verified firsthand this pass or **[C]** carried forward unverified —
+> there are no unmarked rows.
 
-| ID | Finding | Class | Severity | Where | G-ref |
-|----|---------|-------|----------|-------|-------|
-| F1 | Note-level edits inaudible while transport runs (PianoRoll never reloads sequence) | missing | **critical** | PianoRoll.tsx (no reloadSequence); src-tauri/src/ipc/commands.rs | G30 fixed regions only — notes missed |
-| F2 | Silent-track trap: instrument-less lanes drop notes with zero feedback; audition no-ops | feedback + discoverability | **critical** | manager.rs:825,1030-1036; PianoRoll.tsx:353-354; TrackHeader.tsx | adjacent to booked "stale lane name" wart |
-| F3 | FM/PSG param edits inaudible during playback (snapshot embeds patches; editors don't reload) | missing | **high** | FmEditor.tsx:30-38; manager.rs:833-842 | **FIXED** 2026-08-22 (`fix/live-param-audibility`) |
-| F4 | All previews/auditions hardcode ch0 → auditioning fights the playing mix | clunky | **high** | src-tauri/src/ipc/commands.rs `preview_fm_instrument`, `do_preview_psg` (both pin ch 0); src-tauri/src/audio/engine.rs `AudioEngine::process_command` (`StopPreview` arm's `invalidate_fm_cache(0)` recovery) | — |
-| F5 | No QWERTY note input / step record anywhere | missing | **high** | grep (no QWERTY handler anywhere); src/widgets/PianoKeys.tsx `PianoKeys` / `handleKey` (mouse-only) | G36 (booked, owner call open) |
-| F6 | Double-click-per-note placement; no pencil/paint; right-click inert (no erase/menu) | clunky | **high** | src/components/PianoRollCanvas.tsx `handleDoubleClick` (place a note), `handleContextMenu` (right-click = `preventDefault` only) | G13/G14 (booked) |
-| F7 | From-scratch DAC kits impossible on one track; drum-name rows all play one sample | missing + feedback | **high** | src-tauri/src/sequencer/mod.rs `Sequencer::process_event` (`ChannelType::Dac` arm); src-tauri/src/model/song.rs `Note.instrument_id`; src/api/ipc.ts `addNote`; src/components/PianoRoll.tsx `DAC_SAMPLE_NAMES` | — |
-| F8 | Piano-roll PSG audition has no stop path (looped envelope may ring); FM audition fixed 500 ms | feedback | med | src/components/PianoRoll.tsx `handleAudition`; src-tauri/src/audio/engine.rs `AudioEngine::process_command` (`PsgEnvelopePreview` arm) + `AudioEngine::render` (preview-envelope stepping) | — |
-| F9 | No audible pitch feedback on transpose or drag-across-pitches | feedback | med | src/components/PianoRoll.tsx `handleKeyDown` (transpose/nudge, no audition); src/components/PianoRollCanvas.tsx `moveDrag`'s `handleMouseMove` | — |
-| F10 | No section markers / region names / colors — song assembly by bar-number memory | missing | **high** | src-tauri/src/model/song.rs `Region` (no name/color); src/components/TimelineRuler.tsx `TimelineRuler`'s `draw` | — |
-| F11 | No h-scrollbar/minimap/zoom-to-fit; arrangement zoom not cursor-anchored | clunky | med | src/components/ArrangementView.module.css `.body` (`overflow-x: hidden`); src/hooks/useArrangementZoom.ts `useArrangementZoom`'s `handleWheel` (no `zoomAroundPixel`) | G31/G32 (booked) |
-| F12 | No song end: playback runs forever past last note; export needs manual duration | missing (design Q) | med | src-tauri/src/sequencer/mod.rs `Sequencer::advance` (loop bounds only); src/components/TopBar.tsx `handleExportWav` (hardcoded 60 s) | booked design Q — noted only |
-| F13 | Volume-slider ride = reload (silence_all+reprogram) per input event during playback | feedback | **high** | TrackHeader.tsx:162-171; sequencer/mod.rs:65-77 | **FIXED** 2026-08-22 (`fix/live-param-audibility`) |
-| F14 | No master meter/clip latch; meters dead when stopped; master vol resets per launch | missing | med | src/components/TrackHeader.tsx `levelColor` (no peak/clip latch); src/components/ArrangementView.tsx channel-level polling effect (clears levels when `!playing`); src/components/TopBar.tsx `masterVol` | — |
-| F15 | Zero view-state persistence: reopen loses roll/zoom/scroll/loop/snap/panel/filters | missing | **critical** | src-tauri/src/project/manager.rs `ProjectManager::open` / `ProjectManager::save`; src-tauri/src/model/song.rs `ProjectFile`; grep (no localStorage) | — |
-| F16 | Cold-start ceremony: forced Browse, no default location/scratch project, no recents | clunky | med | src/components/NewProjectDialog.tsx `handleBrowse`; src/App.tsx `handleNewProject`, `handleOpenProject` | — |
-| F17 | Core gestures invisible: lane dbl-click, grid dbl-click, ruler halves, header drag-drop, auto-bind | discoverability | **high** | src/components/TimelineCanvas.tsx `handleDoubleClick`; src/components/TimelineRuler.tsx `zoneAt` (invisible upper/lower half); src-tauri/src/project/manager.rs `ProjectManager::bind_to_empty_lane` (+ FM Patch auto-bind), `ProjectManager::assign_library_instrument_to_track` (header drag-drop) | G39 (keymap panel, booked) |
-| F18 | One region at a time: no ghost notes, no multi-region editing across channels | missing | **high** | src/App.tsx `selectedRegions` (last-wins into `BottomPanel`'s `selectedRegion`); src/components/PianoRoll.tsx `loaded` / `notes` (one region) | — |
-| F19 | Can't click-empty to deselect regions; roll closes only via tiny x; no Esc | clunky | low | src/components/TimelineCanvas.tsx `handleMouseUp` (marquee), `handleClick` (hit-only); src/components/PianoRoll.tsx `closeBtn` button (no Esc anywhere in the file) | — |
-| F20 | Mouse-only surface: no seek/zoom/track-focus/M-S/dialog keys; no Esc anywhere; `l` case-sensitive | missing | **high** | inventory above | G39/G40 (booked) |
-| F21 | Velocity lane: click-only, first-hit-by-x (chords un-editable), no paint/numeric/audition | clunky | med | src/components/VelocityLane.tsx `VelocityLane`'s `handleMouseDown` | G17 (booked) |
-| F22 | Single-note readout is header text only; no inspector for exact tick/len/vel | missing | low | src/components/PianoRoll.tsx `selInfo` | S4 NoteInspector (planned) |
-| F23 | 1 s polling for dirty state + track list — laggy dirty dot / cross-view refresh | feedback | low | src/App.tsx `refreshUndoState` poll effect; src/components/ArrangementView.tsx `refresh` + its 1 s interval effect | — |
-| F24 | Failures console-only: paste overflow skips, library assign errors, save-to-library errors | feedback | med | src/components/PianoRoll.tsx `handleKeyDown` (paste `console.warn`); src/components/TrackHeader.tsx `handleDrop`; src/components/FmEditor.tsx save-to-library button `onClick` | — |
+| ID | Finding | Class | Sev | Status (2026-08-22 pass 2) | Where | G-ref |
+|----|---------|-------|-----|---------------------------|-------|-------|
+| F1 | Note-level edits inaudible while transport runs (PianoRoll never reloads sequence) | missing | ~~critical~~ — | **[V] FIXED** — `54c6082` (`bac49a6`). `PianoRoll.tsx` now reloads on every mutating commit; all 13 mutation paths enumerated (add, paint, erase, resize/move via `handleGestureEnd`'s `gestureMutatedRef`, velocity, transpose, nudge, delete, cut, paste, duplicate, voice-drop) | historical | G30 |
+| F2 | Silent-track trap: instrument-less lanes drop notes with zero feedback; audition no-ops | feedback + discoverability | ~~critical~~ **med** | **[V] PARTLY FIXED** — `54c6082` (`be1d0c9`, `6d1382f`). The *feedback* half landed: `TrackHeader`'s `noVoice` badge + `nameUnbound` name style, `PianoRoll`'s `silentNotice` header badge, both with tooltips naming the two binding paths. **Surviving half:** no default voice and no one-click assign at region creation — you must still drag from the Library or find `+ FM Patch`; and `PianoRoll.handleAudition` still returns silently at the moment of the click | src/components/PianoRoll.tsx `handleAudition` (early return on `!track?.instrumentId`); src/components/ArrangementView.tsx `addFm` / `addPsg` | adjacent to booked "stale lane name" wart |
+| F3 | FM/PSG param edits inaudible during playback (snapshot embeds patches; editors don't reload) | missing | ~~high~~ — | **[V] FIXED** — `7f59c18`. Both `FmEditor` and `PsgEditor` call `scheduleReloadSequence`; `PsgEditor` had the same hole the audit missed | historical | — |
+| F4 | All previews/auditions hardcode ch0 → auditioning fights the playing mix | clunky | **high** | **[V] STILL OPEN, and now hit more often** — `do_preview_psg` still opens with `let channel: u8 = 0`, `stop_fm_preview` still sends `FmKeyOff { channel: 0 }`, `AudioEngine` still initialises `psg_preview_channel: 0`. F6's Draw Mode auditions on **each new pitch of a paint run**, so one drag now steals ch0 from the running mix repeatedly | src-tauri/src/ipc/commands.rs `preview_fm_instrument`, `do_preview_fm`, `do_preview_psg`, `stop_fm_preview` (all pin ch 0); src-tauri/src/audio/engine.rs `AudioEngine::process_command` (`StopPreview` arm's `invalidate_fm_cache(0)` recovery), `psg_preview_channel` field | — |
+| F5 | No QWERTY note input / step record anywhere | missing | **high** | **[V] STILL OPEN** — established by full enumeration of every `onKeyDown`/`"keydown"` site in `src/` (11 non-test sites), not by an empty grep. None maps a key to a pitch | src/widgets/PianoKeys.tsx `PianoKeys` / `handleKey` (takes `React.MouseEvent` — mouse-only); src/App.tsx `handleKeyDown`, src/components/PianoRoll.tsx `handleKeyDown`, src/components/ArrangementView.tsx `handleKeyDown` (the only global handlers; transport/edit verbs only) | G36 (booked, owner call open) |
+| F6 | Double-click-per-note placement; no pencil/paint; right-click inert (no erase/menu) | clunky | ~~high~~ — | **[V] FIXED** — `8359f75` (`9f2dc66`). `drawMode` state + `B` key + header `Draw` button; `PianoRollCanvas.paintCellUnderPointer` paints a run (Shift = pitch lock) committed as one gesture/undo step/reload; `handleMouseDown`'s `e.button === 2` branch erases in both modes. `handleContextMenu` is still `preventDefault`-only — that is now browser-menu suppression, not an absent verb | historical | G13/G14 |
+| F7 | From-scratch DAC kits impossible on one track; drum-name rows all play one sample | missing + feedback | ~~high~~ **med** | **[V] PREMISE HALF FALSE** — `abb22a9` shipped per-note voices end to end: `addNote` takes an optional `instrumentId`, `set_note_instrument` exists as IPC, `build_snapshot` resolves `note.instrument_id` via `resolve_instrument_data_by_id` (DAC arm included), and the roll has a drop gesture + per-voice colors. So "impossible" and "no UI or IPC can author them" are dead. **Surviving:** the DAC rows still don't select anything — `process_event`'s `ChannelType::Dac` arm plays the resolved instrument and ignores pitch, so `DAC_SAMPLE_NAMES` still mislabels 29 rows. **And the new gesture cannot reach DAC at all — see F25** | src-tauri/src/sequencer/mod.rs `Sequencer::process_event` (`ChannelType::Dac` arm — pitch unused); src/components/PianoRoll.tsx `DAC_SAMPLE_NAMES` | — |
+| F8 | Piano-roll PSG audition has no stop path (looped envelope may ring); FM audition fixed 500 ms | feedback | med | **[V] STILL OPEN, verbatim** — `handleAudition`'s FM branch arms a 500 ms `stopFmPreview` timer; its PSG branch calls `previewPsgInstrument` and nothing stops it. `stopPreview` exists but is called from nowhere in `src/`; the engine re-seeds `psg_preview_index` from `psg_preview_loop` forever when a loop point is set | src/components/PianoRoll.tsx `handleAudition`; src-tauri/src/audio/engine.rs `AudioEngine::process_command` (`PsgEnvelopePreview` arm) + `AudioEngine::render` (preview-envelope stepping, `psg_preview_loop` re-seed) | — |
+| F9 | No audible pitch feedback on transpose or drag-across-pitches | feedback | med | **[V] STILL OPEN, narrowed** — Draw-Mode paint *does* audition on each new pitch (`paintCellUnderPointer`), so the gesture added since the audit got this right. Keyboard transpose and move-drag are still silent | src/components/PianoRoll.tsx `handleKeyDown` (transpose/nudge branches — no `handleAudition` call); src/components/PianoRollCanvas.tsx `moveDrag` effect's `handleMouseMove` | — |
+| F10 | No section markers / region names / colors — song assembly by bar-number memory | missing | **high** | **[V] STILL OPEN, verbatim** — `Region` gained `instrument_id` since the audit but still has no name and no color | src-tauri/src/model/song.rs `Region`; src/components/TimelineRuler.tsx `TimelineRuler`'s `draw` | — |
+| F11 | No h-scrollbar/minimap/zoom-to-fit; arrangement zoom not cursor-anchored | clunky | med | **[V] STILL OPEN, narrowed** — `.body` is still `overflow-x: hidden` and `handleWheel` still rescales `ticksPerPixel` without touching `scrollLeft`. But the anchoring seam now exists and its sibling uses it: `zoomAtBy` (ruler vertical-drag) calls `zoomAroundPixel`. The wheel path is a small delta from correct | src/components/ArrangementView.module.css `.body` (`overflow-x: hidden`); src/hooks/useArrangementZoom.ts `useArrangementZoom`'s `handleWheel` (vs. its own `zoomAtBy`, which does anchor) | G31/G32 (booked) |
+| F12 | No song end: playback runs forever past last note; **export duration is hardcoded, not user-supplied** | missing (design Q) | med | **[V] STILL OPEN; the audit's own text was wrong** — `Sequencer::advance` still has only loop bounds and no end condition. But WAV export takes **no** duration input: `handleExportWav` calls `ipc.exportWav(path, 60)` with a literal. "Needs manual duration" overstated the user's control; there is none | src-tauri/src/sequencer/mod.rs `Sequencer::advance` (loop bounds only); src/components/TopBar.tsx `handleExportWav` (literal `60`) | booked design Q — noted only |
+| F13 | Volume-slider ride = reload (silence_all+reprogram) per input event during playback | feedback | ~~high~~ — | **[V] FIXED** — `7f59c18`. `handleVolume` still commits per event (deliberate) but reloads through `scheduleReloadSequence`; `reload_snapshot` diffs instead of calling `silence_all` | historical | — |
+| F14 | No master meter/clip latch; meters dead when stopped; master vol resets per launch | missing | med | **[V] STILL OPEN, verbatim** — `levelColor` has three thresholds and no peak/clip latch, the polling effect returns early and clears when `!playing`, `masterVol` is `useState(100)` component state | src/components/TrackHeader.tsx `levelColor`; src/components/ArrangementView.tsx channel-level polling effect (early-returns and clears when `!playing`); src/components/TopBar.tsx `masterVol` | — |
+| F15 | Zero view-state persistence: reopen loses roll/zoom/scroll/loop/snap/panel/filters | missing | **critical** (owner-DEPRIORITIZED) | **[V] STILL OPEN; `Where` was wrong** — `ProjectFile` is still `{ metadata, tracks }` with no view fields, so every listed item is still lost. But **"no localStorage" is false**: `src/utils/recentLocations.ts` (key `seraph.recentProjectLocations.v1`) is the app's first and only `localStorage` user, and the queue has designated it as the seam F15 should extend rather than a counter-example. Owner ruled this deprioritized (queue 2026-08-22: "current behavior matches how they work") — severity is unchanged, fundability is not | src-tauri/src/project/manager.rs `ProjectManager::open` / `ProjectManager::save`; src-tauri/src/model/song.rs `ProjectFile`; src/utils/recentLocations.ts (the designated seam — **not** an absence) | — |
+| F16 | Cold-start ceremony: no default location/scratch project, no recent-**projects** list | clunky | ~~med~~ **low** | **[V] PARTLY FIXED** — `049721b` (`87bc14f`). Dead: "forced Browse" (the location input is editable and prefilled from `mostRecentLocation()`) and "no recents" (a suggestion listbox, plus `defaultPath` on both `handleBrowse` and `handleOpenProject`). **Surviving:** no scratch/default project, no recent-*projects* list to open (only a recent-*locations* prefill), welcome screen still two bare buttons, and still no Enter-to-create / Esc-to-cancel | src/components/MainArea.tsx welcome branch; src/App.tsx `handleOpenProject` (`defaultPath` only, no project list) | — |
+| F17 | Core gestures invisible: lane dbl-click, grid dbl-click, header drag-drop, auto-bind | discoverability | ~~high~~ **med** | **[V] PARTLY FIXED** — the "invisible ruler halves" sub-claim is dead: `TimelineRuler` now sets a per-zone cursor from `HOVER_CURSOR[hoverZone]` (`fba0e3b`). The F2 badges' tooltips now name both voice-binding paths on the lane where it matters, and the `Draw` button's tooltip advertises `B`/paint/right-click-erase. **Surviving:** lane double-click-to-create-region, grid double-click, header drag-drop and `+ FM Patch`'s auto-bind are still unadvertised until you already know | src/components/TimelineCanvas.tsx `handleDoubleClick`; src-tauri/src/project/manager.rs `ProjectManager::bind_to_empty_lane`, `ProjectManager::assign_library_instrument_to_track` | G39 (keymap panel, booked) |
+| F18 | One region at a time: no ghost notes, no multi-region editing across channels | missing | **high** | **[V] STILL OPEN, verbatim** — `App` passes `selectedRegions[selectedRegions.length - 1]` into `BottomPanel`; `PianoRoll` renders only `loaded.notes` for the one open region. Note selection is now *deliberately* cleared on region switch (`e01f6d1`), which makes the open/close cycling the audit describes strictly more costly | src/App.tsx `selectedRegions` (last-wins into `BottomPanel`'s `selectedRegion`); src/components/PianoRoll.tsx `loaded` / `notes` (one region) | — |
+| F19 | Can't click-empty to deselect regions; roll closes only via tiny x; no Esc **on these surfaces** | clunky | low | **[V] STILL OPEN; phrasing corrected** — `handleClick` acts only on a hit and `handleMouseUp` calls `onSelectRegions` only when `hits.length > 0`, so neither an empty click nor an empty marquee clears. `PianoRoll.tsx` genuinely contains no Escape handling. What is wrong is the *global* reading of "no Esc" — see F20 | src/components/TimelineCanvas.tsx `handleMouseUp` (marquee), `handleClick` (hit-only); src/components/PianoRoll.tsx `closeBtn` button (no Escape handling in this file) | — |
+| F20 | Mouse-only surface: no seek/zoom/track-focus/M-S/dialog keys; **no Esc outside inline edit fields**; `l` case-sensitive | missing | **high** | **[V] STILL OPEN; premise corrected** — "no Esc anywhere" is **false** and was false when written: `TrackHeader.handleRenameKeyDown`, `TopBar.handleMetaKeyDown` and `LibraryPanel`'s tag-edit `onKeyDown` all handle `"Escape"`, and this document's own inventory already listed them. The load-bearing claim survives and was **re-verified with a control**: zero `onKeyDown`/`keydown` in all four dialogs, while the same grep shape finds `onClick` in all four. `l` is still `e.key === "l"` (dead under CapsLock/Shift). Inventory gained one key since the audit: `B` = Draw Mode | src/App.tsx `handleKeyDown` (`e.key === "l"`); src/components/NewProjectDialog.tsx, AddTrackDialog.tsx, ImportDialog.tsx, LibraryRootsDialog.tsx (no key handler in any); inventory above | G39/G40 (booked) |
+| F21 | Velocity lane: click-only, first-hit-by-x (chords un-editable), no paint/numeric/audition | clunky | med | **[V] STILL OPEN, verbatim** — `handleMouseDown` loops notes in array order and `return`s on the first x-overlap, ignoring pitch and selection; one `onVelocityChange` per click, no drag, no audition | src/components/VelocityLane.tsx `VelocityLane`'s `handleMouseDown` | G17 (booked) |
+| F22 | Single-note readout is header text only; no inspector for exact tick/len/vel | missing | low | **[V] STILL OPEN** — `selInfo` still renders a header string (it gained detune/mod flags but no tick and no editability) | src/components/PianoRoll.tsx `selInfo` | S4 NoteInspector (planned) |
+| F23 | 1 s polling for dirty state + track list — laggy dirty dot / cross-view refresh | feedback | low | **[V] STILL OPEN, verbatim** — both 1 s `setInterval`s present (App's undo-state poll, ArrangementView's `refresh`) | src/App.tsx `refreshUndoState` poll effect; src/components/ArrangementView.tsx `refresh` + its 1 s interval effect | — |
+| F24 | Failures console-only: paste overflow skips, library assign errors, save-to-library errors | feedback | med | **[V] STILL OPEN, narrowed** — all three cited sites are unchanged (`console.warn` on paste overflow, `console.error` in `TrackHeader.handleDrop` and the FmEditor save-to-library `onClick`). But the premise "the app has no in-app notice channel" is now false: `PianoRoll`'s `showVoiceHint` is a working non-modal notice used for voice-drop hints and backend *rejections* — the fix is to route the remaining sites into it, not to invent a system | src/components/PianoRoll.tsx `handleKeyDown` (paste `console.warn`) vs. its own `showVoiceHint`; src/components/TrackHeader.tsx `handleDrop`; src/components/FmEditor.tsx save-to-library button `onClick` | — |
+| **F25** | **NEW — per-note voice assignment is unreachable for DAC, the one chip it was needed for** | missing | **med** | **[V] NEW THIS PASS, not previously booked.** `PianoRoll.handleVoiceDrop` rejects any drop whose payload `kind !== region.channelType`, and the library can never produce a `"dac"` entry: `LibraryInstrument` has exactly two variants (`Fm`, `Psg`) and `grep -rn "Dac" src-tauri/src/library/` returns nothing (exit 1, checked in isolation). So on a DAC region the only per-note-voice gesture in the app always fails with "Only DAC voices can be dropped on this lane". The IPC (`set_note_instrument`) and the resolution path (`resolve_instrument_data_by_id`'s `ChannelAssignment::Dac` arm) both support it; nothing in the UI can call them for DAC. Imported songs can still carry per-note DAC ids, so the read path is live — only authoring is unreachable. **This is what still blocks F7's headline scenario** | src/components/PianoRoll.tsx `handleVoiceDrop` (kind gate); src/api/library.ts `LIBRARY_DRAG_TYPE` (kind-suffixed types); src-tauri/src/library/entry.rs `LibraryInstrument` (`Fm`/`Psg` only); src-tauri/src/library/store.rs `kind` mapping | — |
+| **F26** | **NEW — every audition costs a full `listTracks` round-trip, on the interactive path** | feedback | low | **[V] NEW THIS PASS, not previously booked.** `PianoRoll.handleAudition` starts with `await ipc.listTracks()` — the whole track/region/note tree serialized across IPC — before it can send a preview. It runs on note press, on grid double-click, on every keys-column click, and (since F6) **once per new pitch in a Draw-Mode paint run**, so a fast painted run issues one full song fetch per row it crosses. The pitch feedback is delayed by that round-trip by construction. Not measured; code-certain | src/components/PianoRoll.tsx `handleAudition` (leading `await ipc.listTracks()`); called from `PianoRollCanvas` `handleMouseDown`, `handleDoubleClick`, `paintCellUnderPointer` and `PianoRollKeys` `onAudition` | — |
 
-## Top-10 biggest feel wins (ranked)
+## Top-10 biggest feel wins — ORIGINAL ranking (2026-08-21, superseded)
 
-1. **Hear what you just placed** — reload the sequence on note-edit commits (or make the
-   sequencer read live data). Fixes the sketch-into-the-loop core. (F1)
-2. **Kill the silent-track trap** — a loud "no voice" state on instrument-less lanes
-   plus a default voice (or one-click assign) at region creation. (F2)
-3. **Session restore** — persist open region, zoom/scroll, loop range, snap/grid, panel
-   layout; add a recent-projects list. Reopening should feel like sitting back down. (F15)
-4. **Live patch tweaking** — instrument edits audible on the next note while looping. (F3)
-5. **One-gesture note entry + right-click erase** — pencil-style draw and erase; ends the
-   double-click tax. (F6, with G13/G14)
-6. **QWERTY audition + step entry** — hands-on-keys composing. (F5/G36)
-7. **Audition on a free channel** — route previews to an unused/overlay channel so
-   in-context audition doesn't fight the mix. (F4)
-8. **Region names/colors or ruler markers** — make verse/chorus visible for assembly. (F10)
-9. **DAC kit authoring** — per-note sample UI (the model already supports it) or per-pitch
-   sample mapping; make the drum-name rows true. (F7)
-10. **Arrangement navigation** — cursor-anchored zoom, h-scrollbar or minimap,
-    zoom-to-fit. (F11, with G31/G32)
+Kept verbatim so the re-rank below can be read as a diff, and so a cold session can
+see which wins the last four parcels bought.
 
-## 15-minute owner play-test script
+1. ~~**Hear what you just placed**~~ — **SHIPPED** `54c6082`. (F1)
+2. ~~**Kill the silent-track trap**~~ — **half shipped** `54c6082` (cues yes, default
+   voice / one-click assign no). (F2)
+3. **Session restore** — (F15) *owner-deprioritized 2026-08-22, still open.*
+4. ~~**Live patch tweaking**~~ — **SHIPPED** `7f59c18`. (F3)
+5. ~~**One-gesture note entry + right-click erase**~~ — **SHIPPED** `8359f75`. (F6)
+6. **QWERTY audition + step entry** — (F5/G36) *still open, owner call open.*
+7. **Audition on a free channel** — (F4) *still open.*
+8. **Region names/colors or ruler markers** — (F10) *still open.*
+9. **DAC kit authoring** — (F7) *half shipped `abb22a9`, blocked by F25.*
+10. **Arrangement navigation** — (F11) *still open, narrowed.*
 
-Confirms/refutes the highest-severity UNVERIFIED findings, in order:
+## Top-10 biggest feel wins — RE-RANKED 2026-08-22 (pass 2)
 
-1. **(F1, 3 min)** New project, voice on FM1, one-bar region with a note, arm loop, play.
-   While looping: draw a second note; drag the first to a new pitch; delete one.
-   *Expected per code: none of it sounds until you stop/restart (but dragging the
-   region itself, or muting/unmuting any track, makes everything current).*
-2. **(F2, 2 min)** Same project: on a lane with NO voice, create a region, place notes,
-   play. *Expected: total silence, no cue anywhere. Also click the piano-roll keys
-   column — expected: nothing.*
-3. **(F3, 2 min)** While the FM1 note loops, open its instrument, drag TL/algorithm
-   hard. *Was: loop timbre unchanged until stop/play. **Now expected (2026-08-22
-   fix, needs ears): the timbre moves under your hand, inside the sustaining
-   note, with no re-attack and no gap.** Drag fast — nothing should stutter.*
-4. **(F4, 2 min)** While looping with FM1 sounding, hold-audition a library entry, then
-   click piano-roll keys. *Expected: FM1's part drops/glitches during audition and
-   recovers on its next note-on.*
-5. **(F13, 2 min)** Add notes on two FM lanes, play, then ride one track's volume
-   slider slowly, then fast. *Was: every slider event silenced and reprogrammed
-   all channels (measured: the mix went to rms 0 for the length of the drag).
-   **Now expected (2026-08-22 fix, needs ears): the ridden lane's level follows
-   the slider inside its sustaining note, and the OTHER lane is completely
-   undisturbed.** Also ride it while a PSG lane sustains an envelope voice —
-   that lane must not re-attack.*
-6. **(F8, 1 min)** Give a PSG lane a looping envelope voice (loop point set), click a
-   note in its piano roll once. *Expected per code: it rings until something else
-   stops previews.*
-7. **(F15, 2 min)** Mid-work: zoomed in, roll open, loop armed, snap=Beat. Save, close,
-   reopen. *Expected: all of it gone — default zoom, no roll, no loop, snap=Bar.*
-8. **(F12+F24, 1 min)** Play past the last region — does it ever stop? Then copy 2 bars
-   of notes and paste 1 bar before the region end — *expected: half the notes silently
-   missing (warning only in devtools console).*
+Four of the original ten are shipped and two are half-shipped, so the ranking is
+re-derived rather than re-numbered. The ordering principle is unchanged
+(centrality to a composing session), with one addition: **a finding whose blast
+radius GREW because a neighbouring parcel landed outranks one that merely stayed
+put.** Proposed, not ratified — the owner's deprioritization of F15 is honoured
+in the fundability note rather than by moving its severity.
+
+1. **Audition on a free channel** (F4) — *promoted from #7, and the recommended next
+   parcel.* Two things changed under it. F1/F3 made "edit and tweak while the loop
+   runs" the normal workflow this audit was aiming for, so an audition that
+   corrupts the running mix is now hit constantly rather than occasionally. And
+   F6's paint run auditions **per new pitch**, so a single drag across five rows
+   now steals ch0 five times. It is also the last audible-severity finding never
+   measured, and the harness that measured F3/F13 (`rendered_rms`,
+   `live_edit_audibility`) can measure it without ears.
+2. **Region names/colors or ruler markers** (F10) — unchanged at high, now the
+   largest untouched capability gap. Song assembly is still bar-number memory, and
+   nothing merged since the audit has touched it.
+3. **QWERTY audition + step entry** (F5/G36) — unchanged. Still gated on an owner
+   call; ranked below F10 only because F10 needs no ruling.
+4. **Two regions at once / ghost notes** (F18) — held at high and arguably
+   *worsened*: the region-switch fix (`e01f6d1`) now correctly clears note selection
+   on every switch, so the open/close cycling the audit describes loses selection by
+   design rather than by accident.
+5. **Finish the silent-track trap** (F2) — the cue landed; the cure did not. A
+   default voice, or one-click assign at region creation, is a small parcel now that
+   the "no voice" state is already computed in two components.
+6. **Make DAC per-note voices reachable** (F25, unblocking F7) — a narrow parcel:
+   the IPC, the resolver and the drop gesture all exist; the library has no DAC
+   kind, so the gesture can never fire on the one chip it was built for. Ranked
+   above the rest because it converts already-paid work into a usable feature.
+7. **Route the remaining failures into the existing notice channel** (F24) — was
+   "build a way to show errors"; is now "call `showVoiceHint`'s equivalent from three
+   more sites". Cheap, and it removes a whole class of silent failure.
+8. **Arrangement navigation** (F11) — narrowed to two concrete deltas: use the
+   existing `zoomAroundPixel` from `handleWheel`, and give `.body` a horizontal
+   scrollbar. The anchoring seam already exists and is already used by `zoomAtBy`.
+9. **Session restore** (F15) — severity is still critical; **fundability is not.**
+   Owner ruled it deprioritized ("current behavior matches how they work"). Left
+   here so a cold session sees the severity and the ruling together. When it is
+   funded, extend `src/utils/recentLocations.ts` rather than starting fresh.
+10. **Velocity lane + note inspector** (F21/F22) — unchanged, and the natural
+    companions to any S4 NoteInspector work.
+
+Dropped off the list because they shipped: F1, F3, F6, F13.
+
+## 15-minute owner play-test script — REWRITTEN 2026-08-22 (pass 2)
+
+> The 2026-08-21 script told the owner to expect behaviour that four merged
+> parcels had since fixed (steps 1, 2 and 5 in particular would have "confirmed"
+> defects that no longer exist, and step 3's *Was:* framing had already been
+> patched once). It is replaced, not amended. Two steps are now **regression
+> checks on shipped fixes** rather than confirmations of open findings — those are
+> the ones worth the owner's ears, because nothing else can confirm them.
+
+Every step's expectation below is derived from the code at `3d72793`.
+
+1. **(F1 regression, 2 min)** New project, drag a Library FM voice onto FM1,
+   double-click the FM1 lane for a one-bar region, place a note, `L` to arm the
+   loop, Space. While it loops: place a second note; drag the first to a new
+   pitch; delete one. **Expected now: every one of those is audible on the very
+   next pass, with no stop/start.** If anything needs a restart to be heard, F1
+   has regressed — say so, it is the audit's #1 and it is supposed to be closed.
+2. **(F6 regression + F4, 3 min)** Still looping. Press `B` (or click **Draw**),
+   then drag across five or six rows to paint a run. **Expected: one gesture
+   paints the whole run, one undo (Ctrl+Z) removes all of it, and it is audible
+   on the next pass.** Now the part that matters: **listen to FM1's own part
+   while you paint.** *Expected per code (F4, needs ears): every new pitch in the
+   run fires a preview on hardware channel 0, so the loop's FM1 voice should drop
+   out or glitch repeatedly during the drag and recover on its next note-on.* This
+   is the single most valuable ear-minute in the script — F4 is the recommended
+   next parcel and its audible cost has never been measured.
+3. **(F6 owner ruling, 1 min)** Still in Draw Mode: left-click an **existing**
+   note. **Current behaviour: it selects/moves the note. Ableton would delete
+   it.** The implementer deviated deliberately and the deviation was ratified
+   *provisionally* pending your ear. **Your call — one-line change either way.**
+4. **(F2, 1 min)** On a lane with **no** voice: it should already read `no voice`
+   next to a dimmed lane name, and opening its region should show a
+   `silent — no voice assigned` badge in the roll header. **Expected: those cues
+   are present** (that half shipped). Then place notes and play. *Expected: still
+   total silence, and clicking the keys column still does nothing —* the cue
+   explains the silence but nothing offers to fix it in one click. That gap is
+   what F2 still funds.
+5. **(F3 + F13 regression, 3 min)** Notes on two FM lanes plus one PSG lane
+   sustaining an envelope voice. Play. (a) Open an FM instrument and drag
+   TL/algorithm hard and fast. **Expected: the timbre moves under your hand inside
+   the sustaining note — no re-attack, no gap, no stutter.** (b) Ride one track's
+   volume slider slowly, then fast. **Expected: that lane's level follows the
+   slider inside its note; the OTHER FM lane is completely undisturbed; and the
+   PSG lane does not re-attack.** These were measured as rendered audio, never
+   heard — a rendered rms of 0 was the original defect, so "it sounds fine" is the
+   confirmation being sought.
+6. **(F8, 1 min)** Give a PSG lane an envelope voice **with a loop point set**,
+   then click one note in its piano roll, once, and let go. *Expected per code: it
+   rings indefinitely — the FM audition self-stops after 500 ms, the PSG one has
+   no stop path at all.*
+7. **(F16, 1 min)** File → New Project. **Expected: the Location field is
+   pre-filled and typeable, and focusing it drops a list of recent locations** —
+   that much shipped. *Still expected to be missing: any way to press Enter to
+   create or Esc to cancel, and any list of recent **projects** to reopen.*
+8. **(F12 + F24, 1 min)** Play past the last region — *expected: it never stops,
+   the UI stays "playing".* Then Ctrl+C two bars of notes and Ctrl+V one bar
+   before the region end — *expected: the overflowing notes are silently missing,
+   with the warning only in the devtools console. Note the contrast: a paste the
+   backend **rejects** does show an in-app notice in the roll header — the channel
+   exists, this path just doesn't use it.*
+9. **(F15, 2 min — optional, owner-deprioritized)** Mid-work: zoomed in, roll
+   open, loop armed, snap=Beat. Save, close, reopen. *Expected: all of it gone.*
+   Skip unless you want to re-examine the deprioritization ruling.
 
 ## BLOCKED / UNVERIFIED for controller follow-up
 
 - **Nothing blocked.** All scenarios were traceable in code.
 - UNVERIFIED (audible/live confirmation needed, covered by the script above):
-  F1 (note edits inaudible mid-loop — code-certain, feel-severity needs ears),
-  ~~F3~~, F4 (ch0 steal audibility), F8 (endless PSG audition), ~~F13~~, and
+  ~~F1~~ (fixed `54c6082`; regression check is script step 1),
+  ~~F3~~, **F4 (ch0 steal audibility — still unmeasured, and now the top-ranked
+  parcel; script step 2)**, **F8 (endless PSG audition — still unmeasured;
+  script step 6)**, ~~F13~~, and
   ~~the exact audible cost of `silence_all` on every reload~~.
+- **TAGGED for the controller's foreground follow-up (never attempted from a
+  background lane):** F4 and F8 both need either ears or a rendered-audio run.
+  Neither was attempted this pass. F4 is measurable *without* ears using the
+  existing harness (`src-tauri/src/audio/rendered_rms.rs`,
+  `src-tauri/src/audio/live_edit_audibility.rs`) — render a two-lane snapshot,
+  fire a preview mid-note, and assert the non-previewed lane's rms is undisturbed.
+  That is the same shape that corrected F13's severity, and it should precede the
+  F4 parcel rather than follow it.
+- **F6's Draw-Mode click-on-existing-note deviation** (selects/moves where Ableton
+  deletes) remains provisionally ratified pending the owner's ear — script step 3.
+  Not a re-grounding finding; carried forward from the queue so it is not lost.
+
+## Re-grounding pass 2 — scope, method, and what was NOT checked
+
+Recorded so the next pass does not have to re-derive it, and so the completeness
+claim can be audited rather than taken on trust.
+
+**Enumeration actually run.** The row set is F1–F24 as written plus the two rows
+added this pass (F25, F26) = **26 rows, every one marked [V]** — for each, a
+symbol or a behaviour was read in the tree at `3d72793` this pass. Zero rows are
+**[C]**. That is a strong claim, so here is exactly what it does and does not
+cover: **[V] means the cited symbol was read and the stated behaviour follows
+from the code as read.** It does **not** mean the behaviour was observed running
+— nothing was executed, no test suite was run, and no audio was rendered. The
+four already-FIXED rows (F1, F3, F6, F13) keep their pre-fix `Where` coordinates
+deliberately; their **[V]** attaches to the fix being present, which was checked
+in the fixing files, not to those historical coordinates. The Top-10 was
+re-derived from this set rather than renumbered.
+
+**Prior-pass warning, honoured rather than repeated.** The first re-grounding
+pass on this document asserted completeness three times and was wrong each time;
+its third miss (F15's `Where`) was found afterwards by someone else. So: this
+pass makes no claim about findings that are *absent* from the table. Two new ones
+(F25, F26) surfaced incidentally while checking F7 and F6 — which is itself
+evidence that the table is a record of what has been looked at, not of what is
+wrong with the app.
+
+**Absences confirmed with controls, not with empty greps** (the F19/F20 defect was
+an uncontrolled absence claim, so every absence below has a paired positive):
+
+- *No key handler in any dialog* — `grep onKeyDown|keydown` over the four dialog
+  files returns nothing; the same shape over the same four files returns `onClick`
+  in all four.
+- *No `Dac` anywhere under `src-tauri/src/library/`* — grep exit status checked in
+  isolation (1, no match), with `LibraryInstrument`'s two variants read directly
+  from `entry.rs` as the positive control.
+- *No QWERTY pitch map* — established by enumerating all 11 `onKeyDown`/`keydown`
+  sites in `src/` and reading each, not by searching for a name it might not use.
+- *Nothing imports `Sidebar`* — re-run unfiltered after an earlier filtered grep
+  could have hidden the answer inside its own `-v` pattern.
+
+**Deliberately NOT re-grounded, and why:**
+
+- The `file:line` coordinates inside Scenarios A–G and the keyboard pass. Their
+  *claims* were re-checked and the false ones are enumerated above; converting
+  ~60 historical coordinates to symbols would rewrite the audit's narrative record
+  for no funding benefit. If a future parcel needs one of those addresses, take it
+  from the findings table's `Where`, which is symbol-grounded, never from the prose.
+- The G1–G41 cross-references. The full enumeration still is not present verbatim
+  in the queue doc (only ~25 G-numbers are named in its Log), so the "no G-ref"
+  rows (F7, F10, F18, F25, F26) may still overlap unnamed G-numbers. Unchanged
+  from the 2026-08-21 note; not resolvable from this repo's docs alone.
+- Anything requiring runtime or audio. No emulator or audio tool was invoked; see
+  the TAGGED items above.
 
 ### F3 / F13 / `silence_all` — VERIFIED then FIXED (2026-08-22)
 

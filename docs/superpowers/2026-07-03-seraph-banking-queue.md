@@ -1227,6 +1227,102 @@ designs target the banked specs (normative); manifest flags carry the gates.
   command-driven. Seraph gets the driver's repair for free: `stop`/`seek`
   invalidate the pan shadow, so the next note-on re-asserts pan.
 
+- 2026-08-22 (cont.): **FEEL-AUDIT RE-GROUNDED, PASS 2 — all 26 rows, the
+  ranking, the prose and the play-test script** (docs-only, branch
+  `docs/reground-feel-audit`, base `3d72793`; no code touched). The booked drift
+  was the trigger; the pass found the booking was incomplete in both directions.
+  **The three booked drifts, confirmed and corrected rather than repeated:**
+  **F16** — Location field editable, prefilled from `mostRecentLocation()`, with
+  a suggestion listbox and `defaultPath` on both Browse and Open; severity med →
+  low, and the surviving half restated precisely (no scratch project, no recent-
+  *projects* list, still no Enter/Esc in the dialog). **F19/F20** — the three
+  `key === "Escape"` handlers are `TrackHeader.handleRenameKeyDown`,
+  `TopBar.handleMetaKeyDown` and LibraryPanel's tag-edit — **all three of which
+  the audit's own inventory table already listed**, which is how the claim got
+  written: the author read their own table's "Inline edit fields" row and still
+  wrote "no Esc anywhere". The load-bearing claim (no dialog handles Enter/Esc)
+  survives and was re-verified WITH A CONTROL (`onClick` found in the same four
+  files by the same grep shape). **F15** — `Where` said "grep (no localStorage)";
+  `src/utils/recentLocations.ts` is the app's first localStorage user. The
+  finding itself is untouched (`ProjectFile` is still `{metadata, tracks}`), but
+  the premise "no persistence seam exists" is dead and the `Where` now points at
+  the seam instead of denying it.
+  **SIX VERDICTS CHANGED.** FIXED: **F1** (`54c6082` — all 13 PianoRoll mutation
+  paths enumerated, every one reloads), **F6** (`8359f75`). Already-booked FIXED
+  confirmed: F3, F13 (`7f59c18`). PARTLY FIXED: **F2** (cues shipped, cure did
+  not — severity critical → med), **F7** (per-note voices exist end to end via
+  `abb22a9`, so "impossible / no UI or IPC" is dead — high → med), **F16**,
+  **F17** (ruler zone cursors killed the "invisible halves" sub-claim — high →
+  med). NARROWED but open: F9 (paint auditions per pitch; transpose/move-drag
+  still silent), F11 (`zoomAtBy` anchors, `handleWheel` still doesn't — the seam
+  exists), F24 (`showVoiceHint` is a working in-app notice channel; three sites
+  still bypass it).
+  **TWO NEW FINDINGS, NEITHER PREVIOUSLY BOOKED — this is the high-value output,
+  and both were found by checking a shipped fix rather than by re-reading a
+  finding.** **F25: per-note voice assignment is unreachable for DAC.**
+  `PianoRoll.handleVoiceDrop` gates on `kind !== region.channelType`, and
+  `LibraryInstrument` has exactly two variants (`Fm`, `Psg`) — `grep -rn "Dac"
+  src-tauri/src/library/` exits 1, checked in isolation. So on a DAC lane the
+  only per-note-voice gesture in the app *always* fails with "Only DAC voices can
+  be dropped on this lane". `set_note_instrument` and
+  `resolve_instrument_data_by_id`'s Dac arm both support it; nothing in the UI
+  can call them. **This is exactly the name/presence/behaviour trap** — F7 reads
+  as closed at the IPC layer while the gesture is dead for the one chip F7 was
+  about. Imported songs still carry per-note DAC ids, so the read path is live;
+  only authoring is unreachable. **F26: every audition costs a full `listTracks`
+  round-trip.** `PianoRoll.handleAudition` opens with `await ipc.listTracks()` —
+  the whole track/region/note tree over IPC — before it can send a preview, on
+  note press, grid double-click, keys-column click, and (since F6) **once per new
+  pitch of a paint run**. Code-certain, not measured.
+  **ONE ERROR IN THE AUDIT'S OWN TEXT, corrected:** F12 said WAV export "renders
+  a fixed user-supplied duration (default 60 s)". `TopBar.handleExportWav` calls
+  `ipc.exportWav(path, 60)` with a literal and there is no duration input
+  anywhere — the finding is slightly worse than it was written, not better.
+  **RANKING RE-DERIVED, not renumbered.** Four of the original Top-10 shipped
+  (F1/F3/F6/F13), two half-shipped (F2/F7). New #1 = **F4, audition on a free
+  channel**, promoted from #7 on a stated principle: *a finding whose blast
+  radius GREW because a neighbouring parcel landed outranks one that merely
+  stayed put.* F1/F3 made edit-while-looping the normal workflow, and F6's paint
+  run auditions **per new pitch** — so one drag across five rows now steals ch0
+  five times. **F15 was NOT promoted despite still being critical**: the owner's
+  deprioritization ruling is honoured in the fundability note, and the severity
+  and the ruling are now recorded together so a cold session cannot read one
+  without the other.
+  **PLAY-TEST SCRIPT REWRITTEN, not amended.** Three of its eight steps were
+  instructing the owner to confirm behaviour that had already been fixed — a
+  wasted gate that cannot be re-run cheaply. Two steps are now regression checks
+  on shipped fixes (F1, F3/F13) because only ears can confirm those; step 2 pairs
+  the F6 regression check with the F4 measurement, which is the highest-value ear
+  minute in the script. F6's Draw-Mode click-on-existing-note deviation is
+  carried into the script as an explicit owner call.
+  **METHOD NOTES worth keeping.** Every absence claim has a paired positive
+  control (dialog `onKeyDown` vs `onClick`; library `Dac` vs `LibraryInstrument`
+  read directly; "no QWERTY map" from enumerating all 11 keydown sites rather
+  than guessing a name). One near-miss caught in flight: a `grep -v` filter on
+  the Sidebar check would have hidden the answer inside its own exclusion
+  pattern — re-run unfiltered. Another: `EXIT=$?` after an intervening `echo`
+  reports the echo's status, not the grep's; the DAC absence was re-checked with
+  the status isolated. The audit's symbol-not-line-number discipline was
+  preserved — **no line numbers were added, and every symbol in a still-open row
+  was confirmed to exist at `3d72793`** rather than inherited from the first pass.
+  **TAGGED for the controller (never attempted from a background lane):** F4 and
+  F8 still need ears or rendered audio. F4 is measurable *without* ears using the
+  existing `rendered_rms` / `live_edit_audibility` harness — fire a preview
+  mid-note in a two-lane snapshot and assert the non-previewed lane's rms is
+  undisturbed. That is the shape that corrected F13's severity, and it should
+  precede the F4 parcel, not follow it.
+  **DELIBERATELY NOT DONE:** the ~60 `file:line` coordinates inside Scenarios A–G
+  were not converted to symbols — their *claims* were re-checked and every false
+  one is enumerated in a new "Prose drift" section, but rewriting the narrative
+  record buys no funding accuracy. The findings table's `Where` is the
+  symbol-grounded address of record; never take an address from the prose.
+  **COMPLETENESS, stated at the strength actually earned:** 26/26 rows carry a
+  **[V]** mark meaning a symbol or behaviour was read this pass — nothing was
+  executed, no suite was run, no audio rendered. No claim is made about findings
+  *absent* from the table; F25 and F26 surfaced incidentally, which is evidence
+  the table records what has been looked at, not what is wrong with the app. The
+  previous pass asserted completeness three times and missed three times.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

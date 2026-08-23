@@ -1722,6 +1722,60 @@ designs target the banked specs (normative); manifest flags carry the gates.
   **The fix choice is NOT delegated.** It is a design call about what the preview
   is allowed to promise, and it goes to the owner with numbers.
 
+- 2026-08-23 (cont.): **BOTH F27 INVESTIGATIONS LANDED — AND F27's PREMISE WAS
+  WRONG.** Merged `75fdd1a` (driver truth) + `6852454` (exposure map); findings
+  banked in the DAW-feel audit at `32cf763`. Docs-only merges, no code touched, so
+  the three verification lanes were not re-run — stated rather than implied.
+  **Full detail is in `docs/superpowers/2026-08-21-daw-feel-audit.md`, section
+  "F27 — GROUNDED 2026-08-23"; this entry is a pointer, not a second copy.**
+  Headline: aeon **does** write `$2B`, at four sites, with a three-mode per-song
+  ch6 contract (DEDICATE / FM6-FM / ADAPTIVE). **Hardware CAN sound FM6 and DAC in
+  one song** — alternating, in ADAPTIVE — so the F27 row's "real hardware cannot"
+  is false as written. That row is deliberately LEFT UNEDITED with the correction
+  in its own section, so the change of understanding is visible rather than
+  laundered into the original claim.
+  **Every load-bearing agent claim was re-verified firsthand by the overseer before
+  banking** (the `$2B` write sites and the `SND_FM6_ADAPTIVE` gate in aeon at
+  `139995f`; `OPN2_ReadChannels` summing `ch_out[0..6]` blind to `dacen`;
+  `vgm.rs`'s `Dac(_) => continue`; `vgm_import.rs`'s `hw_ch == 5 && dac_enabled`;
+  `check_voice_overlap`'s `channel_key` narrowing; the NUL byte and its
+  tree-wide enumeration). Two claims are marked carried-not-verified in the audit
+  rows themselves rather than silently promoted.
+  **NEW FINDINGS BOOKED: F28–F31.** F28 is the one with reach beyond F27 —
+  `src/components/PianoRoll.tsx` contains a NUL byte (`MIXED_VOICE = "\0mixed"`),
+  so grep treats the file as **binary and skips it silently**: `grep -c` exits 1
+  with no output where `grep -ac` returns 7. It is the **only source file in the
+  tree** with a NUL (18 tracked files have them; 17 are icons — enumerated, not
+  assumed), and it is the 907-line note-editing surface. **Every past frontend
+  enumeration in this repo that omitted `-a` excluded it and returned a clean
+  empty result while doing so** — protocol bar 16(d) living permanently in the
+  tree rather than arriving in one command. One-character fix; the value is
+  re-running past sweeps.
+  F29 VGM export drops every DAC note (`Dac(_) => continue`) — **must land before
+  the booked README-7 VGM wiring**, or that fix ships a working button whose first
+  output has no percussion. F30 SMPS export emits both an FM and a DAC header for
+  index 5. F31 `FlamedriverProfile::channel_layout()` advertises six FM voices
+  *including* `FM6/DAC` **plus** a separate DAC channel — seven voices on a
+  six-voice chip — and it is the tree's ONLY `DriverProfile`, is S3K's (which has
+  no FM6 music voice at all), and there is no aeon/Memra profile. F31 is upstream
+  of F27 and wrong however F27 resolves.
+  **THE TWO AGENTS DISAGREED ON THE FIX, AND THAT IS THE RESULT.** The exposure
+  map recommends a key-off-FM6 steal plus a diagnostic; the driver read shows that
+  is right in ADAPTIVE and actively wrong in FM6-FM, where the loss is permanent
+  and a restoring preview would sound BETTER than hardware. Both correct in their
+  own frame. The reconciliation: **Seraph has no song-level ch6-mode field**, so it
+  cannot express which contract a song targets, and no amount of source reading
+  decides what a from-scratch Seraph song should default to. **PARKED FOR THE
+  OWNER as a model-design call.** Bar-19 note: the two derivations enumerated over
+  different parameters (aeon driver source + Z80 blobs vs Seraph's call graph) with
+  neither brief carrying the other's conclusion, so their agreement on the VGM
+  defect is corroboration and their disagreement on the fix is real, not a frame
+  artifact.
+  **TAGGED, NOT ATTEMPTED — no emulator from a background agent, ever:** trace
+  whether post-sample `$28` writes land on a chip-muted ch6 in FM6-FM mode (the
+  driver read calls this inference, not observation); and confirm by ear in Seraph
+  that an FM6 sustain and a drum hit audibly coexist.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

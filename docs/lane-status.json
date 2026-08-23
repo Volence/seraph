@@ -1,6 +1,17 @@
 {
-  "focus": "Nothing running. The note-entry work landed; three things need your ears, and S0's new shape needs your word.",
-  "inFlight": [],
+  "focus": "On F27 — the drum-vs-FM6 clash. Two agents grounding what the chip really does and what it would cost to fix.",
+  "inFlight": [
+    {
+      "what": "Establishing what the real drivers do with the DAC/FM6 steal, so the fix is grounded rather than assumed",
+      "where": "branch research/f27-driver-truth",
+      "agent": true
+    },
+    {
+      "what": "Mapping every place in Seraph the clash shows up — preview, exports, and the authoring gate — with costs per fix",
+      "where": "branch research/f27-exposure-map",
+      "agent": true
+    }
+  ],
   "blockedOnOwner": [
     {
       "what": "Three by-ear checks nothing here can answer: does the picked DAC sample sound right and immediately, does a hand-built kick/hat/snare kit play back as authored, does auditioning feel faster while painting a run",
@@ -15,19 +26,19 @@
       "since": "2026-08-21"
     }
   ],
-  "nextBoundary": "Nothing is open — the lane is at a clean stop. The next boundary is whichever item you pick landing on a green merged tree.",
+  "nextBoundary": "Both investigations back and judged, and the fix choice put to you with real numbers.",
   "queue": [
     {
       "id": "F27",
       "title": "Seraph lets a drum and the FM6 track sound together; the real chip cannot",
-      "state": "next",
+      "state": "doing",
       "size": "M",
       "blockedBy": null
     },
     {
       "id": "S0",
       "title": "Sound-driver capability manifest — the thing that gates every later Seraph piece",
-      "state": "open",
+      "state": "next",
       "size": "L",
       "blockedBy": "which drivers it targets — needs your word, not a relay"
     },
@@ -53,5 +64,5 @@
       "blockedBy": "S0"
     }
   ],
-  "updatedAt": "2026-08-23T07:38:00Z"
+  "updatedAt": "2026-08-23T07:45:32Z"
 }

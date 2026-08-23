@@ -1,13 +1,8 @@
 {
-  "focus": "On F27 \u2014 the drum-vs-FM6 clash. Two agents grounding what the chip really does and what a fix would cost.",
+  "focus": "F27 turned over: the driver is more capable than we assumed, and Seraph's channel roster is wrong in its own right.",
   "inFlight": [
     {
-      "what": "Reading aeon's Z80 driver at a committed revision to establish what really happens when a drum steals channel 6 from FM",
-      "where": "branch research/f27-driver-truth",
-      "agent": true
-    },
-    {
-      "what": "Mapping every place in Seraph the clash shows up \u2014 preview, exports, the authoring gate \u2014 with a price on each of the three fixes",
+      "what": "Mapping every place in Seraph the clash shows up \u2014 preview, exports, the authoring gate \u2014 with a price on each fix",
       "where": "branch research/f27-exposure-map",
       "agent": true
     }
@@ -26,7 +21,7 @@
       "since": "2026-08-21"
     }
   ],
-  "nextBoundary": "Both investigations back and judged, and the fix choice put to you with real numbers. Do not rotate until then \u2014 an agent is live.",
+  "nextBoundary": "The second investigation back and judged, then the fix choice to you with real numbers.",
   "queue": [
     {
       "id": "F27",
@@ -57,5 +52,5 @@
       "blockedBy": "which drivers it targets \u2014 needs your word, not a relay"
     }
   ],
-  "updatedAt": "2026-08-23T08:02:36Z"
+  "updatedAt": "2026-08-23T08:11:07Z"
 }

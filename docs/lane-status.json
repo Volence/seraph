@@ -1,13 +1,11 @@
 {
-  "focus": "F27 turned over: the driver is more capable than we assumed, and Seraph's channel roster is wrong in its own right.",
-  "inFlight": [
-    {
-      "what": "Mapping every place in Seraph the clash shows up \u2014 preview, exports, the authoring gate \u2014 with a price on each fix",
-      "where": "branch research/f27-exposure-map",
-      "agent": true
-    }
-  ],
+  "focus": "F27 is grounded and it turned over: hardware CAN do this in one of three modes, and Seraph can't say which. Needs your call.",
+  "inFlight": [],
   "blockedOnOwner": [
+    {
+      "what": "F27's design call: Seraph has no song-level channel-6 mode field, so it cannot express which of the driver's three contracts a song is written against. Both fixes are right in different modes \u2014 the choice is a model decision, not a code one",
+      "since": "2026-08-23"
+    },
     {
       "what": "Three by-ear checks nothing here can answer: does the picked DAC sample sound right and immediately, does a hand-built kick/hat/snare kit play back as authored, does auditioning feel faster while painting a run",
       "since": "2026-08-22"
@@ -21,21 +19,42 @@
       "since": "2026-08-21"
     }
   ],
-  "nextBoundary": "The second investigation back and judged, then the fix choice to you with real numbers.",
+  "nextBoundary": "Right here \u2014 both investigations landed, findings banked and pushed, nothing running. A clean /clear point.",
   "queue": [
     {
       "id": "F27",
-      "title": "Seraph lets a drum and the FM6 track sound together; the real chip cannot",
-      "state": "doing",
+      "title": "The FM6/DAC design call \u2014 parked on your ruling, not on work",
+      "state": "open",
+      "size": "L",
+      "blockedBy": "needs your call on whether Seraph models the channel-6 mode"
+    },
+    {
+      "id": "F28",
+      "title": "A stray NUL byte in the piano-roll file makes every code search silently skip it",
+      "state": "next",
+      "size": "S",
+      "blockedBy": null
+    },
+    {
+      "id": "F29",
+      "title": "VGM export throws away every drum, silently \u2014 and the booked VGM fix would ship that",
+      "state": "open",
+      "size": "M",
+      "blockedBy": null
+    },
+    {
+      "id": "F31",
+      "title": "The one driver profile offers seven voices on a six-voice chip",
+      "state": "open",
       "size": "M",
       "blockedBy": null
     },
     {
       "id": "README-7",
-      "title": "Seven small booked defects from the README pass \u2014 dead VGM export, WAV export stuck at 60s, a broken --help, a format that does not exist",
+      "title": "Seven small booked defects from the README pass",
       "state": "open",
       "size": "M",
-      "blockedBy": null
+      "blockedBy": "F29 should land first or the VGM fix ships drumless"
     },
     {
       "id": "FLAKE",
@@ -43,14 +62,7 @@
       "state": "open",
       "size": "S",
       "blockedBy": null
-    },
-    {
-      "id": "S0",
-      "title": "Sound-driver capability manifest \u2014 the thing that gates every later Seraph piece",
-      "state": "open",
-      "size": "L",
-      "blockedBy": "which drivers it targets \u2014 needs your word, not a relay"
     }
   ],
-  "updatedAt": "2026-08-23T08:11:07Z"
+  "updatedAt": "2026-08-23T08:15:35Z"
 }

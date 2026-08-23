@@ -106,6 +106,7 @@ function roll(regionId: string, onClose = vi.fn()) {
   return (
     <PianoRoll
       region={sel(regionId)}
+      projectPath={null}
       onClose={onClose}
       playing={false}
       projectMeta={meta}

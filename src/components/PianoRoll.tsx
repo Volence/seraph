@@ -14,10 +14,13 @@ import { OCTAVE_SEMITONES, PITCH_RANGES, DEFAULT_PITCH_RANGE, DEFAULT_NOTE_VELOC
 import { copyNotes, getNoteClipboard, getNoteClipboardChannelType, lastCopiedKind, planNotePaste } from "../utils/clipboard";
 import { setPianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { isEditableTarget } from "../utils/keyboard";
+import { VIEW_STATE_WRITE_DELAY_MS, clampIndex, getViewState, patchViewState } from "../utils/viewState";
 import styles from "./PianoRoll.module.css";
 
 interface PianoRollProps {
   region: SelectedRegion;
+  /** Open project's directory; keys the remembered view state (F15). */
+  projectPath: string | null;
   onClose: () => void;
   playing: boolean;
   projectMeta: SongMetadata;
@@ -41,6 +44,9 @@ const GRID_OPTIONS: { label: string; divisor: number }[] = [
   { label: "1/8T", divisor: 12 },
 ];
 
+/** Index into GRID_OPTIONS used when nothing is remembered: 1/16. */
+const DEFAULT_GRID_IDX = 4;
+
 const CHANNEL_COLORS: Record<string, string> = {
   fm: "#4a9eff",
   psg: "#44cc66",
@@ -63,7 +69,7 @@ const DAC_SAMPLE_NAMES: Record<number, string> = {
  *  forever. */
 const NO_NOTES: Note[] = [];
 
-export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
+export function PianoRoll({ region, projectPath, onClose, playing, projectMeta, seekTick, onSeek, loopEnabled = false }: PianoRollProps) {
   // Everything fetched for the open region, TAGGED with the region it came
   // from. This component is not remounted when a different region opens
   // (BottomPanel renders one persistent PianoRoll, no `key`), so untagged
@@ -106,8 +112,31 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   // Draw Mode (F6): a TOOL setting, not a property of the document — like the
   // grid selector it deliberately survives a region switch (Ableton's Draw
   // Mode is likewise global, not per-clip).
+  //
+  // DELIBERATELY NOT PERSISTED ACROSS SESSIONS (F15). Draw Mode is a MODE: it
+  // changes what a click MEANS. Restoring an invisible-until-used mode from a
+  // previous sitting is the classic mode error — the first gesture of the
+  // session behaves differently for a reason the user does not remember
+  // setting. The grid selector below persists precisely because it is not
+  // modal: it changes granularity, not the meaning of any gesture.
   const [drawMode, setDrawMode] = useState(false);
-  const [gridIdx, setGridIdx] = useState(4);
+  // The view remembered for this project, read once at mount. Only the grid
+  // selector is restored here: the roll's own zoom/scroll are RESET on every
+  // region switch by design (see the region-identity effect below), so a
+  // persisted roll zoom would be overwritten the moment a region opened —
+  // and reinstating the bug that reset was added to fix.
+  const [savedView] = useState(() => (projectPath ? getViewState(projectPath) : {}));
+  const [gridIdx, setGridIdx] = useState(() =>
+    clampIndex(savedView.pianoRoll?.gridIdx, GRID_OPTIONS.length, DEFAULT_GRID_IDX),
+  );
+  // Write-through for the grid selector (debounced like the rest of F15).
+  useEffect(() => {
+    if (!projectPath) return;
+    const timer = setTimeout(() => {
+      patchViewState(projectPath, { pianoRoll: { gridIdx } });
+    }, VIEW_STATE_WRITE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [projectPath, gridIdx]);
   const [scrollTop, setScrollTop] = useState(0);
   const ticksPerBeat = projectMeta.ticksPerBeat;
   const ticksPerBar = grid.ticksPerBar(projectMeta);

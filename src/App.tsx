@@ -14,10 +14,24 @@ import { recordPlayStart, recordStop, noteSeek, consumeStopDoubleTap, resetTrans
 import { mostRecentLocation, parentDirectory, rememberLocation } from "./utils/recentLocations";
 import { defaultPreviewLoop, type PreviewLoopRange } from "./utils/previewLoop";
 import { resetClipboard } from "./utils/clipboard";
+import {
+  VIEW_STATE_WRITE_DELAY_MS,
+  clearViewState,
+  getViewState,
+  patchViewState,
+  resolveLoop,
+  resolveOpenRegion,
+  songEndTick,
+} from "./utils/viewState";
 import styles from "./App.module.css";
 
 export default function App() {
   const [projectMeta, setProjectMeta] = useState<SongMetadata | null>(null);
+  // Directory of the open project. The key the remembered view state (F15) is
+  // filed under, and the identity the arrangement/bottom panel remount on — a
+  // different project is a different document, so their view state must not
+  // carry over the way it legitimately does across a region switch.
+  const [projectPath, setProjectPath] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument | null>(null);
@@ -123,6 +137,62 @@ export default function App() {
     await ipc.transportSetLoop(start, end);
     setLoopEnabled(true);
   }, []);
+
+  /**
+   * Rebuild the App-owned half of the remembered view for `path`: which region
+   * was open in the roll, and the preview loop (re-armed if it was armed).
+   *
+   * DEFENSIVE BY CONSTRUCTION. The project may have been edited elsewhere
+   * since we last saw it, so nothing stored is trusted on its own: the region
+   * is resolved against the tracks as they are right now (a deleted track or
+   * region simply does not reopen), and the loop is dropped when its range is
+   * degenerate or its content is gone. Every failure degrades to "restore
+   * less" — this runs inside project-open, and a corrupt convenience record
+   * must never be able to stop a project from opening.
+   *
+   * The loop is re-armed through `transport_set_loop`, the same command the
+   * ruler drag and the L key already use. Nothing here READS the engine's
+   * published `loopStart`/`loopEnd`, which are still the unsynchronized
+   * armed->re-armed fields booked in the queue's 2026-08-22 landing note.
+   */
+  const restoreProjectView = useCallback(async (path: string) => {
+    const restored: { regions: SelectedRegion[]; loop: PreviewLoopRange | null; armed: boolean } = {
+      regions: [],
+      loop: null,
+      armed: false,
+    };
+    try {
+      const view = getViewState(path);
+      const tracks = await ipc.listTracks();
+      const region = resolveOpenRegion(view.openRegion, tracks);
+      if (region) restored.regions = [region];
+      const loop = resolveLoop(view.loop, songEndTick(tracks));
+      if (loop) {
+        restored.loop = { start: loop.start, end: loop.end };
+        if (loop.enabled) {
+          await ipc.transportSetLoop(loop.start, loop.end);
+          restored.armed = true;
+        }
+      }
+    } catch (e) {
+      console.warn("view-state restore skipped:", e);
+    }
+    return restored;
+  }, []);
+
+  // Write-through for the App-owned view state. Debounced so a loop drag
+  // records once per gesture rather than once per pointer move.
+  useEffect(() => {
+    if (!projectPath) return;
+    const timer = setTimeout(() => {
+      const region = selectedRegions[selectedRegions.length - 1] ?? null;
+      patchViewState(projectPath, {
+        openRegion: region ? { trackId: region.trackId, regionId: region.regionId } : null,
+        loop: previewLoop ? { ...previewLoop, enabled: loopEnabled } : null,
+      });
+    }, VIEW_STATE_WRITE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [projectPath, selectedRegions, previewLoop, loopEnabled]);
 
   const startPlayback = useCallback(async () => {
     // Feed the launch-point memory so a stop double-tap can return there
@@ -280,13 +350,24 @@ export default function App() {
       if (projectOpen) await ipc.closeProject();
       setPlaying(false);
       resetSeekCursor();
-      const song = await ipc.openProject(selected as string);
+      const path = selected as string;
+      const song = await ipc.openProject(path);
       // The chosen directory is the project itself; its parent is the
       // "location" worth prefilling in future New Project dialogs.
-      rememberLocation(parentDirectory(selected as string));
+      rememberLocation(parentDirectory(path));
+      // Resolve the remembered view BEFORE any of it reaches React state, so
+      // the whole switch lands in one batch: a transient render carrying the
+      // new project's path next to the old project's selection would have the
+      // write-through effect above erase what we are about to restore.
+      const view = await restoreProjectView(path);
+      setProjectPath(path);
       setProjectMeta(song.metadata);
       setSelectedInstrument(null);
-      setSelectedRegions([]);
+      setSelectedRegions(view.regions);
+      // Loop state is per project: it was previously carried across an open,
+      // leaving project B armed with project A's bars.
+      setPreviewLoop(view.loop);
+      setLoopEnabled(view.armed);
       // A different project: the module clipboard's note instrumentIds and
       // region track/region ids belong to the project just closed.
       resetClipboard();
@@ -295,13 +376,20 @@ export default function App() {
     }
   }
 
-  function handleProjectCreated(meta: SongMetadata) {
+  function handleProjectCreated(meta: SongMetadata, path: string) {
     setPlaying(false);
     resetSeekCursor();
+    // A brand-new project is a new document even when it reuses a directory a
+    // previous project occupied: forget whatever view was filed under that
+    // path rather than reopening a stranger's region and loop.
+    clearViewState(path);
+    setProjectPath(path);
     setProjectMeta(meta);
     setShowNewProject(false);
     setSelectedInstrument(null);
     setSelectedRegions([]);
+    setPreviewLoop(null);
+    setLoopEnabled(false);
     // Same project boundary as handleOpenProject — see resetClipboard's note.
     resetClipboard();
   }
@@ -327,12 +415,17 @@ export default function App() {
     }
   }
 
-  function handleImported(meta: SongMetadata, warnings: ipc.ImportWarning[]) {
+  function handleImported(meta: SongMetadata, warnings: ipc.ImportWarning[], path: string) {
     setPlaying(false);
     resetSeekCursor();
+    // Import writes a NEW project directory — same reasoning as create.
+    clearViewState(path);
+    setProjectPath(path);
     setProjectMeta(meta);
     setSelectedInstrument(null);
     setSelectedRegions([]);
+    setPreviewLoop(null);
+    setLoopEnabled(false);
     // Import closes the old project and opens the imported one — same
     // boundary as open/new.
     resetClipboard();
@@ -404,6 +497,7 @@ export default function App() {
         <MainArea
           projectOpen={projectOpen}
           projectMeta={projectMeta}
+          projectPath={projectPath}
           playing={playing}
           seekTick={seekTick}
           onSeek={handleSeek}
@@ -426,6 +520,10 @@ export default function App() {
       </div>
       {projectOpen && (
         <BottomPanel
+          // A different project gets a fresh panel: its remembered height,
+          // collapse and grid selector are seeded at mount.
+          key={projectPath ?? "no-project"}
+          projectPath={projectPath}
           selectedInstrument={selectedInstrument}
           selectedRegion={selectedRegions[selectedRegions.length - 1] ?? null}
           onCloseRegion={() => setSelectedRegions([])}

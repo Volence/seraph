@@ -50,6 +50,7 @@ function renderView(overrides: Partial<Parameters<typeof ArrangementView>[0]> = 
   return render(
     <ArrangementView
       projectMeta={meta}
+      projectPath={null}
       playing={false}
       seekTick={0}
       onSeek={vi.fn()}

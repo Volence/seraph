@@ -6,6 +6,8 @@ import styles from "./MainArea.module.css";
 interface MainAreaProps {
   projectOpen: boolean;
   projectMeta: SongMetadata | null;
+  /** Open project's directory; keys the remembered view state (F15). */
+  projectPath: string | null;
   playing: boolean;
   /** Seek cursor position; owned by App so transport shortcuts and the
    *  stop-sync (G29) keep it truthful. */
@@ -26,6 +28,7 @@ interface MainAreaProps {
 export function MainArea({
   projectOpen,
   projectMeta,
+  projectPath,
   playing,
   seekTick,
   onSeek,
@@ -54,7 +57,11 @@ export function MainArea({
 
   return (
     <ArrangementView
+      // A different project gets a fresh arrangement: zoom, scroll, snap and
+      // collapsed channel groups are seeded from ITS remembered view at mount.
+      key={projectPath ?? "no-project"}
       projectMeta={projectMeta}
+      projectPath={projectPath}
       playing={playing}
       seekTick={seekTick}
       onSeek={onSeek}

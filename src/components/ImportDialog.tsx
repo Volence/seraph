@@ -28,7 +28,8 @@ const ZYRINX_SONGS: { id: number; name: string }[] = [
 
 interface ImportDialogProps {
   onClose: () => void;
-  onImported: (meta: SongMetadata, warnings: ipc.ImportWarning[]) => void;
+  /** Reports the imported project's directory so App can key its view state. */
+  onImported: (meta: SongMetadata, warnings: ipc.ImportWarning[], path: string) => void;
   projectOpen: boolean;
 }
 
@@ -106,7 +107,7 @@ export function ImportDialog({ onClose, onImported, projectOpen }: ImportDialogP
 
       const song = await ipc.openProject(result.projectDir);
       rememberLocation(parentDir);
-      onImported(song.metadata, result.warnings);
+      onImported(song.metadata, result.warnings, result.projectDir);
     } catch (e: any) {
       setError(e?.message ?? String(e));
     } finally {

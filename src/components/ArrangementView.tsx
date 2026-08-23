@@ -13,10 +13,14 @@ import { SONG_REVERTED_EVENT, isEditableTarget } from "../utils/keyboard";
 import { pianoRollNoteSelectionActive } from "../utils/noteSelection";
 import { copyRegions, getRegionClipboard, lastCopiedKind } from "../utils/clipboard";
 import { followScrollLeft, followAllowed } from "../utils/followPlayhead";
+import { VIEW_STATE_WRITE_DELAY_MS, getViewState, patchViewState } from "../utils/viewState";
 import styles from "./ArrangementView.module.css";
 
 interface ArrangementViewProps {
   projectMeta: SongMetadata;
+  /** Open project's directory; keys the remembered view state (F15). Null
+   *  disables persistence entirely rather than filing state under a guess. */
+  projectPath: string | null;
   playing: boolean;
   /** Seek cursor position + seek request; owned by App (G29). */
   seekTick: number;
@@ -53,6 +57,7 @@ function channelLabel(track: Track): string {
 
 export function ArrangementView({
   projectMeta,
+  projectPath,
   playing,
   seekTick,
   onSeek,
@@ -66,12 +71,23 @@ export function ArrangementView({
 }: ArrangementViewProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [showAddTrack, setShowAddTrack] = useState(false);
+  // The view remembered for this project, read ONCE at mount. App remounts
+  // this component per project (`key={projectPath}`), which is what makes a
+  // mount-time seed the whole story — see MainArea.
+  const [savedView] = useState(() => (projectPath ? getViewState(projectPath) : {}));
   // Arrangement snap (region create/move/resize, ruler loop drag). The
   // piano roll keeps its own grid selector.
-  const [snapMode, setSnapMode] = useState<grid.SnapMode>("bar");
+  const [snapMode, setSnapMode] = useState<grid.SnapMode>(
+    () => savedView.arrangement?.snapMode ?? "bar",
+  );
   const [channelLevels, setChannelLevels] = useState<number[]>([]);
-  const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(new Set());
-  const zoom = useArrangementZoom(projectMeta);
+  // Collapsed channel GROUPS, by label. Labels that no longer match any group
+  // (the tracks were deleted while we were away) simply never match — the
+  // group map is rebuilt from the live tracks every render.
+  const [collapsedChannels, setCollapsedChannels] = useState<Set<string>>(
+    () => new Set(savedView.arrangement?.collapsedChannels ?? []),
+  );
+  const zoom = useArrangementZoom(projectMeta, savedView.arrangement);
   const { interpolatedTick, currentTick } = usePlaybackPosition(playing, projectMeta.tempo, projectMeta.ticksPerBeat);
   const trackHeight = 60;
   // Manual scrolls (wheel, ruler drag) suspend follow-playhead briefly so the
@@ -90,6 +106,29 @@ export function ArrangementView({
     const next = followScrollLeft(currentTick / zoom.ticksPerPixel, zoom.scrollLeft, viewWidth);
     if (next !== null) zoom.setScrollLeft(next);
   }, [currentTick, playing, loopEnabled, zoom.ticksPerPixel, zoom.scrollLeft, zoom.setScrollLeft, zoom.bodyRef]);
+
+  // Write-through for the arrangement's view state, debounced so one wheel
+  // gesture records once.
+  //
+  // NOT WHILE PLAYING, deliberately. follow-playhead drives `scrollLeft`
+  // during playback (G28), so persisting then would record wherever the
+  // transport had paged to rather than where the USER left the view — and
+  // would write on every follow step. `playing` is a dependency, so the
+  // moment playback stops the final view is recorded.
+  useEffect(() => {
+    if (!projectPath || playing) return;
+    const timer = setTimeout(() => {
+      patchViewState(projectPath, {
+        arrangement: {
+          ticksPerPixel: zoom.ticksPerPixel,
+          scrollLeft: zoom.scrollLeft,
+          snapMode,
+          collapsedChannels: [...collapsedChannels],
+        },
+      });
+    }, VIEW_STATE_WRITE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [projectPath, playing, zoom.ticksPerPixel, zoom.scrollLeft, snapMode, collapsedChannels]);
 
   const { visibleTracks, groupHeads } = useMemo(() => {
     const groups = new Map<string, Track[]>();

@@ -6,7 +6,8 @@ import styles from "./NewProjectDialog.module.css";
 
 interface NewProjectDialogProps {
   onClose: () => void;
-  onCreated: (meta: SongMetadata) => void;
+  /** Reports the created project's directory so App can key its view state. */
+  onCreated: (meta: SongMetadata, path: string) => void;
 }
 
 export function NewProjectDialog({ onClose, onCreated }: NewProjectDialogProps) {
@@ -52,7 +53,7 @@ export function NewProjectDialog({ onClose, onCreated }: NewProjectDialogProps) 
       await ipc.createProject(fullPath, name, driverId, tempo, timeSigNum, timeSigDen);
       rememberLocation(location);
       const meta = await ipc.getProjectInfo();
-      if (meta) onCreated(meta);
+      if (meta) onCreated(meta, fullPath);
     } catch (e) {
       setError(String(e));
     } finally {

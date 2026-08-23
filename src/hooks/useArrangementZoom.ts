@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { ticksPerBar as ticksPerBarOf, type GridMeta } from "../utils/grid";
 import { zoomAroundPixel } from "../utils/zoomDrag";
+import { clampNumber } from "../utils/viewState";
 
 /** Zoom-in floor. Exported so the view-state restore clamps a persisted
  *  ticksPerPixel to exactly the range the live zoom paths allow. */
@@ -18,11 +19,22 @@ interface ZoomState {
   zoomAtBy: (anchorPx: number, factor: number) => void;
 }
 
-export function useArrangementZoom(meta: GridMeta): ZoomState {
+/**
+ * @param restored view state remembered for this project (F15). Applied at
+ *   MOUNT only, and clamped to exactly the range the live wheel/drag zoom
+ *   paths allow — a record written against a different tempo or time
+ *   signature, or hand-edited, can name a zoom this view could never reach.
+ */
+export function useArrangementZoom(
+  meta: GridMeta,
+  restored?: { ticksPerPixel?: number; scrollLeft?: number },
+): ZoomState {
   const ticksPerBar = ticksPerBarOf(meta);
   const defaultTicksPerPixel = (ticksPerBar * 16) / 1200;
-  const [ticksPerPixel, setTicksPerPixel] = useState(defaultTicksPerPixel);
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const [ticksPerPixel, setTicksPerPixel] = useState(() =>
+    clampNumber(restored?.ticksPerPixel, MIN_TICKS_PER_PIXEL, ticksPerBar, defaultTicksPerPixel),
+  );
+  const [scrollLeft, setScrollLeft] = useState(() => Math.max(0, restored?.scrollLeft ?? 0));
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const ticksPerBarRef = useRef(ticksPerBar);
   ticksPerBarRef.current = ticksPerBar;

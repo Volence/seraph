@@ -149,6 +149,7 @@ function mockTracks(regions: SelectedRegion[]) {
 function rollProps(region: SelectedRegion) {
   return {
     region,
+    projectPath: null,
     onClose: vi.fn(),
     playing: false,
     projectMeta: meta,

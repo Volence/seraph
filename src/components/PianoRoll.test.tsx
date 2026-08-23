@@ -63,7 +63,7 @@ function setupTracks(notes: Note[], instrumentId: string | null = null): { regio
 async function renderRoll(notes: Note[], seekTick = 0, instrumentId: string | null = null) {
   const { region } = setupTracks(notes, instrumentId);
   const utils = render(
-    <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={seekTick} onSeek={vi.fn()} />,
+    <PianoRoll region={region} projectPath={null} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={seekTick} onSeek={vi.fn()} />,
   );
   // Flush the initial refresh() so the notes state (and the keydown
   // handler's re-registration against it) has definitely landed before
@@ -126,7 +126,7 @@ describe("velocity lane alignment (G5)", () => {
       };
     })();
     const { container } = render(
-      <PianoRoll region={region} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={0} onSeek={vi.fn()} />,
+      <PianoRoll region={region} projectPath={null} onClose={vi.fn()} playing={false} projectMeta={meta} seekTick={0} onSeek={vi.fn()} />,
     );
     await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
     await act(async () => {});
@@ -428,7 +428,7 @@ describe("PianoRoll refresh on undo/redo", () => {
   it("closes when the open region no longer exists after a revert", async () => {
     const { region } = setupTracks([note(0, 60)]);
     const onClose = vi.fn();
-    render(<PianoRoll region={region} onClose={onClose} playing={false} projectMeta={meta} seekTick={0} onSeek={vi.fn()} />);
+    render(<PianoRoll region={region} projectPath={null} onClose={onClose} playing={false} projectMeta={meta} seekTick={0} onSeek={vi.fn()} />);
     await waitFor(() => expect(ipc.listTracks).toHaveBeenCalled());
     await act(async () => {});
     // The revert removed the region (e.g. undo of add_region).

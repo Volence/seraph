@@ -49,19 +49,54 @@ The **MEMRA execution sessions S0→S6** are the banked plan of record — each 
 cold-executable plan under `docs/superpowers/plans/2026-07-03-s*.md`, each
 self-contained (paths, code, commands, gates).
 
-Current state (2026-08-19):
+> **THIS SECTION IS A SNAPSHOT AND THE LOG IS NOT — when they disagree, the Log
+> wins.** A boot doc ages while the queue's Log accumulates, so the one file every
+> cold session reads *first* is the one most likely to hand it pre-ruling state and
+> present it as current. This is not hypothetical: on 2026-08-22 a session booted
+> from the text below, reported S0 to a peer as an open owner call, and had it
+> escalated to the owner — who had **already ruled on it the day before**. The same
+> session separately dispatched a parcel for a finding the owner had deprioritized.
+> Both rulings sat mid-Log; both boots read the Log's head and tail only.
+> **Before acting on any status below, and before funding any parcel off the
+> DAW-feel audit, grep the Log for the identifier:**
+>
+> ```sh
+> grep -nE "S0|F15|DEPRIORITIZED|owner ruling" docs/superpowers/2026-07-03-seraph-banking-queue.md
+> ```
+>
+> A severity number is a property of the CODE; a hold or a deprioritization is a
+> property of the OWNER's intent, and only the second can make a ready or critical
+> item not-next. Nothing in a status line or a findings table can tell you which
+> applies.
+
+Current state (last reconciled against the Log 2026-08-22):
 
 - **S0 is PARKED** (2026-07-15 ruling) and it gates S1 Tasks 2–8 and everything
   downstream. Park condition: aeon's sound format was still moving (MEV changes,
   the sigil DSM migration, `sound_constants.asm` on the .emp conversion path).
 - **S0 UNPARKED 2026-08-19** (aeon overseer ruling, verified firsthand at aeon
   `236c306b` — full ruling, verification, and three standing caveats in the queue
-  doc's Log entry for that date). S0 is READY TO EXECUTE; opening the execution
-  session is an owner call. Do not re-derive the S0 plan — it's banked; its
+  doc's Log entry for that date). Technically READY TO EXECUTE. Do not re-derive
+  the S0 plan — it's banked; its
   aeon-facing inputs must be re-grounded against `sound_constants.emp` + the
   `emit_sound_blob` contract at the pinned SHA (the plan predates the asm→.emp
   move), parsing constants from source at use time — never transcribing them
   into seraph-side constants that can drift.
+- **S0 HELD BY THE OWNER, 2026-08-21 — this supersedes "ready" above as the
+  operative status.** A session offered to open the unparked S0; the owner chose
+  *"hold S0, other work"* and named the gap he wanted closed instead (no way to
+  create a measure and write music). That gap was closed the same session
+  (compose-from-scratch path, merged `3c6ee0d`), and most of the work he
+  redirected the lane to has since landed. **So S0 is re-offerable — but as a
+  REVISIT carrying its history ("you held this on 08-21 because X; X is now
+  closed"), never as a fresh open decision.** Re-asking an answered question
+  reads to the owner as nobody having recorded his answer.
+- **F15 (view-state persistence) is DEPRIORITIZED by owner ruling** (2026-08-21,
+  "current behavior matches how they work") despite still being severity-critical
+  and rank #3 in the audit. Branch `feat/view-state-persistence` holds an
+  erroneously-dispatched, unreviewed partial implementation — preserved unmerged
+  in case the ruling reverses; it must not be landed on the strength of a status
+  line.
 - Done so far: S1 Task 1 (tauri-specta, merged `437841e`); instrument library
   shipped independently of the S-queue (merged `1799c3c`, deferrals listed in the
   queue Log entry for 2026-07-16).

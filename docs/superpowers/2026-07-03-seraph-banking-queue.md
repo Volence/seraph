@@ -1380,6 +1380,104 @@ designs target the banked specs (normative); manifest flags carry the gates.
   **NOT RUN:** `npm run build` — stated rather than implied, since the merge
   provably touches no code.
 
+- 2026-08-22 (cont.): **OWNER RULINGS — F25+F26 BEFORE S0, AND S0 IS RETARGETED
+  OFF MEMRA.** Two rulings, and they reached this lane by different routes, which
+  is itself recorded because the routes have different evidentiary weight.
+  **RULING 1 — SEQUENCING, taken DIRECTLY from the owner in this session
+  (granting act witnessed):** asked to choose between opening S0 and clearing two
+  small parcels, he chose **"F25 + F26 first, then S0"**. Background: a peer lane
+  relayed an owner approval of S0 given as the single phrase *"I guess"*; this
+  lane **declined to act on it** and put the question to the owner directly
+  instead. Two reasons, and the second is the load-bearing one: a relayed
+  approval is not this session's to act on, **and** this lane had authored the
+  reframe that produced the answer — so it was the last party that should treat
+  the answer as a mandate. The peer independently reached the same
+  recommendation. Standing rule, now suite-wide: **never record an approval whose
+  granting act you have not seen.**
+  **RULING 2 — S0 SCOPE, RELAYED (granting act NOT witnessed by this lane;
+  transcription, not quotation, until anchored).** Asked whether to open S0, the
+  owner reportedly said: *"We can start this but like not with memra engine yet I
+  don't think, maybe s2 clone driver, zyrinx driver, flamewing driver, then like
+  s1/s2/s3k driver?"* Read as: **S0's capability manifest is to be designed
+  against the S2-clone / Zyrinx / Flamewing / S1-S2-S3K drivers, NOT Memra
+  first.** This is a **scope change to a banked plan**, not a go-ahead — the S0
+  plan and `specs/2026-07-03-s0-memra-contract-design.md` are both written
+  Memra-first. Note the register (*"I don't think"*, ends in a question mark):
+  **direction with the reasoning open.** Do not re-derive the S0 plan against
+  four drivers on the strength of this entry; re-put the question when S0 is
+  actually opened, and get the ruling first-hand.
+  **The argument FOR the retarget** (the relaying lane's read, explicitly not the
+  owner's stated reasoning, which he did not give — recorded so a later session
+  can weigh it rather than inherit it): a manifest designed against one driver is
+  a description of that driver wearing a manifest's clothes, and you cannot tell
+  which parts are general until a second implementation disagrees with the first.
+  Four established drivers make the manifest's shape fall out of real variation
+  rather than out of one case plus imagination — abstraction extracted, not
+  guessed. It also makes S0 checkable immediately, since those drivers' ROMs
+  already exist, which answers the standing objection that S0's payoff was
+  suite-integration rather than anything audible.
+  **CONSEQUENCE for whoever opens S0:** it is now a LARGER and more open-ended
+  piece of work than when it was banked, which strengthens rather than weakens
+  the case for clearing small parcels first. Re-ground the plan's aeon-facing
+  inputs as always, and re-confirm the driver list with the owner before
+  designing to it.
+
+- 2026-08-22 (cont.): **README RE-GROUNDED** (owner directive, verbatim: *"let's
+  quickly have everything update their readmes correctly. Doesn't have to be
+  super in depth"* — accuracy over depth). Merged `f5eb86f`, README-only
+  (+36/−18). It had not been touched since `b22b782` (2026-06-28) and a great
+  deal had shipped under it. Corrections included: **"cycle-accurate" deleted**
+  (true of Nuked-OPN2, false of the hand-written SN76489 and of the DAC path);
+  the channel roster replaced with the literal `channel_layout()` names; FM
+  import narrowed to the four extensions the match arm actually accepts
+  (`.tfi/.vgi/.y12/.gyb`); Zyrinx reworded as ROM-extraction rather than a song
+  format; VGM demoted to core-only. Added: the instrument library (606 committed
+  entries, counted with `git ls-files`), live-edit/live-parameter audibility,
+  Draw Mode, per-note voice override, and the four dev commands — **all four
+  executed, exit codes read directly rather than through a pipe**.
+  **BOOKED DEFECTS found while verifying the README — none fixed, all evidenced.**
+  A README pass reads a lot of surface at once and is unusually productive of
+  these:
+  1. **`extract_library --help` cannot print usage** — `let out = …get("out")`
+     is evaluated before the subcommand match, so any invocation without `--out`
+     dies first; the `usage()` arm is unreachable. Confirmed by running it.
+  2. **`export_vgm` is dead from the UI** — command + typed wrapper exist, no
+     `.tsx` caller (control grep on `exportSong` returns a hit, so the empty
+     result is evidence).
+  3. **WAV export duration hardcoded** — `ipc.exportWav(path, 60)` at the call
+     site regardless of song length; the IPC takes the duration as a parameter,
+     so this is purely a UI gap. (This is audit **F12**'s real shape: the audit
+     said "user-supplied duration, default 60 s" — there is no duration input at
+     all.)
+  4. **DAC does not steal FM6 in the preview engine** — `AudioEngine` keeps the
+     DAC as an independent stream summed into the mix, and register `$2B` is
+     never written by `audio/`, `sequencer/` or `dac/`. **Verified firsthand by
+     the overseer with a control** (`0x2b`/`$2b` → grep exit 1 across all three
+     trees; control `0x28` → 9 hits in `engine.rs`). So an FM6 track and a DAC
+     track sound together in Seraph and **cannot** on hardware — a
+     preview-vs-driver divergence of the same class as the overlap
+     last-note-priority fix, and the README now discloses it rather than
+     implying the conflict is modeled. Distinct from F25 despite both being DAC.
+  5. **`export_formats()` advertises `"binary"`** with no implementation.
+  6. **`DriverFeature::Fm3SpecialMode` declared supported**, implemented nowhere.
+  7. **Stale comment** — `PianoRoll.tsx` says "Draw Mode (F6)" where `F6` is the
+     audit item number and the binding is `B`; it reads as a keybinding.
+  8. **`get_channel_overlaps`** is backend + wrapper only, no `.tsx` caller.
+  **UNDETERMINED, deliberately not guessed:** whether a debug `cargo run` serves
+  the built `dist/` or expects a live Vite dev server (`devUrl` is set). The line
+  was **removed** rather than documented wrongly; `npm run tauri dev` covers the
+  need. TAGGED for foreground follow-up.
+  **NAMING, flagged for the owner rather than resolved:** the README's closing
+  line described dropping output into the Z80 **Flamedriver**, which is the
+  S3K/skdisasm path, not the active `aeon` engine whose driver is **Memra**. The
+  code is unambiguous (zero `memra` identifiers; the only driver registered is
+  `FlamedriverProfile`), so the README correctly says Flamedriver today. The
+  sentence was narrowed to "the SMPS-based ROM-hacking projects" rather than
+  re-pointing it at aeon — **that is an intent question, not a code question.**
+  Note this now interacts with RULING 2 above: if S0's manifest targets the
+  S2-clone/Zyrinx/Flamewing/S1-S2-S3K drivers, Flamedriver-first is closer to
+  where the suite is heading than Memra-first was.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

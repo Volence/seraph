@@ -407,6 +407,92 @@ marked *(carried forward — not re-verified)*.
 | **F25** | **NEW — per-note voice assignment is unreachable for DAC, the one chip it was needed for** | missing | ~~med~~ — | **[V] NEW THIS PASS, not previously booked.** `PianoRoll.handleVoiceDrop` rejects any drop whose payload `kind !== region.channelType`, and the library can never produce a `"dac"` entry: `LibraryInstrument` has exactly two variants (`Fm`, `Psg`) and `grep -rn "Dac" src-tauri/src/library/` returns nothing (exit 1, checked in isolation). So on a DAC region the only per-note-voice gesture in the app always fails with "Only DAC voices can be dropped on this lane". The IPC (`set_note_instrument`) and the resolution path (`resolve_instrument_data_by_id`'s `ChannelAssignment::Dac` arm) both support it; nothing in the UI can call them for DAC. Imported songs can still carry per-note DAC ids, so the read path is live — only authoring is unreachable. **This is what still blocks F7's headline scenario.** **[V] FIXED `ea1adcf`** — via a per-note **Sample picker** in the piano-roll header (DAC lanes only), fed by the PROJECT's DAC bank (`list_dac_instruments`) and applying to the note selection through the existing `set_note_instrument`. ZERO backend change. The library was deliberately NOT given a `Dac` variant: `DacInstrument` is a pointer to a `pcm_file`, not a self-contained parameter struct like `FmInstrument`/`PsgInstrument`, so a library DAC kind means designing PCM asset storage, hashing and extraction — a much larger parcel, and not what F25 was about. The drop message on a DAC lane now points at the picker rather than at a library kind that cannot exist | src/components/PianoRoll.tsx `handleVoiceDrop` (kind gate); src/api/library.ts `LIBRARY_DRAG_TYPE` (kind-suffixed types); src-tauri/src/library/entry.rs `LibraryInstrument` (`Fm`/`Psg` only — unchanged); src-tauri/src/library/store.rs `kind` mapping | — |
 | **F26** | **NEW — every audition costs a full `listTracks` round-trip, on the interactive path** | feedback | ~~low~~ — | **[V] NEW THIS PASS, not previously booked.** `PianoRoll.handleAudition` starts with `await ipc.listTracks()` — the whole track/region/note tree serialized across IPC — before it can send a preview. It runs on note press, on grid double-click, on every keys-column click, and (since F6) **once per new pitch in a Draw-Mode paint run**, so a fast painted run issues one full song fetch per row it crosses. The pitch feedback is delayed by that round-trip by construction. Not measured; code-certain. **[V] FIXED `b7eb13f`** — new narrow IPC `get_track_instrument(track_id) -> Option<String>` (backed by `ProjectManager::track_instrument_id`) replaces the leading `listTracks`. Deliberately NOT a frontend cache: the binding is rewritten by `TrackHeader`'s library drop / unbind / track delete and by `library_assign_to_track`, none of which notify the roll (`SONG_REVERTED_EVENT` is the only cross-component signal, and undo/redo alone dispatches it), so any cache would audition the previous voice. MEASURED by mock call count in `PianoRoll.auditionCost.test.tsx`: five keys-column auditions and a three-row paint run now add ZERO `listTracks` calls. The second round trip (the preview itself) remains — collapsing both into one `preview_track_note` was considered and rejected as audio-path surface that cannot be verified without ears | src/components/PianoRoll.tsx `handleAudition`; called from `PianoRollCanvas` `handleMouseDown`, `handleDoubleClick`, `paintCellUnderPointer` and `PianoRollKeys` `onAudition` — all four funnel through the one function | — |
 | **F27** | **NEW — the preview lets an FM6 track and a DAC track sound together; real hardware cannot** | fidelity (preview-vs-driver divergence) | **high** | **[V] NEW, found during the README accuracy pass (`f5eb86f`), verified firsthand by the overseer WITH A CONTROL.** On a Mega Drive the DAC steals FM channel 6 — writing `$2B` bit 7 swaps FM6's output for the 8-bit DAC stream, so the two are mutually exclusive by construction. Seraph's preview models neither half: `AudioEngine` keeps `dac_samples`/`dac_position` as an **independent** stream summed into the mix alongside `fm_l`/`fm_r`, and register `$2B` is **never written** anywhere in `audio/`, `sequencer/` or `dac/`. Evidence: `grep -rniE "0x2b\|\$2b"` over all three trees exits 1, with a control grep for `0x28` returning 9 hits in `engine.rs` — so the empty result is evidence, not a broken invocation. **Consequence:** a song that sounds correct in Seraph can be silently wrong on hardware and in any driver export, because FM6 and DAC content that overlaps in time is unreproducible. This is the SAME CLASS as the overlap fidelity bug already fixed (`ee11da5`, last-note-priority): the preview must not promise what the driver cannot deliver. **Not yet sized.** The honest fix is presumably to mute FM6 while DAC content is sounding and reflect it in the UI, but that is a design call (silent steal? a visible warning? an authoring-time gate like `check_voice_overlap`?) and the driver's exact behaviour should be confirmed against aeon rather than assumed. **Related but distinct from F7/F25**, which are about *which* sample a DAC note plays; this is about DAC and FM6 coexisting at all | src-tauri/src/audio/engine.rs `AudioEngine` (`dac_samples`/`dac_position` fields; the mix summation in `AudioEngine::render`); absence of any `$2B` write across `src-tauri/src/{audio,sequencer,dac}` | — |
+| **F28** | **NEW — `PianoRoll.tsx` holds a NUL byte, so every grep silently skips the note-editing surface** | methodology hazard | **high** | **[V] NEW 2026-08-23, verified firsthand by the overseer.** `src/components/PianoRoll.tsx` contains one NUL byte, in `const MIXED_VOICE = "\0mixed"`. GNU grep therefore classifies the file as **binary**: `grep -c MIXED_VOICE src/components/PianoRoll.tsx` exits **1 with no usable output**, while `grep -ac` on the same file returns **7**. Enumerated across the whole tree: 18 tracked files contain NULs and **17 are icons/PNGs — this is the ONLY source file**, and it is 907 lines and is the entire note-editing surface. **Consequence: every frontend search in this repo's history that omitted `-a` excluded the most-edited file in the app, and reported a clean empty result while doing so.** This is protocol bar 16(d) — "a failing command and an empty world produce the same output" — sitting permanently in the tree rather than arriving in one command. Fix is one character (`\u0000` escape or a non-NUL sentinel); the audit value is re-running any past enumeration that touched `src/` | src/components/PianoRoll.tsx `MIXED_VOICE` | — |
+| **F29** | **NEW — VGM export silently discards every DAC note** | fidelity (export) | **high** | **[V] NEW 2026-08-23, verified firsthand by the overseer.** `src-tauri/src/export/vgm.rs` has `ChannelAssignment::Dac(_) => continue` — there is no DAC in the VGM exporter at all, so every drum in the song is dropped with no error, no warning and no log line. **Sequencing matters: this must land BEFORE the booked README-7 fix that wires up the dead `export_vgm` UI path**, or that fix ships a working button whose first output is missing all percussion. Note for any follow-up grep: `out[0x2B]` in this file is a **VGM header offset, not a YM register** — it is not evidence of `$2B` handling | src-tauri/src/export/vgm.rs (the `ChannelAssignment::Dac(_)` arm) | — |
+| **F30** | **NEW — SMPS export emits both an FM and a DAC header for channel 6, with no cross-channel validation** | fidelity (export) | med | **[C] NEW 2026-08-23, from the exposure map; the `Dac(_)` arms were confirmed present by the overseer, the both-headers-for-index-5 behaviour is carried from the agent's read and NOT independently re-derived.** `smps.rs` emits `smpsHeaderDAC` and `smpsHeaderFM` for index 5 and never checks whether the two conflict, so an FM6+DAC song exports a header pair the hardware cannot honour. Distinct from F29: SMPS over-promises where VGM under-delivers | src-tauri/src/export/smps.rs (`ChannelAssignment::Dac(_)` arms; header emission) | — |
+| **F31** | **NEW — the only driver profile advertises seven voices on a six-voice chip** | fidelity (capability model) | **high** | **[V] NEW 2026-08-23, verified firsthand by the overseer.** `FlamedriverProfile::channel_layout()` returns six `FmChannelInfo` entries — including `{ index: 5, name: "FM6/DAC" }` — **and** a separate `DacChannelInfo { index: 0, name: "DAC" }`. The name is honest about the sharing; the **structure** is not, since the two are offered as independent lanes, which is where every downstream surface gets its channel roster. Worse: this profile is **S3K's Flamedriver, which has no FM6 music voice at all** (aeon's init table reads `db 80h, 6 ; FM6 music track (does not exist in this driver)` at aeon `origin/master` `139995f`), and **there is no aeon/Memra profile in the tree** — `FlamedriverProfile` is the only `DriverProfile`. **This is upstream of F27**: the roster over-promises before any note is authored, and it is wrong however F27 resolves | src-tauri/src/driver/flamedriver.rs `FlamedriverProfile::channel_layout`; src-tauri/src/driver/mod.rs (sole profile export) | — |
+
+### F27 — GROUNDED 2026-08-23, AND THE ROW ABOVE STATES THE PREMISE WRONG
+
+Two investigations landed (`75fdd1a`, `6852454`; reports at
+`docs/research/2026-08-23-f27-driver-truth.md` and
+`docs/research/2026-08-23-f27-exposure-map.md`). **The F27 row's central claim —
+"real hardware cannot" — is false as written, and the row is left unedited above so
+the correction is visible rather than laundered.**
+
+**What the driver actually does** (read at aeon `origin/master` =
+`139995f256f5e50c26d2053c229dd09b5e70c84d`, every read via `git show <rev>:<path>`
+and never through the sibling path, since the aeon lane is live in that tree;
+re-verified firsthand by the overseer):
+
+aeon **does** write `$2B` — at four sites — and implements a deliberate **three-mode
+per-song contract** for chip channel 6, selected by `SH_FLAGS`:
+
+- **DEDICATE** — ch6 is the DAC. No FM6 music voice.
+- **FM6-FM** (`SH_F_FM6_FM`) — ch6 is a sixth FM voice, DAC off.
+- **ADAPTIVE** (`SH_F_FM6_ADAPTIVE`, requires `SH_F_FM6_FM`) — genuine time-share:
+  key-off before each sample, EG-edge re-key when the sample drains.
+
+So **hardware CAN sound FM6 and DAC in one song** — in ADAPTIVE, alternating, if the
+song declares it. What it cannot do is sound them *simultaneously*, and what the
+format does not do is stop you declaring the wrong mode.
+
+**The trap that makes the obvious fix wrong.** `.stop`'s DAC-off-and-restore is gated
+on `SND_FM6_ADAPTIVE`. In **FM6-FM** mode there is no restore, so the first drum takes
+FM6 away **permanently** — and `Fm_NoteOn`'s suppression stops firing once
+`SND_STAT_DAC_ACTIVE` clears, so the driver then keys FM6 on into a channel the chip
+has muted. **A preview that ducks FM6 and restores it would therefore sound BETTER
+than hardware**, which is precisely the failure F27 exists to prevent. Silent steal is
+not a whole fix; it is a fix for one of three modes.
+
+**And `$2B` is the wrong lever on the Seraph side anyway.** Nuked-OPN2 substitutes the
+DAC in its time-multiplexed output stage, but `AudioEngine` reads through
+`OPN2_ReadChannels`, which sums `ch_out[0..6]` and is **blind to `dacen`** (verified
+firsthand in `src-tauri/vendor/nuked-opn2/ym3438.c`). Any estimate premised on "just
+write `$2B`" is wrong: the fix is a new accessor in the vendored C, or a driver-level
+key-off of FM6.
+
+**The semantics already exist in this repo, on the import side only.**
+`ImportState::process_key_on` in `src-tauri/src/import/vgm_import.rs` has
+`if hw_ch == 5 && self.dac_enabled { return; }` — the one line in the tree coupling FM
+channel 5 to DAC state. VGM-imported projects are self-consistent and **cannot exhibit
+the bug**; only hand-authored (and possibly SMPS-imported) ones can. The model was
+built and never reached playback or export.
+
+**`check_voice_overlap` cannot host the gate.** It narrows to a single
+`channel_key(&target.channel)` on its third line and iterates only tracks matching that
+key (verified firsthand), so a cross-channel constraint is not a case inside it. Gating
+this properly means gating 7–8 entry points — `update_note`, `move_region`,
+`update_track` among them — none of which has ever had a gate.
+
+**THE OPEN DESIGN CALL, and why it is the owner's.** The two investigations
+**disagree**, and the disagreement is the finding: the exposure map recommends a
+key-off-FM6 steal plus a diagnostic, while the driver read shows that is correct only
+in ADAPTIVE and actively wrong in FM6-FM. Both are right within their own frame. The
+reconciliation is that **Seraph has no song-level ch6-mode field at all**, so it cannot
+currently express which of the three contracts a song is written against — and no
+amount of source reading decides which mode a from-scratch Seraph song should default
+to. That is a model-design question, PARKED for the owner with numbers.
+
+*(Independence check, protocol bar 19: these two derivations enumerated over different
+parameters — one over aeon's driver source and disassembled Z80 blobs, one over
+Seraph's own call graph — and neither brief carried the other's conclusion. Their
+agreement on the VGM-export defect is therefore corroboration rather than echo. Their
+disagreement on the fix is real, not a frame artifact.)*
+
+**TAGGED for foreground follow-up — neither agent could run the emulator, and did not
+try.** (1) Pack a song with `flags=SH_F_FM6_FM`, an FM6 melody and one `$E2` drum, and
+trace whether post-sample `$28` writes land on a chip-muted ch6 — the driver read calls
+this inference from four code paths plus a source comment, **not** an observation.
+(2) By ear in Seraph: play an FM6 sustain under a drum hit and confirm they audibly
+coexist — a 30-second check that upgrades the central claim from read-verified to
+heard-verified.
+
+**Could not be established, recorded so it is not mistaken for closed:** whether real
+SMPS songs actually produce FM6+DAC through `smps_mapper`'s sequential FM indexing; and
+MDSDRV's single FM6/PCM1 slot — `aeon/docs/research/external/` is **empty** at that
+SHA, so every `mdsdrv.68k:` citation in aeon's in-repo docs is currently unreproducible
+and must be treated as second-hand.
 
 ## Top-10 biggest feel wins — ORIGINAL ranking (2026-08-21, superseded)
 

@@ -1776,6 +1776,33 @@ designs target the banked specs (normative); manifest flags carry the gates.
   driver read calls this inference, not observation); and confirm by ear in Seraph
   that an FM6 sustain and a drum hit audibly coexist.
 
+- 2026-08-23 (cont.): **PUSH AUTHORIZATION — OWNER RULING, RELAYED BY THE HUB, NOT
+  WITNESSED BY THIS LANE.** *"A lane may push its own repo's master without asking each
+  time."* Chosen by the owner over two narrower options (standing-for-docs-ask-for-code;
+  per-push), on a suite-wide question the empyrean hub consolidated from two lanes stopped
+  on it separately — sigil asked outright, aeon was holding finished commits for the same
+  reason. **Conditions ride with the grant** and are transcribed rather than paraphrased:
+  verify `origin` actually MOVED (the push is not the act, the remote moving is); never
+  rewrite already-pushed history; never push another lane's repo; publication to the public
+  wiki site stays a separate explicit ask.
+  **Provenance, stated because this lane's standing rule is that a relayed grant is not a
+  witnessed one:** the granting act reached seraph through empyrean-18, not from the owner
+  directly. **Anchor verified firsthand here** — empyrean `2bd72a03` is an ancestor of
+  empyrean `origin/main` (freshly fetched), and `git show --stat` confirms it is a
+  **docs** commit (`docs/OVERSEER.md`, +23) — which is the correct SHA *class*, since what
+  it anchors is a ruling record and not a code guarantee. The hub's relayed wording was
+  read against the banked text and matches; nothing was added in transit.
+  **SCOPE — it authorizes PUSHING, not the work being pushed.** It does not release this
+  lane from its boot stop, is not approval to dispatch, and does not touch anything already
+  parked with the owner: F27's ch6-mode design call, the five open ear-gates, or the S0
+  driver-list question all remain his.
+  **What it changes here: nothing operational.** Seraph's landing lane already pushes `main`
+  as the last step of every landing and has done so throughout (`origin/main` was
+  `ls-remote`-verified at each push, which is condition one already being met). Recorded so
+  the *authority* for that practice is banked rather than assumed — the practice was
+  correct, its warrant was undocumented. The wiki condition is inert in this repo: seraph
+  publishes no `wiki/dist/`.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

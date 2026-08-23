@@ -1,9 +1,9 @@
 {
-  "focus": "F27 is grounded and it turned over: hardware CAN do this in one of three modes, and Seraph can't say which. Needs your call.",
+  "focus": "Booted and holding for your word. F27 turned over and needs a call from you; F28 is a one-character fix that's ready.",
   "inFlight": [],
   "blockedOnOwner": [
     {
-      "what": "F27's design call: Seraph has no song-level channel-6 mode field, so it cannot express which of the driver's three contracts a song is written against. Both fixes are right in different modes \u2014 the choice is a model decision, not a code one",
+      "what": "F27's design call: Seraph has no song-level channel-6 mode field, so it cannot express which of the driver's three contracts a song is written against. Both fixes are right in different modes — the choice is a model decision, not a code one",
       "since": "2026-08-23"
     },
     {
@@ -11,7 +11,7 @@
       "since": "2026-08-22"
     },
     {
-      "what": "S0's driver list first-hand \u2014 it reached this repo relayed and hedged, and it makes S0 materially bigger than the banked plan",
+      "what": "S0's driver list first-hand — it reached this repo relayed and hedged, and it makes S0 materially bigger than the banked plan",
       "since": "2026-08-22"
     },
     {
@@ -19,15 +19,8 @@
       "since": "2026-08-21"
     }
   ],
-  "nextBoundary": "Right here \u2014 both investigations landed, findings banked and pushed, nothing running. A clean /clear point.",
+  "nextBoundary": "Nothing dispatched yet; the first clean boundary is whichever item you pick, landed and re-verified on the merged tree.",
   "queue": [
-    {
-      "id": "F27",
-      "title": "The FM6/DAC design call \u2014 parked on your ruling, not on work",
-      "state": "open",
-      "size": "L",
-      "blockedBy": "needs your call on whether Seraph models the channel-6 mode"
-    },
     {
       "id": "F28",
       "title": "A stray NUL byte in the piano-roll file makes every code search silently skip it",
@@ -36,15 +29,22 @@
       "blockedBy": null
     },
     {
-      "id": "F29",
-      "title": "VGM export throws away every drum, silently \u2014 and the booked VGM fix would ship that",
+      "id": "F27",
+      "title": "The FM6/DAC design call — parked on your ruling, not on work",
+      "state": "open",
+      "size": "L",
+      "blockedBy": "needs your call on whether Seraph models the channel-6 mode"
+    },
+    {
+      "id": "F31",
+      "title": "The one driver profile offers seven voices on a six-voice chip — wrong however F27 resolves",
       "state": "open",
       "size": "M",
       "blockedBy": null
     },
     {
-      "id": "F31",
-      "title": "The one driver profile offers seven voices on a six-voice chip",
+      "id": "F29",
+      "title": "VGM export throws away every drum, silently — and the booked VGM fix would ship that",
       "state": "open",
       "size": "M",
       "blockedBy": null
@@ -64,5 +64,5 @@
       "blockedBy": null
     }
   ],
-  "updatedAt": "2026-08-23T08:15:35Z"
+  "updatedAt": "2026-08-23T14:44:39Z"
 }

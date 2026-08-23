@@ -1680,6 +1680,48 @@ designs target the banked specs (normative); manifest flags carry the gates.
   - Does audition FEEL faster while painting a run across rows? That is the
     half of F26 no test here can report on.
 
+- 2026-08-23: **F27 INVESTIGATIONS DISPATCHED (second attempt) — and the first
+  pair's silent death is the transferable part.** The 2026-08-22 session
+  dispatched two research agents for F27 and wrote them into
+  `docs/lane-status.json` as `inFlight`. The owner then relaunched all six lanes
+  from the Dominion console, which cleared that session. **Background subagents do
+  not survive a session rotation.** Both branches
+  (`research/f27-driver-truth`, `research/f27-exposure-map`) were found at
+  `9e7695f` with **zero commits** and **clean worktrees, nothing untracked** — the
+  agents died before writing anything. Neither branch nor worktree is recoverable
+  work; both were removed and re-created fresh.
+  **Two things made this detectable, and one of them was missing.** (1) Branch
+  state: `git rev-list --count main..<branch>` = 0. **That result is two-valued**
+  (protocol bar 16a) — "never had commits" and "already merged" produce identical
+  output — so it was disambiguated with `git log <branch>`, which showed only
+  main's own commits, plus `git status --porcelain -uall` in each worktree showing
+  nothing written. (2) **A queue Log entry, which did not exist.** The dispatch was
+  recorded ONLY in `lane-status.json`, a file whose whole purpose is to describe
+  the *live* session — so when the session died, the only record of what it had
+  started died with it in every sense that mattered, leaving a status file
+  asserting activity that no longer existed. **The status file is the volatile
+  record; this Log is the durable one. A dispatch goes in both.**
+  Re-dispatched with the same split, both read-only, both delivering a COMMITTED
+  report so that a second rotation cannot erase the result:
+  - `research/f27-driver-truth` → `docs/research/2026-08-23-f27-driver-truth.md`.
+    What aeon's driver actually does with the channel-6 steal, read at aeon
+    `origin/master` = `139995f256f5e50c26d2053c229dd09b5e70c84d` (`ls-remote`-verified
+    2026-08-23T07:55Z) via `git show <rev>:<path>` — **never** through the sibling
+    path, since the aeon lane is live in that tree right now. Plus what the
+    established drivers do, from the disassembled Z80 blobs under aeon
+    `docs/research/z80_blobs/`.
+  - `research/f27-exposure-map` → `docs/research/2026-08-23-f27-exposure-map.md`.
+    Every Seraph surface where the clash shows up (preview, `build_snapshot`,
+    each export path, `check_voice_overlap` / the uncalled `get_channel_overlaps`,
+    the UI affordances F25 shipped), with the three fix options — silent steal /
+    visible warning / authoring-time gate — priced individually.
+  The briefs deliberately do NOT share a frame: one enumerates over the driver's
+  source, the other over Seraph's call graph, and neither is told the other's
+  conclusion (protocol bar 19 — two agents given the same brief share it by
+  construction, so agreement between them would be echo, not corroboration).
+  **The fix choice is NOT delegated.** It is a design call about what the preview
+  is allowed to promise, and it goes to the owner with numbers.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

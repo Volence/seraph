@@ -82,8 +82,26 @@ Current state (last reconciled against the Log 2026-08-22):
   `emit_sound_blob` contract at the pinned SHA (the plan predates the asm→.emp
   move), parsing constants from source at use time — never transcribing them
   into seraph-side constants that can drift.
-- **S0 HELD BY THE OWNER, 2026-08-21 — this supersedes "ready" above as the
-  operative status.** A session offered to open the unparked S0; the owner chose
+- **S0 IS OPEN AGAIN (2026-08-22) AND RETARGETED — AND THE BANKED S0 PLAN NO
+  LONGER DESCRIBES THE TASK. Read this before opening `plans/2026-07-03-s0-memra-contract.md`.**
+  The owner reportedly re-opened S0 while redirecting it **off Memra**:
+  *"We can start this but like not with memra engine yet I don't think, maybe s2
+  clone driver, zyrinx driver, flamewing driver, then like s1/s2/s3k driver?"*
+  **That plan and `specs/2026-07-03-s0-memra-contract-design.md` are both written
+  Memra-first**, so designing the manifest against four established drivers is
+  real design work, not a parameter swap — and S0 is now materially LARGER than
+  when it was banked.
+  **Both the re-opening and the retarget reached this repo RELAYED through the
+  empyrean lane; no seraph session witnessed the granting act.** The register was
+  hedged (*"I don't think"*, ending in a question mark) — direction with the
+  reasoning open. **So: get this ruling first-hand from the owner before
+  designing to it, and do not treat this bullet or the queue Log entry as the
+  authority.** Full entry, with the argument for the retarget attributed to the
+  lane that made it rather than to the owner, is in the queue Log for 2026-08-22.
+  Sequencing he *did* give directly: **F25 + F26 first, then S0.**
+- **S0 HELD BY THE OWNER, 2026-08-21 — superseded by the re-opening above, kept
+  because it is why the re-offer had to carry its history.** A session offered to
+  open the unparked S0; the owner chose
   *"hold S0, other work"* and named the gap he wanted closed instead (no way to
   create a measure and write music). That gap was closed the same session
   (compose-from-scratch path, merged `3c6ee0d`), and most of the work he
@@ -97,6 +115,41 @@ Current state (last reconciled against the Log 2026-08-22):
   erroneously-dispatched, unreviewed partial implementation — preserved unmerged
   in case the ruling reverses; it must not be landed on the strength of a status
   line.
+
+### Live state a fresh boot needs (2026-08-22)
+
+- **Emulator cutover costs this lane nothing.** Seraph's audio path is its own
+  Rust engine, not an emulated ROM, so there is **no oracle/emulator dependency
+  today** — current measurement work uses the in-repo `rendered_rms` /
+  `live_edit_audibility` harnesses. Do not go looking for one. The ask becomes
+  real only at **S3** (driver-in-the-loop), which wants per-channel audio
+  isolation, driver-state readout at Memra's symbols, and deterministic VGM
+  capture hooks from oracle. Forward notice only — nothing is owed and nothing
+  should be scheduled until S3 opens.
+- **KNOWN FLAKE, unidentified.** The vitest suite failed **1 test in 1 of ~6 full
+  runs**; five runs since were clean at 336/336. **The name was not recovered**,
+  because that run was piped through `tail -20` and the `FAIL` lines were
+  discarded. Per this repo's standing rule a flake gets made deterministic, not
+  watch-listed — so if you see it, **capture the full output** and kill it.
+  Two transferable lessons from that command: `npm test | tail` reports **tail's**
+  exit status (it exited 0 with a test failing), and truncating a log is the same
+  defect class as `2>/dev/null` — it destroys the artifact that would name the
+  problem.
+- **BOOKED PRODUCT DEFECT — `$2B` / DAC-vs-FM6 divergence.** Seraph's preview
+  engine keeps the DAC as an independent stream summed into the mix and **never
+  writes register `$2B`**, so an FM6 track and a DAC track sound together in the
+  app and **cannot** on real hardware. Verified firsthand with a control grep
+  (`0x2b`/`$2b` → exit 1 across `audio/`, `sequencer/`, `dac/`; control `0x28` →
+  9 hits in `engine.rs`). Same class as the overlap last-note-priority fix that
+  already landed: the preview must not promise what the driver cannot do. It is
+  in the queue Log with evidence but **not yet a row in the audit findings
+  table** — deliberately, to avoid conflicting with an in-flight agent editing
+  that table. **Add it as a finding once that parcel lands.**
+- **Seven more booked defects** from the README pass (dead `export_vgm` UI path,
+  hardcoded 60 s WAV export, unreachable `extract_library --help`, phantom
+  `"binary"` export format, unimplemented `Fm3SpecialMode`, a stale "Draw Mode
+  (F6)" comment where the binding is `B`, uncalled `get_channel_overlaps`) — all
+  in the queue Log for 2026-08-22 with evidence, none fixed.
 - Done so far: S1 Task 1 (tauri-specta, merged `437841e`); instrument library
   shipped independently of the S-queue (merged `1799c3c`, deferrals listed in the
   queue Log entry for 2026-07-16).

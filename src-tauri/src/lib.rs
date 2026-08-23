@@ -35,7 +35,7 @@ use ipc::{
     delete_dac_instrument, list_dac_instruments, preview_dac,
     get_dac_pcm_data,
     // Track CRUD
-    add_track, update_track, delete_track, list_tracks,
+    add_track, update_track, delete_track, list_tracks, get_track_instrument,
     // Region CRUD
     add_region, update_region, move_region, duplicate_region, delete_region,
     // Note CRUD
@@ -110,6 +110,7 @@ fn build_specta() -> Builder<tauri::Wry> {
         update_track,
         delete_track,
         list_tracks,
+        get_track_instrument,
         // Region CRUD
         add_region,
         update_region,

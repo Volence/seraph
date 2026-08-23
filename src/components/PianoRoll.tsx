@@ -597,19 +597,38 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
 
   const fmPreviewTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>);
 
+  /**
+   * Audition one pitch on this lane.
+   *
+   * This is the most-run interactive path in the roll — note press, grid
+   * double-click, keys-column click, and once per new pitch of a Draw-Mode
+   * paint drag — and it used to open with `ipc.listTracks()`, serializing
+   * the whole track/region/note tree across IPC to read ONE field: the
+   * track's instrument binding (F26). `getTrackInstrument` asks for exactly
+   * that field.
+   *
+   * It stays a live read rather than a value cached off `refresh()`. The
+   * binding changes from surfaces this component never hears about — a
+   * library drop or unbind on `TrackHeader`, a track delete, an
+   * `assign_library_instrument_to_track` from the library panel — and none
+   * of them notify the piano roll (the only cross-component signal that
+   * exists is `SONG_REVERTED_EVENT`, which undo/redo alone dispatches). A
+   * cache would audition the previous voice until something unrelated
+   * happened to refetch, which is exactly the staleness class `e01f6d1`
+   * swept out of this file.
+   */
   async function handleAudition(pitch: number) {
-    const tracks = await ipc.listTracks();
-    const track = tracks.find((t) => t.id === region.trackId);
-    if (!track?.instrumentId) return;
+    const trackVoiceId = await ipc.getTrackInstrument(region.trackId);
+    if (!trackVoiceId) return;
     if (region.channelType === "fm") {
       clearTimeout(fmPreviewTimer.current);
-      await ipc.previewFmInstrument(track.instrumentId, pitch);
+      await ipc.previewFmInstrument(trackVoiceId, pitch);
       fmPreviewTimer.current = setTimeout(() => { ipc.stopFmPreview(); }, 500);
     } else if (region.channelType === "psg") {
-      await ipc.previewPsgInstrument(track.instrumentId, pitch);
+      await ipc.previewPsgInstrument(trackVoiceId, pitch);
     } else {
       const dacNote = notes.find(n => n.pitch === pitch && n.instrumentId);
-      const dacInstId = dacNote?.instrumentId ?? track.instrumentId;
+      const dacInstId = dacNote?.instrumentId ?? trackVoiceId;
       if (dacInstId) await ipc.previewDac(dacInstId);
     }
   }

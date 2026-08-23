@@ -118,6 +118,25 @@ Current state (last reconciled against the Log 2026-08-22):
 
 ### Live state a fresh boot needs (2026-08-22)
 
+- **Nothing is in flight.** Every dispatched agent's work is landed, verified on
+  the merged tree, and pushed; `origin/main` was `ls-remote`-verified at each
+  push. The one preserved branch is `feat/view-state-persistence` (F15,
+  deprioritized — see above), unreviewed and not to be landed without a ruling.
+- **Last merged-tree lanes** (at the F25/F26 landing): cargo **264/0**, vitest
+  **352/352 across 33 files**, `npm run build` clean with zero warnings, no
+  `src/bindings.ts` drift. All exit codes read from the runner directly, never
+  through a pipe.
+- **Owner gates OPEN — these need ears and a fresh session cannot close them.**
+  From F25/F26: does picking a sample in the DAC lane's new header picker sound
+  right, immediately? Can a kick/hat/snare kit built from scratch on one DAC lane
+  be played back with the per-note samples as authored? Does auditioning *feel*
+  faster while painting a run across rows (the half of F26 no test can report)?
+  Still open from F6: the Draw toggle's legibility, and whether a paint-drag over
+  a running transport is audible at audition loudness. Also unresolved from F6 —
+  in Draw Mode a left-click on an existing note **selects** rather than deletes,
+  a deliberate deviation from the banked Ableton ruling, ratified provisionally
+  as a data-loss guard and reversible in one line.
+
 - **Emulator cutover costs this lane nothing.** Seraph's audio path is its own
   Rust engine, not an emulated ROM, so there is **no oracle/emulator dependency
   today** — current measurement work uses the in-repo `rendered_rms` /
@@ -141,10 +160,11 @@ Current state (last reconciled against the Log 2026-08-22):
   app and **cannot** on real hardware. Verified firsthand with a control grep
   (`0x2b`/`$2b` → exit 1 across `audio/`, `sequencer/`, `dac/`; control `0x28` →
   9 hits in `engine.rs`). Same class as the overlap last-note-priority fix that
-  already landed: the preview must not promise what the driver cannot do. It is
-  in the queue Log with evidence but **not yet a row in the audit findings
-  table** — deliberately, to avoid conflicting with an in-flight agent editing
-  that table. **Add it as a finding once that parcel lands.**
+  already landed: the preview must not promise what the driver cannot do. Now
+  booked as audit finding **F27** (severity high, unsized) as of `d668619`; the
+  fix is a design call — silent steal, a visible warning, or an authoring-time
+  gate like `check_voice_overlap` — and **the driver's exact behaviour should be
+  confirmed against aeon rather than assumed.**
 - **Seven more booked defects** from the README pass (dead `export_vgm` UI path,
   hardcoded 60 s WAV export, unreachable `extract_library --help`, phantom
   `"binary"` export format, unimplemented `Fm3SpecialMode`, a stale "Draw Mode

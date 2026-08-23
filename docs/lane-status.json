@@ -1,0 +1,57 @@
+{
+  "focus": "Nothing running. The note-entry work landed; three things need your ears, and S0's new shape needs your word.",
+  "inFlight": [],
+  "blockedOnOwner": [
+    {
+      "what": "Three by-ear checks nothing here can answer: does the picked DAC sample sound right and immediately, does a hand-built kick/hat/snare kit play back as authored, does auditioning feel faster while painting a run",
+      "since": "2026-08-22"
+    },
+    {
+      "what": "S0's driver list first-hand — it reached this repo relayed, hedged, and it makes S0 materially bigger than the banked plan",
+      "since": "2026-08-22"
+    },
+    {
+      "what": "Two smaller open ear-gates from the Draw Mode work: is the Draw toggle legible, and is a paint-drag over a running transport audible at audition loudness",
+      "since": "2026-08-21"
+    }
+  ],
+  "nextBoundary": "Nothing is open — the lane is at a clean stop. The next boundary is whichever item you pick landing on a green merged tree.",
+  "queue": [
+    {
+      "id": "F27",
+      "title": "Seraph lets a drum and the FM6 track sound together; the real chip cannot",
+      "state": "next",
+      "size": "M",
+      "blockedBy": null
+    },
+    {
+      "id": "S0",
+      "title": "Sound-driver capability manifest — the thing that gates every later Seraph piece",
+      "state": "open",
+      "size": "L",
+      "blockedBy": "which drivers it targets — needs your word, not a relay"
+    },
+    {
+      "id": "README-7",
+      "title": "Seven small booked defects from the README pass — dead VGM export, WAV export stuck at 60s, a broken --help, a format that does not exist",
+      "state": "open",
+      "size": "M",
+      "blockedBy": null
+    },
+    {
+      "id": "FLAKE",
+      "title": "One test fails about once in six full runs and its name was never captured",
+      "state": "open",
+      "size": "S",
+      "blockedBy": null
+    },
+    {
+      "id": "S3",
+      "title": "Play a song through the real driver and A/B it against the preview",
+      "state": "open",
+      "size": "L",
+      "blockedBy": "S0"
+    }
+  ],
+  "updatedAt": "2026-08-23T07:38:00Z"
+}

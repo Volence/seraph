@@ -1323,6 +1323,63 @@ designs target the banked specs (normative); manifest flags carry the gates.
   the table records what has been looked at, not what is wrong with the app. The
   previous pass asserted completeness three times and missed three times.
 
+- 2026-08-22 (cont.): **OVERSEER LANDING NOTE — re-grounding merged (`5585115`);
+  an F15 PARCEL WAS DISPATCHED IN ERROR AND STOPPED.**
+  **THE ERROR, recorded because the next session boots from this file and would
+  repeat it.** This overseer booted, read the Log's *header and tail* plus
+  `OVERSEER.md`, ranked F15 (severity critical, audit rank #3) as the front of
+  the queue, and dispatched a parcel for it. **F15 was DEPRIORITIZED BY THE
+  OWNER** — banked in this very document ("F15 view-state persistence
+  DEPRIORITIZED (owner: current behavior matches how they work)"), in a Log
+  entry sitting between the two ranges that were read. The agent's report
+  correctly cited that ruling as its reason for not promoting F15; the overseer
+  initially suspected the agent had fabricated an owner ruling and checked —
+  the agent was right and the overseer was wrong.
+  **Generalisable, not a one-off slip:** a severity number in a findings table
+  is a property of the CODE; a deprioritization is a property of the OWNER's
+  intent, and only the second one can make a critical finding not-next. Reading
+  a queue's head and tail gets every landing and misses every *ruling*, because
+  rulings are recorded where they happened, not where the reader is looking.
+  **A cold session must grep this Log for the finding ID before funding any
+  parcel off the audit** — `grep -n "F<NN>"` over this file costs one command
+  and is the only step that can refute "this is the obvious next parcel".
+  **DISPOSITION:** branch `feat/view-state-persistence` (worktree
+  `agent-ad49279747a861166`, commits `78597ab` + `cffb634`, plus uncommitted
+  `App.tsx` edits and a new `App.viewState.test.tsx`) is **PRESERVED UNMERGED**,
+  not deleted — if the owner ever reverses the deprioritization the work is
+  most of the way there. It has NOT been reviewed and must not be landed on the
+  strength of this entry. Its design premise was independently sound: the
+  LOCATION MEMORY entry above had already designated `recentLocations.ts` as
+  the persistence seam ("versioned key + typed module, not scattered raw
+  calls"), which is the same call the overseer re-derived rather than read.
+  **MERGED — `5585115`, docs-only** (2 files, +468/−83; `--stat`-verified to
+  touch zero code, which is why the code lanes below cannot be attributed to
+  it). Findings table F1–F26 re-grounded, ranking re-derived, prose drift
+  enumerated, play-test script rewritten. **Two new findings, both verified
+  firsthand by the overseer rather than taken on report:** **F25** — per-note
+  voice assignment is DEAD for DAC: `LibraryInstrument` has exactly `Fm`/`Psg`
+  (no `Dac` anywhere under `src-tauri/src/library/`, grep exit 1) while
+  `handleVoiceDrop` rejects on `kind !== region.channelType`, so on a DAC lane
+  the app's only per-note-voice gesture always fails with a hint. The *joint
+  the report left implicit* was checked separately, since it was the only step
+  that could have refuted the finding: DAC regions really do carry
+  `channelType === "dac"` (`PianoRoll.tsx` `isDac`). **F26** — every audition
+  opens with `await ipc.listTracks()`, i.e. the whole song over IPC per note
+  press, and since F6 once per new pitch of a paint run.
+  **LANES on the merged tree:** cargo **263/0**; `npm test` **336/336 across 31
+  files**. **A FLAKE WAS OBSERVED AND IS NOT YET IDENTIFIED:** the first run
+  reported `1 failed | 335 passed`, four subsequent runs were clean. The
+  failing test's NAME IS UNRECOVERABLE because that run was piped through
+  `tail -20`, which discarded the `FAIL` lines — the same family of defect as
+  `2>/dev/null`: the truncation destroyed the artifact that would have named
+  it. **Booked, not watch-listed**, per this repo's standing rule that a flake
+  gets made deterministic rather than tolerated. Second lesson from the same
+  command: **`npm test | tail` reports `tail`'s exit status, not vitest's** —
+  that run exited 0 while a test was failing, so an exit code from a pipeline
+  is not a gate.
+  **NOT RUN:** `npm run build` — stated rather than implied, since the merge
+  provably touches no code.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

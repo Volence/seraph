@@ -41,6 +41,30 @@ driver — "Memra" is the docs/UI name). Standing decisions: driver-in-the-loop
 guarantee; Aeon-native model, wide import, narrow export; capability manifest lives
 in **empyrean**; correct-by-construction UI over export-time validation.
 
+## Two committed files the contract requires, beyond the queue
+
+`docs/decisions.jsonl` and `docs/lane-log.jsonl` are required and committed, per
+`contract/DECISIONS.md` and `contract/LANE_LOG.md` in empyrean, ratified 2026-08-23
+and read here at `origin/main` = `94ea23982df466c04b125e44cf6513a3267741ee`
+(`ls-remote`-verified). **Those documents govern; this is a pointer, not a copy.**
+
+Why it needs saying here at all: that rule reaches a lane only through the
+`/overseer` skill, which lives outside every repo and outside version control — a
+gap `DECISIONS.md`'s own Status section names as open and parked with the owner. So
+a cold boot that reads only this file would never learn either file exists.
+
+- **`docs/decisions.jsonl` EXISTS here** (seeded `9cdbb4a`, four entries `d-1`..`d-4`).
+  Append-only. Every `blockedOnOwner` row in `docs/lane-status.json` carries a
+  matching `id` pointing at it. Correct an entry by appending one with `supersedes`,
+  never by rewriting the line. Drop the blocker when the decision is settled and not
+  before — that disappearance is the only receipt the console ever gets.
+- **`docs/lane-log.jsonl` DOES NOT EXIST here yet.** Owed, not written; noted so the
+  gap is visible rather than silently absent.
+- `at` and `updatedAt` come from `date -u +%Y-%m-%dT%H:%M:%SZ` and nowhere else.
+- No em dashes or en dashes in either file's prose fields (standing owner
+  instruction, 2026-08-23). Note the contrast with this document, which is written
+  for a lane rather than for him.
+
 ## Queue — plan of record
 
 Canonical status record: `docs/superpowers/2026-07-03-seraph-banking-queue.md`

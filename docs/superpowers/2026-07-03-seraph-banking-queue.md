@@ -1803,6 +1803,51 @@ designs target the banked specs (normative); manifest flags carry the gates.
   correct, its warrant was undocumented. The wiki condition is inert in this repo: seraph
   publishes no `wiki/dist/`.
 
+- 2026-08-24: **THE DECISIONS FORMAT IS IN FORCE, AND THIS LANE'S FOUR BLOCKERS ARE
+  NOW STATED RATHER THAN NAMED.** Owner instruction, relayed by the empyrean hub;
+  **relayed, not witnessed by this lane** — recorded that way per this repo's standing
+  rule, and it costs nothing here because the instruction is a *format* rule and
+  carries no authorization. The hub said so itself in the message.
+  **Anchor verified firsthand before acting on it:** empyrean `origin/main` =
+  `94ea23982df466c04b125e44cf6513a3267741ee`, checked with `git ls-remote` against the
+  remote rather than a local ref or the sibling working tree, and `contract/DECISIONS.md`
+  + `contract/LANE_LOG.md` read at that revision via `git show <rev>:<path>`. Bonus from
+  the same check, worth banking because it retires a doubt rather than raising one: the
+  protocol blob at that SHA is `0e55e265…`, **byte-identical to the one this session
+  booted on**, so the boot read was already current and no bar moved underneath it.
+  **What landed (`9cdbb4a`):** `docs/decisions.jsonl`, four entries, one per existing
+  `blockedOnOwner` row, each with the problem stated in his vocabulary, two or more
+  options carrying a cost he can picture, and a recommendation. `blockedOnOwner[].id`
+  in `docs/lane-status.json` points at them. d-1 the FM6/DAC ch6 model call (F27),
+  recommending the song-level mode field on the argument that the two cheaper options
+  are each silently wrong for a subset of songs; d-2 the three F25/F26 ear gates;
+  d-3 S0's driver list; d-4 the two F6 Draw Mode gates.
+  **The shape call, made here and flagged to him rather than hidden:** d-2 and d-4 are
+  ear and eye checks, and **a question only his ears can answer has no options for him
+  to weigh**, so forcing the literal check into an options list would have invented a
+  choice that does not exist. Both are instead written as decisions about *how much of
+  his attention to spend* and what this lane does under each answer. The hub proposed
+  this shape and explicitly did not rule it; the call is this lane's, and d-2 says so in
+  its own text so he can reject it without reading a Log.
+  **Contract compliance details that are mechanism, not habit:** every `at` and
+  `updatedAt` came from `date -u`, never from this session's sense of the time (rule 7,
+  and the reason it exists is that a model has no clock); the barred em and en dashes
+  were checked for **programmatically over every prose field before the file was
+  written**, not proofread afterwards; and the recommendation key was asserted to name
+  one of the entry's own options, since a recommendation pointing at nothing rejects the
+  whole entry and looks like guidance while being none.
+  **KNOWN GAP, STATED SO IT IS NOT SILENTLY ABSENT: `docs/lane-log.jsonl` is equally
+  required by the ratified contract and DOES NOT EXIST in this repo.** The owner's
+  relayed text asked for the decisions half only, so writing a retroactive lane log was
+  not in the ask and was not done. Not an oversight; an unfilled obligation, and the
+  distinction is the whole point of writing it down.
+  **`docs/OVERSEER.md` now carries a pointer to both files**, because the rule requiring
+  them reaches a lane only through the `/overseer` skill, which lives outside every repo
+  and outside version control — a hole `DECISIONS.md`'s own Status section names as open
+  and parked with the owner. Without that pointer a cold boot of this repo would read the
+  whole boot doc and never learn either file exists. It is a pointer with its citation
+  and a "that document governs" line, deliberately not a copy of the rules.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

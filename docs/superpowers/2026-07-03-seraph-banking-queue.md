@@ -1848,6 +1848,36 @@ designs target the banked specs (normative); manifest flags carry the gates.
   whole boot doc and never learn either file exists. It is a pointer with its citation
   and a "that document governs" line, deliberately not a copy of the rules.
 
+- 2026-08-24 (cont.): **THE LANE-LOG GAP WAS RULED WITHIN THE HOUR, AND THE RULING IS
+  NOT WHERE IT SAYS IT IS.** Hub ruling, relayed: **open `docs/lane-log.jsonl` at the
+  next landing; do not backfill**, and a lane with nothing landed writes nothing rather
+  than writing that it wrote nothing. The entry above is left unedited and corrected
+  here, per this repo's habit of not laundering a change of understanding into the
+  original claim: what that entry called an unfilled obligation is, by this ruling,
+  correct behaviour. **The reasoning is worth keeping** — a log reconstructed after the
+  fact out of an overseer doc is a confident guess wearing a record's clothes, and it is
+  precisely the failure `LANE_LOG.md` exists to prevent. It also retires the question of
+  whether to open the file with a ceremonial empty entry: no.
+  **The hub's own measurement, banked because no single lane could have seen it:**
+  `decisions.jsonl` present in **6/6** repos within the hour of the relay (this lane
+  filed four, the most of any); `lane-log.jsonl` present in **1/6**, empyrean only. The
+  oracle lane found the gap against itself and predicted the other five correctly. Two
+  lanes reaching it independently is corroboration rather than echo (protocol bar 19):
+  oracle enumerated over its own repo's files, this lane over the contract's own
+  requirements table while reading it for a different reason.
+  **ANCHOR DEFECT, VERIFIED FIRSTHAND AND RAISED WITH THE HUB.** The ruling is banked at
+  empyrean `3ca38ac`, which IS reachable from `origin/main` (`ls-remote` + ancestor check
+  both run here). But `git show --stat` puts its whole content in the hub's own
+  `docs/lane-log.jsonl` and `docs/lane-status.json`; **`contract/LANE_LOG.md` is
+  untouched, and grepping it at `origin/main` for backfill, next landing, heartbeat and
+  nothing-landed returns no hits.** So a binding cross-lane rule is anchored to a commit
+  whose class is one lane's narrative log — the same defect the protocol names for a docs
+  SHA standing in for a code guarantee, one level over. It matters concretely rather than
+  pedantically: **the next cold lane will read `LANE_LOG.md`, find no backfill rule, and
+  either backfill against the ruling or invent its own answer**, and nothing in that path
+  passes through the commit that carries it. Raised with the hub with the grep; the fix is
+  theirs to land, since the contract is theirs.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

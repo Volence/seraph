@@ -163,8 +163,14 @@ Current state (last reconciled against the Log 2026-08-22):
   right, immediately? Can a kick/hat/snare kit built from scratch on one DAC lane
   be played back with the per-note samples as authored? Does auditioning *feel*
   faster while painting a run across rows (the half of F26 no test can report)?
-  Still open from F6: the Draw toggle's legibility, and whether a paint-drag over
-  a running transport is audible at audition loudness. Also unresolved from F6 —
+  **CLOSED 2026-08-24 by owner ruling (d-4/d-5): the Draw toggle's legibility and
+  paint-drag audibility are settled "leave both alone until they annoy you in real
+  use". Do not re-raise them.** But note what that ruling did NOT cover: the queue
+  Log's original F6 entry names a **third** gate, whether a painted run RENDERS
+  correctly (jsdom has no 2D context, so no test can see it), and this list only ever
+  carried two of the three. The card inherited the omission, so his answer cannot be
+  stretched to it — it stays open and unfiled. This is the snapshot-versus-Log drift
+  this file warns about at the top, caught in this file itself. Also unresolved from F6 —
   in Draw Mode a left-click on an existing note **selects** rather than deletes,
   a deliberate deviation from the banked Ableton ruling, ratified provisionally
   as a data-loss guard and reversible in one line.

@@ -1912,6 +1912,61 @@ designs target the banked specs (normative); manifest flags carry the gates.
   finding inherits the finding's credibility for free.** Nothing marked it as the unverified
   half, including to the sender.
 
+- 2026-08-24: **FIRST OWNER ANSWER THROUGH THE CONSOLE, AND A QUESTION BACK ON THE
+  BIGGER ONE. WITNESSED IN THIS SESSION, not relayed.**
+  **d-4 SETTLED: the two F6 gates (Draw toggle legibility, paint-drag audibility) are
+  ruled "leave both alone until they annoy you in real use"** — this lane's own
+  recommendation, accepted. Recorded by appending **d-5** (supersedes d-4) and the
+  blocker dropped from `lane-status.json` in the same act, which is the only receipt the
+  console ever gets. **Do not re-raise these.**
+  **SCOPE CATCH, and it is the reason to read a settled card carefully rather than
+  filing it:** the card named TWO gates. The original F6 Log entry above names **THREE**
+  — the third being whether a painted run RENDERS correctly, which no test can see
+  because jsdom has no 2D context. `OVERSEER.md`'s gate list only ever carried two of the
+  three, and the card inherited that omission. **His answer therefore does NOT cover the
+  third**, and stretching it to cover a gate he was never shown is precisely the
+  laundering `DECISIONS.md` rule 8b bars. Left open and deliberately unfiled: filing a
+  near-identical card minutes after he ruled on its siblings spends his attention badly.
+  Raised with him in prose instead. Note where the drift came from: the boot doc's own
+  snapshot, which that doc warns about at its top, biting the doc that carries the
+  warning.
+  **FORMAT GAP, raised with the hub rather than worked around:** `DECISIONS.md` has no
+  `outcome` field and no shape for a closed card, while the console's answer prompt asks
+  the lane to "record the outcome in `docs/decisions.jsonl`". Rule 8 forbids rewriting the
+  settled line, and appending an entry with an invented question would be worse. Encoding
+  chosen: append a `supersedes` entry carrying the **identical** question, options and
+  recommendation, with the outcome in `detail`. Nothing is invented, and because the
+  blocker is dropped no card re-renders. Every lane hits this on its first answer.
+  **d-1 NOT ANSWERED — HE ASKED A QUESTION, AND HE EXPLICITLY SAID TO KEEP IT LISTED.**
+  Per `DECISIONS.md`, a question leaves the blocker standing; it stands. His question:
+  *"Maybe we should have the engine determine what it does? Like if sonic 1 always eats a
+  channel for DAC, if we're using that engine that's how it should behave right?"*
+  **He is right, and the evidence for it was already sitting in this repo unread against
+  this question.** `docs/research/2026-08-23-f27-driver-truth.md` §2 read paired `.lst`
+  disassemblies for five drivers: S3K Flamedriver has **no FM6 music track at all** (the
+  init table's own comment says so); Batman excludes ch6's voice per sub-frame from a
+  state flag; Alien Storm, Gunstar and TF4 toggle `$2B` per sample; MDSDRV (second-hand,
+  marked) collapses slot 5 to FM6-or-PCM1 so its format cannot express both. §2.3:
+  **nobody lets FM6 and the DAC sound simultaneously, and no driver read represents that
+  state at all.** So the driver determines it in every established case, and aeon's Memra
+  is the *only* driver found that offers a per-song choice.
+  Recorded by appending **d-6** (supersedes d-1) with his option added as
+  `driver-decides` and `recommend` re-pointed at it, per rule 8b — **added, never mapped
+  onto the nearest option already offered**, since mapping would launder his answer into a
+  choice he did not make. The status file still names `d-1`; the reader follows
+  `supersedes`, which is exactly what that pointer is for, so nothing needed re-pointing.
+  **CAVEAT KEPT IN THE CARD: Sonic 1 specifically was NOT among the five blobs read.** His
+  instinct holds across all five that were; S1 itself is untested here. Stated rather than
+  quietly generalised, because his example is the one thing in his question this repo
+  cannot confirm.
+  **CONSEQUENCE FOR SEQUENCING: this promotes F31 from cleanup to the first step of the
+  fix.** Under `driver-decides` the driver profile is the thing that carries the answer,
+  and seraph's only profile is `FlamedriverProfile`, advertising seven voices on a
+  six-voice chip, with no aeon/Memra profile at all. It must be right before anything
+  reads it. The already-proposed order (F28, then F31) lines up with his thinking by
+  accident rather than design, which is worth noting so a future session does not read
+  the alignment as evidence.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

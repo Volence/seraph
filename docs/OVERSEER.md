@@ -58,6 +58,16 @@ a cold boot that reads only this file would never learn either file exists.
   matching `id` pointing at it. Correct an entry by appending one with `supersedes`,
   never by rewriting the line. Drop the blocker when the decision is settled and not
   before — that disappearance is the only receipt the console ever gets.
+  **Closing an answered one has exactly one legal shape, `DECISIONS.md` rule 8c**
+  (empyrean `829d3ac`, located with `git log -S` over the file and confirmed as the
+  carrier, not merely the tip it also happens to be): append an entry with `supersedes`
+  set to the settled id, carrying the **identical** `question`, `options` and
+  `recommend`, and what he chose plus what you did in `detail`. No card re-renders,
+  because the blocker is already gone. This repo's `d-5` is the worked example.
+  Do not invent an `outcome` or `answered` key: a consumer that rebuilds each item from
+  a fixed key set **drops an unknown key silently**, so such an entry looks complete on
+  disk and loses the outcome at the reader, undetectably from both ends. A first-class
+  `answered` field is booked centrally as a coordinated change with the console.
 - **`docs/lane-log.jsonl` DOES NOT EXIST here yet, and that is now CORRECT.**
   `contract/LANE_LOG.md` **rule 8**: open the log at your next landing, never backfill.
   A lane that has landed nothing writes nothing — the file records landings, it is not a

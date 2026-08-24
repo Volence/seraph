@@ -1967,6 +1967,33 @@ designs target the banked specs (normative); manifest flags carry the gates.
   accident rather than design, which is worth noting so a future session does not read
   the alignment as evidence.
 
+- 2026-08-24 (cont.): **THE CLOSING ENCODING IS RULED, AND IT IS THIS LANE'S —
+  `DECISIONS.md` RULE 8c**, verified firsthand at empyrean `829d3ac` (`git log -S` over
+  the file to get the carrier rather than the tip, which it also happens to be).
+  `d-5` above is now the worked example of a ruled convention rather than a local
+  workaround, and `OVERSEER.md` cites the rule so a future session here does not
+  re-derive it.
+  **The part worth keeping is why the alternative was worse, because this lane could not
+  have worked it out alone.** The hub hit the identical gap an hour earlier and invented
+  a top-level `outcome` object without noticing. **A consumer that rebuilds each item
+  from a fixed key set — the design that stops an unvalidated field reaching a UI —
+  drops an unknown key silently.** So that encoding loses the outcome at the reader while
+  looking complete on disk; the producer cannot detect it and the consumer structurally
+  cannot report it. Bar 16(d) in a new surface: **an absence with no artifact to
+  re-examine.** The `supersedes` form was preferred for costing the consumer nothing,
+  not for being tidier.
+  **This lane's objection survived into the rule rather than being adopted away:** it is
+  a supersession that supersedes nothing, a slightly dishonest use of the pointer. The
+  rule states its own limit and books a first-class `answered` field as a coordinated
+  change with the console, deliberately not adopted yet, since adding a field the reader
+  does not parse trades a clean record for a broken card.
+  **Bar 19 check on the convergence, since two lanes agreeing is exactly what this
+  document keeps warning about:** the hub and this lane reached the same gap from
+  different parameters (their own first answer, an hour apart, neither aware of the
+  other) and reached DIFFERENT encodings. That is not corroboration and was never
+  claimed as such; it is two independent derivations disagreeing, which is why a central
+  ruling was the right resolution rather than either lane's habit spreading by example.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

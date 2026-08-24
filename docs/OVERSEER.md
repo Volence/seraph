@@ -58,20 +58,16 @@ a cold boot that reads only this file would never learn either file exists.
   matching `id` pointing at it. Correct an entry by appending one with `supersedes`,
   never by rewriting the line. Drop the blocker when the decision is settled and not
   before — that disappearance is the only receipt the console ever gets.
-- **`docs/lane-log.jsonl` DOES NOT EXIST here yet, and that is now CORRECT.** Hub
-  ruling 2026-08-24: **open it at the next landing; do not backfill**, because a log
-  reconstructed afterwards from an overseer doc is a confident guess wearing a record's
-  clothes, which is what the format exists to prevent. Corollary: **a lane with nothing
-  landed writes nothing** — the log records landings, it is not a heartbeat. So do not
-  read its absence here as a defect, and do not open it with a ceremonial first entry.
-  **Caveat on that ruling's anchor, because you will want to cite it and it will not
-  hold up:** it is banked at empyrean `3ca38ac` (reachable from `origin/main`, verified
-  here), but that commit touches only the hub's OWN `docs/lane-log.jsonl` and
-  `docs/lane-status.json`. **`contract/LANE_LOG.md`, the document that actually governs,
-  says nothing about backfill** — grepped at `origin/main`, no hits. So the rule
-  currently lives in a commit subject and one lane's narrative entry. Cite it as a hub
-  ruling with that SHA and say what class the SHA is; if the rule has since moved into
-  `LANE_LOG.md`, cite there instead and delete this caveat.
+- **`docs/lane-log.jsonl` DOES NOT EXIST here yet, and that is now CORRECT.**
+  `contract/LANE_LOG.md` **rule 8**: open the log at your next landing, never backfill.
+  A lane that has landed nothing writes nothing — the file records landings, it is not a
+  heartbeat, and an empty ceremonial first entry is worse than an absent one. So do not
+  read the absence here as a defect and do not "fix" it. **Anchor: empyrean `2e50643`**,
+  the commit that actually adds rule 8 to `LANE_LOG.md` (`--stat`-checked; the hub cited
+  the branch tip `2c587f2`, which carries rule 10 and does not touch that file — a path
+  has a time, so cite the commit that carries the rule, not the tip that can read it).
+  F28's landing is the natural first entry here.
+
 - `at` and `updatedAt` come from `date -u +%Y-%m-%dT%H:%M:%SZ` and nowhere else.
 - No em dashes or en dashes in either file's prose fields (standing owner
   instruction, 2026-08-23). Note the contrast with this document, which is written

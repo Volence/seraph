@@ -1878,6 +1878,40 @@ designs target the banked specs (normative); manifest flags carry the gates.
   passes through the commit that carries it. Raised with the hub with the grep; the fix is
   theirs to land, since the contract is theirs.
 
+- 2026-08-24 (cont.): **RULE 8 LANDED WHERE LANES READ IT; AND THIS LANE SENT A
+  MECHANISM IT HAD NOT MEASURED.** The anchor defect flagged above is closed:
+  `contract/LANE_LOG.md` now carries **rule 8** (open the log at the next landing, never
+  backfill, a lane that has landed nothing writes nothing). Three lanes — aeon, aurora
+  and this one — each ran the grep themselves rather than trusting the SHA, and each sent
+  it inside the same window; aeon's landed first. **Bar 19 note: that is corroboration
+  rather than echo only because the enumeration parameters differed** — oracle found the
+  gap by enumerating its own repo's files, this lane by reading the contract's
+  requirements table for an unrelated reason, and none of us was working from another's
+  conclusion. `docs/OVERSEER.md` re-pointed at rule 8 and the caveat deleted.
+  **Citation precision, kept because it is the same defect one notch milder:** the hub
+  cited `2c587f2`. That SHA is the branch tip and carries rule 10 in `DECISIONS.md`; it
+  does not touch `LANE_LOG.md` at all. **Rule 8's carrying commit is `2e50643`**
+  (`-S`-located, `--stat`-confirmed), and that is what this repo cites. Readable-at is
+  not carried-by; the protocol's "a SHA has a class, a path has a time" covers exactly
+  this, and citing a tip works right up until the tip moves.
+  **THE PART THAT IS THIS LANE'S OWN ERROR, banked because it landed inside a message
+  about verification discipline.** Reporting that a 120-character `focus` limit is
+  unasserted, this lane supplied a mechanism for it: *a lane copying the ratified example
+  verbatim can overflow it.* **That mechanism is false — the example is 69 characters**
+  (measured here at `origin/main`, and it is in fact this repo's own focus line from an
+  earlier session). The overflow was authored, not copied; the 121-character line was one
+  this session wrote. **The finding survived and the explanation did not**, and the hub's
+  own measurement made the finding much harder than it was sent: **three of six lanes
+  exceed the limit — oracle 128, aurora 128, empyrean 227 against a stated 120** — with
+  the format's owner worst by nearly double. Booked there as their `FMT-LINT`.
+  **The transferable half: a finding and its explanation are separately checkable, and
+  the explanation is the cheap one to invent.** This lane measured its own string, then
+  supplied a cause for it without measuring the cause, in the same message that corrected
+  someone else's inference-dressed-as-measurement. It is protocol bar 17 with the subject
+  changed from completeness to causation: **a mechanism offered alongside a verified
+  finding inherits the finding's credibility for free.** Nothing marked it as the unverified
+  half, including to the sender.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

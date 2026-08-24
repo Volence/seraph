@@ -177,6 +177,16 @@ Current state (last reconciled against the Log 2026-08-22):
   isolation, driver-state readout at Memra's symbols, and deterministic VGM
   capture hooks from oracle. Forward notice only — nothing is owed and nothing
   should be scheduled until S3 opens.
+  **Whether an instance EXISTS is a separate question from whether this lane needs
+  one, and the guidance above is unchanged either way** *(2026-08-24)*. The hub
+  relays that a live oracle server has been up since 2026-08-19 with its socket in a
+  private `XDG_RUNTIME_DIR`, invisible to every lane — **their measurement, relayed,
+  NOT verified here**, deliberately, because nothing in this queue depends on it and
+  verifying a shared instance means touching a resource another lane may be
+  mid-measurement on. Recorded only so a future session at S3 does not spend an hour
+  concluding there is no emulator: re-check it then, firsthand, rather than trusting
+  this line. Note it also predates the cutover, so the standing one-instance norm
+  applies to whoever next starts one.
 - **KNOWN FLAKE, unidentified.** The vitest suite failed **1 test in 1 of ~6 full
   runs**; five runs since were clean at 336/336. **The name was not recovered**,
   because that run was piped through `tail -20` and the `FAIL` lines were

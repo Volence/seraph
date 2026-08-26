@@ -414,6 +414,32 @@ marked *(carried forward — not re-verified)*.
 
 ### F27 — GROUNDED 2026-08-23, AND THE ROW ABOVE STATES THE PREMISE WRONG
 
+**RULED BY THE OWNER 2026-08-24 — THE DRIVER DECIDES. Design closed; the row and the
+grounding below are both left unedited.** Decision `d-7` in `docs/decisions.jsonl`
+(chain `d-1` → `d-6` → `d-7`). **The driver profile carries the channel-6 behaviour and
+Seraph follows it. There is no per-song channel-6 mode**, and a song cannot claim a
+behaviour its driver does not have.
+
+The option he chose was **his own**, proposed as a question and added under
+`DECISIONS.md` rule 8b rather than mapped onto the nearest one already offered. His
+reasoning: if a given driver always eats a voice for drums, a song on that driver should
+behave that way. The driver read in §2 of `docs/research/2026-08-23-f27-driver-truth.md`
+supports it across **all five drivers whose bytes were read** — S3K has no FM6 music
+track at all; Batman excludes the voice per sub-frame; Alien Storm, Gunstar and TF4
+toggle `$2B` per sample; §2.3 records that **nobody lets FM6 and the DAC sound
+simultaneously and no driver read represents that state**. *Caveat kept: Sonic 1, his own
+example, was NOT among the five.*
+
+**What stays open, and is deliberately not being re-asked now:** aeon's Memra is the only
+driver found that genuinely offers a per-song choice (DEDICATE / FM6-FM / ADAPTIVE), so
+one Memra-scoped setting is still wanted. It gets its own card when Memra playback is
+actually built, per his stated preference for deciding things he can hear.
+
+**Sequencing consequence: F31 is promoted from cleanup to step one.** Under this ruling
+the profile is the thing that carries the answer, so it must be right before any surface
+reads it. F27's remaining work is implementation, unblocked, and sits behind F31.
+
+
 Two investigations landed (`75fdd1a`, `6852454`; reports at
 `docs/research/2026-08-23-f27-driver-truth.md` and
 `docs/research/2026-08-23-f27-exposure-map.md`). **The F27 row's central claim —

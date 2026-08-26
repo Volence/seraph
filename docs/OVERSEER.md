@@ -203,6 +203,12 @@ Current state (last reconciled against the Log 2026-08-22):
   concluding there is no emulator: re-check it then, firsthand, rather than trusting
   this line. Note it also predates the cutover, so the standing one-instance norm
   applies to whoever next starts one.
+  **Superseded 2026-08-26, relayed by the hub, NOT verified here:** the suite switched to
+  the new Oracle (owner ruling, empyrean `3c21183`); a fresh session's `mcp__oracle__*`
+  tools now spawn a private oracle-aether (aeon's `s4.debug.bin`, starts paused) and reap
+  it on exit rather than dialling the shared socket; `ORACLE_SOCKET=/run/user/1000/oracle.sock`
+  attaches to the window the owner watches; do not open `oracle_gui`. Same guidance as
+  above: nothing here needs it before S3; re-check firsthand then.
 - **KNOWN FLAKE, unidentified.** The vitest suite failed **1 test in 1 of ~6 full
   runs**; five runs since were clean at 336/336. **The name was not recovered**,
   because that run was piped through `tail -20` and the `FAIL` lines were

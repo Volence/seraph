@@ -1994,6 +1994,20 @@ designs target the banked specs (normative); manifest flags carry the gates.
   claimed as such; it is two independent derivations disagreeing, which is why a central
   ruling was the right resolution rather than either lane's habit spreading by example.
 
+- 2026-08-24 (cont.): **d-1 SETTLED BY THE OWNER — `driver-decides`, closed as `d-7`.**
+  Answered through the console 2026-08-24; he chose the option that was his own
+  (added under rule 8b as `d-6`) and this lane's recommendation. Closed per rule 8c:
+  `d-7` supersedes `d-6` with identical question, options and recommendation, outcome in
+  `detail`, blocker dropped from `lane-status.json` in the same act. The audit doc's F27
+  section carries the ruling above its grounding, unedited below. **What it rules:** the
+  driver profile carries channel-6 behaviour and Seraph follows it; a song carries no
+  channel-6 mode. **Not ruled, deliberately:** a Memra-scoped setting (the only driver
+  found offering DEDICATE / FM6-FM / ADAPTIVE per song) gets its own card when Memra
+  playback exists. **Sequencing:** F31 is step one, F27 implementation behind it.
+  Committed 2026-08-26T01:53:44Z by a boot session that found the ruling written 2026-08-24 but
+  sitting uncommitted for two days (BANK-D7). No parcel dispatched; the owner named other
+  lanes to continue tonight and this lane was not among them.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

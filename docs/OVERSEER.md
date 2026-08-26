@@ -209,6 +209,35 @@ Current state (last reconciled against the Log 2026-08-22):
   it on exit rather than dialling the shared socket; `ORACLE_SOCKET=/run/user/1000/oracle.sock`
   attaches to the window the owner watches; do not open `oracle_gui`. Same guidance as
   above: nothing here needs it before S3; re-check firsthand then.
+  **CORRECTED 2026-08-26, VERIFIED FIRSTHAND HERE, and the paragraph above is DANGEROUS
+  if read alone.** "A fresh session spawns its own emulator" is a property of the **MCP
+  shim process**, not of the conversation, and **`/clear` does not restart that process** —
+  so a session can be conversationally fresh and still be running a shim from before the
+  cutover, which **dials `/run/user/1000/oracle.sock`: the owner's on-screen player**. Any
+  `mcp__oracle__*` call from such a session pauses, steps or writes into the game he is
+  playing. Found by oracle, corroborated by the hub (`ps` + `ss -xp`); the part verified
+  **here** is the one neither of them could check, this session's own shim: PID 287652, a
+  child of this `claude` process, started **2026-08-25 20:29:19** local with **no child
+  `oracle-aether`**, while `oracle-old` `07314aa` ("the shim opens its own emulator on
+  first use") is dated **2026-08-26 01:09:53Z** — hours later. This conversation was
+  `/clear`ed the following morning and the shim did not move, which makes this lane its own
+  worked example.
+  **How to tell which kind of session you are, and do it BEFORE the first `mcp__oracle__*`
+  call, because the call itself is the harm.** Walk your own ancestry to the `claude` PID,
+  then look for a paired emulator:
+
+  ```sh
+  ps -eo pid,ppid,lstart,args | awk '$2=='"$CLAUDE_PID"''   # the shim is a child of claude
+  ps -eo pid,ppid,args | awk '$2=='"$SHIM_PID"''            # a post-cutover shim has an oracle-aether child
+  ```
+
+  A shim with its own `oracle-aether` child is safe; one without it is a dialer. **A shim
+  with no live connection right now proves nothing** — it connects on first use, so an empty
+  `ss -xp` is bar 16(d)'s ambiguous absence, not an all-clear. Remedy is a Dominion
+  clear+reboot (which respawns the MCP process) or your own emulator with `ORACLE_SOCKET`
+  pointed at it. **Never kill or reset his player.** Costless for this lane either way,
+  since nothing here needs an emulator before S3 — recorded so the session that opens S3
+  does not learn it by pausing his game.
 - **KNOWN FLAKE, unidentified.** The vitest suite failed **1 test in 1 of ~6 full
   runs**; five runs since were clean at 336/336. **The name was not recovered**,
   because that run was piped through `tail -20` and the `FAIL` lines were

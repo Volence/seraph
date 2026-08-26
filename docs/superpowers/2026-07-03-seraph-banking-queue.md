@@ -2008,6 +2008,42 @@ designs target the banked specs (normative); manifest flags carry the gates.
   sitting uncommitted for two days (BANK-D7). No parcel dispatched; the owner named other
   lanes to continue tonight and this lane was not among them.
 
+- 2026-08-26: **S2 HAS LOST ITS INSTRUMENT, AND THAT IS THE REAL NEWS OF THE DAY.**
+  Relayed by oracle (their `d-12`), NOT verified here against their tree, and deliberately
+  not verified: checking it means calling the very tools that are the hazard below.
+  **What they report:** three of the four audio methods this lane would reach for are **not
+  served by the new emulator at all** — `emulator_vgm_start/status/stop`, `audio_spectrum`,
+  and the channel-state/mask pair (the last needs a synth not compiled into the bus server).
+  They are on oracle's unserved list and would **refuse by name** today even from a private
+  instance.
+  **Why that is load-bearing rather than a catalogue note, verified firsthand HERE in our own
+  plan:** `plans/2026-07-03-s2-verification-gate.md:10-16` makes side B of the A/B gate
+  *entirely* `emulator_vgm_start/stop` → `vgm2wav`, compared by envelope and spectrum
+  correlation. That is not one convenience among several; it is the whole of side B. **So S2
+  as banked is not executable against the new Oracle**, and the failure would present late —
+  at the runbook step, after the compiler work it gates is already done.
+  **NOT a blocker today and must not be written up as one:** S2 sits behind S0 and S1, both
+  unopened, so nothing is waiting on it. This is booked so that whoever opens S2 meets it
+  first rather than at the runbook, and so the ask can be filed on a real schedule instead of
+  as an emergency.
+  **The ask was NOT filed as a queue item in oracle.** Their standing invitation is genuine
+  (the owner's direction is that instrument asks from other lanes are first-class work there),
+  but protocol bar 18 scopes notification to a **live** dependency and this one is two
+  unopened packages away. Filing now would put dated work on another lane's board for a
+  consumer that does not exist yet. What was sent instead: the three method names, what S2
+  uses each for, and the condition that fires the ask — **S1 landing**, which is the point the
+  dependency becomes real. Recorded here so a future session can see the ask was shaped and
+  timed, not forgotten.
+  **Also banked, in `docs/OVERSEER.md` rather than here because it is a boot-time hazard:**
+  every suite session started before `oracle-old` `07314aa` runs an MCP shim that dials the
+  owner's on-screen player instead of a private emulator, so any `mcp__oracle__*` call from
+  this session would pause or write into the game he is playing. `/clear` does not restart
+  that process; this session's own shim predates the cutover by **40 minutes**. Corrected the
+  boot doc's flatly-wrong sentence on this (`e9e1f5a`, timezone fix `836a7e39`) and gave the
+  suite the discriminator that actually works — **does the shim have an `oracle-aether`
+  child** — since at a 40-minute margin the clock misclassifies in both directions. The
+  four-hour timezone error was made HERE first, in a commit, and caught with `date +%z`.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

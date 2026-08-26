@@ -1,50 +1,39 @@
 {
-  "focus": "Booted and holding for your word. F27 turned over and needs a call from you; F28 is a one-character fix that's ready.",
+  "focus": "You cleared the drum check. One question back to you on the foundation; my answer changed because of your point.",
   "inFlight": [],
   "blockedOnOwner": [
     {
-      "what": "F27's design call: Seraph has no song-level channel-6 mode field, so it cannot express which of the driver's three contracts a song is written against. Both fixes are right in different modes — the choice is a model decision, not a code one",
-      "since": "2026-08-23"
-    },
-    {
-      "what": "Three by-ear checks nothing here can answer: does the picked DAC sample sound right and immediately, does a hand-built kick/hat/snare kit play back as authored, does auditioning feel faster while painting a run",
+      "id": "d-3",
+      "what": "S0's driver list first-hand. It reached this repo relayed and hedged, and it makes S0 materially bigger than the banked plan",
       "since": "2026-08-22"
-    },
-    {
-      "what": "S0's driver list first-hand — it reached this repo relayed and hedged, and it makes S0 materially bigger than the banked plan",
-      "since": "2026-08-22"
-    },
-    {
-      "what": "Two smaller open ear-gates from the Draw Mode work: is the Draw toggle legible, and is a paint-drag over a running transport audible at audition loudness",
-      "since": "2026-08-21"
     }
   ],
-  "nextBoundary": "Nothing dispatched yet; the first clean boundary is whichever item you pick, landed and re-verified on the merged tree.",
+  "nextBoundary": "At a boundary now. Next one is the stray-byte fix (F28) landed, which also opens this lane's log.",
   "queue": [
     {
       "id": "F28",
-      "title": "A stray NUL byte in the piano-roll file makes every code search silently skip it",
+      "title": "A stray invisible byte in the piano-roll file makes every code search silently skip it. Re-confirmed present this boot, one byte at offset 32584",
       "state": "next",
       "size": "S",
       "blockedBy": null
     },
     {
-      "id": "F27",
-      "title": "The FM6/DAC design call — parked on your ruling, not on work",
-      "state": "open",
-      "size": "L",
-      "blockedBy": "needs your call on whether Seraph models the channel-6 mode"
-    },
-    {
       "id": "F31",
-      "title": "The one driver profile offers seven voices on a six-voice chip — wrong however F27 resolves",
+      "title": "The one driver profile offers seven voices on a six-voice chip and carries no channel-6 rule. Your ruling makes fixing it step one of the channel-6 work",
       "state": "open",
       "size": "M",
       "blockedBy": null
     },
     {
+      "id": "F27",
+      "title": "Make playback follow the driver instead of promising both at once. Design ruled by you; the work is unblocked and sits behind F31",
+      "state": "open",
+      "size": "M",
+      "blockedBy": "F31 - the driver profile has to be right before playback can read it"
+    },
+    {
       "id": "F29",
-      "title": "VGM export throws away every drum, silently — and the booked VGM fix would ship that",
+      "title": "VGM export throws away every drum, silently, and the booked VGM fix would ship that",
       "state": "open",
       "size": "M",
       "blockedBy": null
@@ -64,5 +53,7 @@
       "blockedBy": null
     }
   ],
-  "updatedAt": "2026-08-23T14:44:39Z"
+  "updatedAt": "2026-08-26T21:06:00Z",
+  "awaiting": "your call on d-9: whether to wait for the engine to settle, or build the foundation against two contrasting drivers now",
+  "atBoundary": true
 }

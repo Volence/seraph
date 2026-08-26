@@ -217,9 +217,16 @@ Current state (last reconciled against the Log 2026-08-22):
   `mcp__oracle__*` call from such a session pauses, steps or writes into the game he is
   playing. Found by oracle, corroborated by the hub (`ps` + `ss -xp`); the part verified
   **here** is the one neither of them could check, this session's own shim: PID 287652, a
-  child of this `claude` process, started **2026-08-25 20:29:19** local with **no child
+  child of this `claude` process, started **2026-08-26 00:29:19Z** with **no child
   `oracle-aether`**, while `oracle-old` `07314aa` ("the shim opens its own emulator on
-  first use") is dated **2026-08-26 01:09:53Z** — hours later. This conversation was
+  first use") is dated **2026-08-26 01:09:53Z** — **40 minutes later**. (Both normalised to
+  UTC; this machine is EDT and `ps lstart` prints local, so a start time compared against a
+  git date straight off the two commands is off by four hours. That mistake was made here
+  first and caught by running `date +%z`, which is the whole reason the margin is stated as
+  a duration rather than left as two timestamps a reader would have to reconcile.)
+  **A 40-minute margin is why start-time is the WRONG discriminator** and the child-process
+  check below is the right one: every shim on this machine started within about a day of
+  that commit, so eyeballing a clock misclassifies in both directions. This conversation was
   `/clear`ed the following morning and the shim did not move, which makes this lane its own
   worked example.
   **How to tell which kind of session you are, and do it BEFORE the first `mcp__oracle__*`

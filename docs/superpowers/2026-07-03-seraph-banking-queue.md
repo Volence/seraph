@@ -2044,6 +2044,41 @@ designs target the banked specs (normative); manifest flags carry the gates.
   child** — since at a 40-minute margin the clock misclassifies in both directions. The
   four-hour timezone error was made HERE first, in a commit, and caught with `date +%z`.
 
+- 2026-08-26 (cont.): **THE ENTRY ABOVE UNDER-RATED ITS OWN EVIDENCE, AND THE REASONING THAT
+  MADE IT DO SO IS THE PART WORTH KEEPING.** It recorded the unserved-audio-methods fact as
+  "relayed, NOT verified here, and **deliberately** not verified: checking it means calling the
+  very tools that are the hazard". **That sentence is wrong, and comfortably so.** Calling the
+  tools is one instrument for the question; **their source is another**, and it was reachable
+  the whole time by a read that touches no socket. A hazard on one instrument was allowed to
+  read as a hazard on the question. This is protocol bar 9 inverted — not changing the subject
+  to suit the instrument, but **abandoning the subject because one instrument was unsafe.**
+  **Now VERIFIED FIRSTHAND** at oracle `origin/main` = `903a08fe33776cc96b73a9c8e449efd2fc28cc2e`
+  (`git show <rev>:<path>`, never the sibling working tree):
+  `crates/oracle-aether/tests/schema_conformance.rs:403` declares
+  `SCHEMATIZED_NOT_ADVERTISED`, an 18-entry list of methods that are schematized and **not
+  served**. All four this lane cares about are in it: `emulator/vgm_start`, `vgm_status`,
+  `vgm_stop`, `audio_spectrum`, plus `get_channel_states` / `set_channel_enabled`. The list is
+  **asserted exactly** (`assert_eq!(schema_only_sorted, expected_schema_only)`), and its own
+  comment records that methods leave the set *by being served*, forced red on the commit that
+  ships each handler. Independently, `crates/oracle-aether/src/engine.rs:1415` has the server
+  advertise `"vgm": false` in its handshake `capabilities`, under a comment naming those as the
+  groups this build does not implement and telling clients to branch on them.
+  **So the S2 conclusion HARDENS: side B has no instrument, and that is machine-enforced in
+  oracle's own tree rather than a booked reading.**
+  **The distinction that makes this bar 10 rather than a bigger hammer:** oracle hedged, in good
+  faith, that the channel pair "needs a synth not compiled into the bus server" was *read, not
+  run*. **That hedge is correct and belongs to the REASON, not the VERDICT.** The verdict
+  (unserved) is asserted by their test suite; the mechanism (why) remains their unverified
+  reading and is NOT claimed here. A gate's verdict and its stated reason are separately
+  checkable, and the hedge on one was being carried as a hedge on both — by them offering it and
+  by this lane accepting it.
+  **Frame check per bar 19, since agreeing with a peer is exactly what this document warns
+  about:** their derivation came from a survey agent reading the tree; this one enumerated the
+  test's asserted literal and the handshake capability block. Different parameter, same answer,
+  so this is corroboration rather than echo. Note also that `audio_spectrum` greps to test files
+  only — consistent, but that is an absence and is NOT what the claim rests on; list membership
+  is.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

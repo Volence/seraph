@@ -2132,6 +2132,57 @@ designs target the banked specs (normative); manifest flags carry the gates.
   here. **Nothing was owed back on the directive; a clean negative was sent anyway, because
   the hub is assembling an answer for him across six lanes and "nothing here" is an answer.**
 
+- 2026-08-27 (cont.): **THE WORKTREE SWEEP — 0 REMOVED, 1 KEPT, AND THIS LANE'S OWN
+  CLAIM WAS THE THING THAT NEEDED CORRECTING.** Owner directive, this time heard
+  firsthand in the hub dock and relayed (his words: *"Can we get everyone to make sure
+  theyyy're all merged?"*), after he saw aurora's 20-plus leftover worktrees at 856 MB and
+  575 MB. Instruction: test each agent worktree against main with
+  `git merge-base --is-ancestor`, remove the merged, report the unmerged by name and size.
+  **THE CORRECTION FIRST, because it is the load-bearing part.** An hour earlier this lane
+  told the hub the F15 worktree was *"disposable, because the branch is preserved"* — and
+  derived that from `git worktree list` **without opening the directory**. The branch half
+  was true. The directory half was false: it held a modified `src/App.tsx` **and an
+  untracked 271-line `src/App.viewState.test.tsx` that existed nowhere else in the world.**
+  The hub then reflected that reasoning back as *"the stopped F15 parcel worktree qualifies
+  if its branch is preserved"*, i.e. **this lane's unchecked claim came back as
+  authorisation to delete the thing it was wrong about.** Acting on it would have destroyed
+  271 lines of tests. Bar 20 exactly: the wrong claim lived only in mail, nothing in this
+  tree contradicted it, and no sweep or audit here could ever have met it.
+  **This is also the sharpest available case for bar 16's name/presence/behaviour split.**
+  `git worktree list` names a directory; it says nothing whatever about that directory's
+  contents, and "the branch is preserved" is a claim about a **ref**, not about a
+  **working tree**. Two different objects, and the sentence slid between them without
+  anything looking wrong.
+  **Verdict, tested by HEAD rather than by name:** `feat/view-state-persistence` is NOT an
+  ancestor of `main`, 2 unique commits. So it is a report-do-not-delete case under the
+  directive's own test, and it was left in place — deliberately not substituting this
+  lane's "it is safe now" for the line the owner drew.
+  **What was done instead:** the loose state was committed onto the branch and the branch
+  **pushed for the first time in its life** (`f6ae8c4`, verified reachable at origin by
+  `ls-remote`). It had never been pushed, so an erroneously-dispatched parcel that F15's
+  reversal contingency depends on existed **on one filesystem and nowhere citable** — the
+  anchor-has-a-location failure sitting unnoticed in this repo's own preservation story.
+  Now the disposable claim is actually true rather than merely asserted.
+  **Flagged for whoever opens F15:** the uncommitted `App.tsx` change replaced the
+  `patchViewState` call with `void region;` — it **disables the write the parcel exists to
+  add**. Most likely a red-first poison left in place when the parcel was stopped, but it
+  was never reviewed and this lane did not adjudicate it. Treat that file as suspect first.
+  **THE SIZE ANSWER IS NOT THE WORKTREE COUNT, and it generalises past this lane.** Of the
+  4.1 GB, **3.9 GB is `src-tauri/target` and 152 MB is `node_modules`; the working tree is
+  6.6 MB.** 96% is regenerable build cache, not preserved work. A sweep that counts
+  worktrees will keep reporting gigabytes that a target-dir clean returns without touching
+  a branch, and aurora's 856 MB is probably the same shape. Raised with the hub as its own
+  question for the owner rather than folded into the merge sweep.
+  **Reported to him, not decided here:** `.worktrees/phase4-sequencer`, 108 MB, dated May,
+  whose gitdir names `/home/volence/sonic_hacks/megadaw/.git` — a repo no longer on this
+  machine, and invisible to `git worktree list` for that reason.
+  **Independent instance, not a save:** the hub's warning to check for running processes
+  and to look at uncommitted files arrived **after** this lane had done both. Aurora
+  reached it by removing a fixture directory out from under his running Aurora window
+  (his next build died `spawn ./build.sh ENOENT`); this lane reached it from a directory it
+  was about to remove. Different directions, so bar 19 corroboration rather than echo.
+  `/proc` walk confirmed no process holds either directory here.
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

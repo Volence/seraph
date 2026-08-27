@@ -2079,6 +2079,59 @@ designs target the banked specs (normative); manifest flags carry the gates.
   only — consistent, but that is an absence and is NOT what the claim rests on; list membership
   is.
 
+- 2026-08-27: **THE OWNER'S ANTI-PIN DIRECTIVE COSTS THIS LANE NOTHING — CHECKED, NOT
+  ASSUMED, AND THE NEGATIVE IS THE FINDING.** The hub relayed an owner directive spoken to
+  aurora and quoted by that lane (the hub did not hear it firsthand, and neither did this
+  lane; **relayed twice over**): stale pinned aeon clones in aurora's scratchpad stood
+  between him and running what he had just built, and he wants pins gone from his path.
+  Ledgered centrally as Q-28, *a pin created for a parcel dies with the parcel*, banked at
+  empyrean `45d1f8d`. The ask to this lane was narrow: does any pinned tree, fixture or
+  driver snapshot here sit on his path to testing?
+  **It does not, and here is the enumeration rather than the verdict.** (1) No aeon clone
+  exists under this repo — a `find` for `.git` returns exactly two entries, neither an aeon
+  pin (below). (2) No vendored driver blob, manifest or golden is tracked: `git ls-files`
+  filtered for aeon/memra/manifest/`.bin`/blob/golden/corpus returns **seven files, all
+  prose docs**. That is expected rather than lucky — S0 has not run, and the manifest
+  generator it would create does not exist yet, so there is no artifact to go stale. (3)
+  The driver profile is **compiled in**, not loaded from a pinned snapshot
+  (`registry.register(Box::new(FlamedriverProfile))`, `src-tauri/src/lib.rs:181`), so there
+  is nothing to unpin even in principle. (4) This lane's audio path is its own Rust engine,
+  so no ROM or emulator sits on the launch path at all before S3.
+  **Why this was worth running rather than answering from the boot doc**, which already
+  says all of (4): that is bar 24's shape in the cheap direction — the question had a second
+  instrument (this tree, two commands) and answering from a remembered document would have
+  been an unchecked assertion about my own repo shipped to a peer with my confidence on it,
+  which is exactly bar 20.
+  **Two directories the sweep turned up, both dead weight and NEITHER a pin on his path,
+  recorded so the next sweep does not re-derive them.** `.claude/worktrees/agent-ad49279747a861166`
+  holds `feat/view-state-persistence` — the erroneously-dispatched F15 parcel. It is Q-28's
+  own shape (a worktree outliving its stopped parcel) but the *branch* is what the F15
+  reversal contingency preserves and the branch survives the worktree, so the directory is
+  disposable and the preservation is not. Not deleted: outside the directive's stated scope
+  and not in his way. `.worktrees/phase4-sequencer` is **108 MB** and its gitdir pointer
+  names `/home/volence/sonic_hacks/megadaw/.git/worktrees/…` — **a repo that no longer
+  exists on this machine**, so it is a dangling worktree from a predecessor project, dated
+  May. Also not touched, for the same reason, and flagged to the owner rather than cleaned
+  on a peer's say-so.
+  **ADJACENT FINDING, BOOKED AS F32, NOT IN THE DIRECTIVE'S SCOPE AND NOT ACTED ON.** The
+  only absolute paths anywhere in this tree's source are two, both in
+  `src-tauri/src/import/mod.rs` (`:1461`, `:1502`), both naming a Batman & Robin ROM under
+  this user's home, and both inside `#[test]` bodies that `return` early when the file is
+  absent after printing `Batman ROM not found, skipping Zyrinx test`. So on any tree without
+  that ROM — a fresh worktree, another machine, CI — `test_import_zyrinx_batman_main_title`
+  and `test_import_all_zyrinx_songs` **report green while executing none of their
+  assertions**, and the aggregate count this repo treats as monotonic absorbs the loss
+  without a mark. That is protocol **bar 25** (a green log and an absent run are the same
+  artifact) standing permanently in the tree rather than arriving in one command, and the
+  notice it prints is the `skipping …` wording rather than the `skip:` form a grep-based
+  bar would catch — sigil's `SKIP-TEXT-HOLE` shape, met here independently, which makes it
+  corroboration rather than echo per bar 19. **Size S; the fix is a named fixture path plus
+  a hard failure when the harness expects the ROM and cannot find it, so the skip is a
+  decision rather than an accident.** It is genuinely NOT on his path to testing: these are
+  tests, not the app, and this booking must not be read as agreeing that a pin blocked him
+  here. **Nothing was owed back on the directive; a clean negative was sent anyway, because
+  the hub is assembling an answer for him across six lanes and "nothing here" is an answer.**
+
 ## EXECUTION HANDOFF (cold start — read this first)
 
 For any future session executing this queue:

@@ -1,14 +1,14 @@
 {
-  "focus": "You cleared the drum check. One question back to you on the foundation; my answer changed because of your point.",
+  "focus": "Rebooted, nothing running. The one-byte piano-roll fix is still ready; the foundation question is still yours.",
   "inFlight": [],
   "blockedOnOwner": [
     {
-      "id": "d-3",
-      "what": "S0's driver list first-hand. It reached this repo relayed and hedged, and it makes S0 materially bigger than the banked plan",
+      "id": "d-9",
+      "what": "S0's driver list. Your wait-for-the-engine point is answered in the card and my recommendation changed because of it",
       "since": "2026-08-22"
     }
   ],
-  "nextBoundary": "At a boundary now. Next one is the stray-byte fix (F28) landed, which also opens this lane's log.",
+  "nextBoundary": "At a boundary now. The next one is the stray-byte fix (F28) landed, which also opens this lane's log.",
   "queue": [
     {
       "id": "F28",
@@ -29,7 +29,7 @@
       "title": "Make playback follow the driver instead of promising both at once. Design ruled by you; the work is unblocked and sits behind F31",
       "state": "open",
       "size": "M",
-      "blockedBy": "F31 - the driver profile has to be right before playback can read it"
+      "blockedBy": "F31, because the driver profile has to be right before playback can read it"
     },
     {
       "id": "F29",
@@ -51,9 +51,31 @@
       "state": "open",
       "size": "S",
       "blockedBy": null
+    },
+    {
+      "id": "F32",
+      "title": "Two import tests name a ROM under your home folder and quietly pass themselves when it is missing, so on any other tree they report green having checked nothing",
+      "state": "open",
+      "size": "S",
+      "blockedBy": null
+    },
+    {
+      "id": "PITCH-FORMAT",
+      "title": "The engine lane's board says you chose that the music driver stores musical pitch rather than raw chip numbers, and that it needs a joint plan with this lane. Relayed off their board, not witnessed here",
+      "state": "open",
+      "size": "L",
+      "blockedBy": "a joint plan with the aeon lane, and confirming with you that this is really yours to me and not just theirs"
+    },
+    {
+      "id": "S0",
+      "title": "The foundation piece: one agreed description of what a sound driver can do, generated from driver source",
+      "state": "open",
+      "size": "L",
+      "blockedBy": "d-9, your call on which drivers it targets",
+      "project": "SOUND-TRUTH"
     }
   ],
-  "updatedAt": "2026-08-26T21:06:00Z",
-  "awaiting": "your call on d-9: whether to wait for the engine to settle, or build the foundation against two contrasting drivers now",
+  "updatedAt": "2026-08-27T13:25:52Z",
+  "awaiting": "your go on what to pick up. I propose the one-byte piano-roll fix (F28), confirmed present again this boot. d-9 is five days old, and the engine lane's board still says you gave me a pitch-format job I have never heard from you.",
   "atBoundary": true
 }

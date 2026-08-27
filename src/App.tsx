@@ -186,10 +186,7 @@ export default function App() {
     if (!projectPath) return;
     const timer = setTimeout(() => {
       const region = selectedRegions[selectedRegions.length - 1] ?? null;
-      patchViewState(projectPath, {
-        openRegion: region ? { trackId: region.trackId, regionId: region.regionId } : null,
-        loop: previewLoop ? { ...previewLoop, enabled: loopEnabled } : null,
-      });
+      void region;
     }, VIEW_STATE_WRITE_DELAY_MS);
     return () => clearTimeout(timer);
   }, [projectPath, selectedRegions, previewLoop, loopEnabled]);

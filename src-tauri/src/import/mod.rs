@@ -1455,15 +1455,49 @@ mod tests {
         );
     }
 
+    /// Default location of the Zyrinx test ROM on the machine this repo is
+    /// developed on. Overridable with `SERAPH_ZYRINX_ROM`.
+    const ZYRINX_ROM_DEFAULT: &str =
+        "/home/volence/sonic_hacks/The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md";
+
+    /// Resolves the Zyrinx test ROM, or **fails the test** explaining how to
+    /// proceed (audit F32).
+    ///
+    /// These tests used to hardcode an absolute path under one user's home
+    /// directory and `return` early when it was missing, which meant that on
+    /// any other tree they REPORTED GREEN HAVING CHECKED NOTHING. A test that
+    /// cannot run must say so; it must never pass by default.
+    ///
+    /// Returning `None` requires the opt-out to be set deliberately, so
+    /// skipping is always a conscious act by someone who has read this.
+    fn zyrinx_test_rom() -> Option<std::path::PathBuf> {
+        let rom_path = std::path::PathBuf::from(
+            std::env::var("SERAPH_ZYRINX_ROM")
+                .unwrap_or_else(|_| ZYRINX_ROM_DEFAULT.to_string()),
+        );
+        if rom_path.exists() {
+            return Some(rom_path);
+        }
+        if std::env::var("SERAPH_SKIP_ROM_TESTS").is_ok() {
+            eprintln!(
+                "SERAPH_SKIP_ROM_TESTS set; skipping Zyrinx ROM test (looked at {})",
+                rom_path.display(),
+            );
+            return None;
+        }
+        panic!(
+            "Zyrinx test ROM not found at {}.\n\
+             This test verifies importing a real commercial ROM and cannot check \
+             anything without it, so it FAILS rather than passing silently (F32).\n\
+             Either set SERAPH_ZYRINX_ROM to the ROM's path, or set \
+             SERAPH_SKIP_ROM_TESTS=1 to skip it deliberately.",
+            rom_path.display(),
+        );
+    }
+
     #[test]
     fn test_import_zyrinx_batman_main_title() {
-        let rom_path = std::path::PathBuf::from(
-            "/home/volence/sonic_hacks/The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md"
-        );
-        if !rom_path.exists() {
-            eprintln!("Batman ROM not found, skipping Zyrinx test");
-            return;
-        }
+        let Some(rom_path) = zyrinx_test_rom() else { return };
 
         let tmp = tempfile::tempdir().unwrap();
         let result = super::import_zyrinx_rom(&rom_path, tmp.path(), 1, &Default::default()).unwrap();
@@ -1498,15 +1532,19 @@ mod tests {
 
     #[test]
     fn test_import_all_zyrinx_songs() {
-        let rom_path = std::path::PathBuf::from(
-            "/home/volence/sonic_hacks/The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md"
-        );
-        if !rom_path.exists() {
-            eprintln!("Batman ROM not found, skipping Zyrinx batch test");
-            return;
-        }
+        let Some(rom_path) = zyrinx_test_rom() else { return };
 
         let tmp = tempfile::tempdir().unwrap();
+        // SECOND DEFECT, found while fixing F32's path handling and not named
+        // in its booking: this loop used to print `ERROR` on a failed import
+        // and assert NOTHING afterwards. Every one of the 19 songs could have
+        // failed to import and the test still passed. A print harness in a
+        // test's clothing is the same defect class as the silent skip above,
+        // one level in: it cannot fail, so it cannot report.
+        let mut failures: Vec<String> = Vec::new();
+        let mut noteless: Vec<String> = Vec::new();
+        let mut imported = 0usize;
+
         for game_id in 1u8..20 {
             let result = super::import_zyrinx_rom(&rom_path, tmp.path(), game_id, &Default::default());
             match result {
@@ -1522,12 +1560,45 @@ mod tests {
                         "[{:02}] {}: {} tracks, {} instruments, {} notes, {} warnings",
                         game_id, r.metadata.name, r.track_count, r.instrument_count, notes, r.warnings.len()
                     );
+                    imported += 1;
+                    if notes == 0 {
+                        noteless.push(format!("[{game_id:02}] {}", r.metadata.name));
+                    }
                 }
                 Err(e) => {
                     eprintln!("[{:02}] ERROR: {}", game_id, e);
+                    failures.push(format!("[{game_id:02}] {e}"));
                 }
             }
         }
+
+        // SLOT 0 IS DELIBERATELY OUT OF RANGE, and this is a finding, not an
+        // oversight. The driver reports `valid: 0-19`, so slot 0 exists, and
+        // it does import -- as "Silence", with 6,868 notes, which is BYTE FOR
+        // BYTE the note count of slot 1 "Main Title". A song called Silence
+        // carrying another song's note count suggests slot 0 resolves to slot
+        // 1's data. Extending this gate over it would ratify behaviour nobody
+        // has verified, so the range stays 1..20 and the question is booked as
+        // F35 instead.
+        // MEASURED, not booked: all 19 song slots import cleanly from this ROM
+        // with 0 errors and 0 warnings, note counts ranging 5,702..571,753.
+        // The gate asserts the invariants that measurement established, not a
+        // transcribed snapshot: every slot imports, and an imported song has
+        // notes. A song that imports to silence is a failure wearing success.
+        assert!(
+            failures.is_empty(),
+            "every Zyrinx song slot must import; {} of 19 failed: {:?}",
+            failures.len(), failures,
+        );
+        assert!(
+            noteless.is_empty(),
+            "an imported song with zero notes is a silent import failure: {:?}",
+            noteless,
+        );
+        assert_eq!(
+            imported, 19,
+            "expected all 19 Zyrinx song slots to import from this ROM, got {imported}",
+        );
     }
 
     #[test]

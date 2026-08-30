@@ -544,7 +544,31 @@ pub fn generate_music_asm(
     // So `fm_count + dac_count` is right. The out-of-driver channel that F30
     // was booked for is refused in `validate_for_export`, which `write_export`
     // runs before this function.
-    let fm_dac_count = fm_count + dac_count;
+    //
+    // F37: the FM/DAC channel entries are not a list, they are SLOTS, and slot
+    // 0 is the drum slot. `.fm_dac_loop` copies header entry N into track slot
+    // N (`Z80 Sound Driver.asm:1836-1857`), pairing each with a fixed init byte
+    // from `zFMDACInitBytes` (`ibid.:1893-1906`) whose own comment reads "The
+    // first is for DAC; then 0, 1, 2 then 4, 5, 6 for the FM channels". Slot 0
+    // is `zSongFM6_DAC` (`ibid.:176-183`) and `zUpdateMusic` drives it through
+    // `zUpdateDACTrack` unconditionally (`ibid.:717-719`), reading its bytes as
+    // sample ids rather than notes.
+    //
+    // So a song with no drum track used to export its FIRST FM entry into the
+    // drum slot: that instrument's notes played as drum samples, and the export
+    // reported success. Every one of the 60 shipped songs in
+    // `skdisasm/Sound/Music/` writes exactly one `smpsHeaderDAC`, first, at
+    // line 7 -- including the one drumless song -- so the entry is an invariant
+    // of the format, not a property of having drums.
+    //
+    // The fix synthesizes one for EVERY drumless export, whether or not the
+    // song has FM tracks. Uniform on purpose (owner ruling `d-11`,
+    // `synthesize`): one code path and one shape to reason about. For a
+    // drumless song with no FM tracks nothing audible changes; for one with FM
+    // tracks, its first instrument stops being played as drums.
+    let needs_silent_dac = dac_count == 0;
+    let silent_dac_label = format!("Snd_{label}_DAC_Silent");
+    let fm_dac_count = fm_count + dac_count + usize::from(needs_silent_dac);
 
     asm.push_str(&format!("Snd_{label}_Header:\n"));
     asm.push_str("\tsmpsHeaderStartSong 3\n");
@@ -552,6 +576,11 @@ pub fn generate_music_asm(
     asm.push_str(&format!("\tsmpsHeaderChan\t\t${fm_dac_count:02X}, ${psg_count:02X}\n"));
     asm.push_str(&format!("\tsmpsHeaderTempo\t\t${:02X}, ${:02X}\n", params.divider, params.modifier));
 
+    // The DAC entry goes FIRST -- it is slot 0 -- which is also where all 60
+    // shipped songs put it (line 7 of every file in `skdisasm/Sound/Music/`).
+    if needs_silent_dac {
+        asm.push_str(&format!("\tsmpsHeaderDAC\t\t{silent_dac_label}, $00, $00\n"));
+    }
     for track in &active_tracks {
         if !matches!(track.channel, ChannelAssignment::Dac(_)) { continue; }
         let ch_label = format!("Snd_{label}_DAC{}", channel_index(&track.channel));
@@ -578,6 +607,32 @@ pub fn generate_music_asm(
     }
 
     asm.push('\n');
+
+    // The body for the entry above. `smpsHeaderDAC` puts its operand through
+    // `CheckedChannelPointer` (`_smps2asm_inc.asm:317-318`), so this label has
+    // to be DEFINED or the exported file will not assemble at all.
+    //
+    // A lone `smpsStop` is copied from the one shipped drumless song, not
+    // invented: `Chaos Emerald.asm:74-78` is a bare `Snd_Emerald_DAC:` falling
+    // straight through into `Snd_Emerald_PSG3: / smpsStop`. That assembles to
+    // the single byte $F2 (`_smps2asm_inc.asm:580-582`), whose handler
+    // `cfStopTrack` does `res 7, (ix+zTrack.PlaybackControl)`
+    // (`Z80 Sound Driver.asm:3443-3444`) -- precisely the bit `zUpdateMusic`
+    // tests before it calls `zUpdateDACTrack` (`ibid.:717-719`). The slot is
+    // therefore entered once, stops, and is never updated again: it neither
+    // hangs nor plays a sample. Resting forever or looping on a rest would
+    // instead keep the slot running for the whole song; the shipped song does
+    // not do that, so this does not either.
+    if needs_silent_dac {
+        asm.push_str("; ------------------------------------------------------------\n");
+        asm.push_str("; DAC Channel - silent placeholder (this song has no drum track)\n");
+        asm.push_str("; Track slot 0 is always driven as drums, so it must be claimed\n");
+        asm.push_str("; or the first FM entry would play through the drum channel.\n");
+        asm.push_str("; ------------------------------------------------------------\n");
+        asm.push_str(&format!("{silent_dac_label}:\n"));
+        asm.push_str("\tsmpsStop\n");
+        asm.push('\n');
+    }
 
     let psg_env_map: HashMap<Uuid, u8> = instruments.psg.iter()
         .filter_map(|i| i.smps_envelope_index.map(|idx| (i.id, idx)))
@@ -1671,5 +1726,211 @@ mod tests {
                 layout.fm_channels.len(),
             );
         }
+    }
+
+    // ---- audit F37: the DAC slot is filled positionally ----
+
+    /// Build a song on `channels` and return its exported music ASM.
+    /// Reuses the F30 builder, which puts one note and a valid instrument on
+    /// every requested lane, so nothing here trips an unrelated validator.
+    fn f37_asm(channels: &[ChannelAssignment]) -> String {
+        let mut song = f30_song(channels);
+        song.metadata.name = "F37".into();
+        let params = compute_tempo_params(120.0, 480);
+        let (voice_map, _v) = build_voice_index(&song.tracks, &song.instruments);
+        generate_music_asm(&song, &song.instruments, &voice_map, &params).unwrap()
+    }
+
+    /// The channel entries of an exported header, in the order the driver will
+    /// copy them into its track slots, as `(kind, operand)` pairs.
+    ///
+    /// Order is the whole point: `zBGMLoad` copies entry N into track slot N
+    /// (`skdisasm/Sound/Z80 Sound Driver.asm:1836-1857`), so reading them as a
+    /// set would not be able to see this defect at all.
+    fn header_channel_entries(asm: &str) -> Vec<(String, String)> {
+        asm.lines()
+            .filter_map(|l| {
+                let t = l.trim();
+                for kind in ["DAC", "FM", "PSG"] {
+                    if let Some(rest) = t.strip_prefix(&format!("smpsHeader{kind}")) {
+                        return Some((kind.to_string(), rest.trim().to_string()));
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    /// The booked defect. A song with no drum track and three FM instruments
+    /// used to export three channel entries, the first of which was FM1.
+    ///
+    /// Derived, not copied: `zBGMLoad` fills the FM/DAC track slots
+    /// POSITIONALLY -- `ld b, (iy+2)` (the FM+DAC count) then `.fm_dac_loop`
+    /// copying each header entry into `zTracksStart` onward
+    /// (`skdisasm/Sound/Z80 Sound Driver.asm:1836-1857`) -- and the init bytes
+    /// it pairs them with are fixed:
+    ///
+    ///     zFMDACInitBytes:
+    ///             db   80h,   6      ; <- slot 0
+    ///             db   80h,   0
+    ///             ...
+    ///
+    /// whose own comment reads "The first is for DAC; then 0, 1, 2 then 4, 5,
+    /// 6 for the FM channels" (`ibid.:1893-1906`). Slot 0 is `zSongFM6_DAC`
+    /// (`ibid.:176-183`) and is driven unconditionally through
+    /// `zUpdateDACTrack` (`ibid.:717-719`), which reads its data bytes as
+    /// SAMPLE ids, not notes. So the old first entry, FM1, played as drums.
+    ///
+    /// After the fix the first entry must be a DAC entry, and the count must
+    /// include it: 3 FM + 1 DAC = `$04`.
+    #[test]
+    fn a_drumless_song_does_not_put_its_first_instrument_on_the_drum_channel() {
+        let asm = f37_asm(&[
+            ChannelAssignment::Fm(0), ChannelAssignment::Fm(1), ChannelAssignment::Fm(2),
+        ]);
+        let entries = header_channel_entries(&asm);
+        assert_eq!(
+            entries.first().map(|(k, _)| k.as_str()),
+            Some("DAC"),
+            "track slot 0 is the DAC slot and is always driven as drums, so the FIRST \
+             channel entry must be a DAC entry; entries were {entries:?}",
+        );
+        assert!(
+            asm.contains("smpsHeaderChan\t\t$04, $00"),
+            "the synthesized DAC entry must be counted: 3 FM + 1 DAC = $04; header was:\n{}",
+            asm.lines().take(8).collect::<Vec<_>>().join("\n"),
+        );
+    }
+
+    /// The other direction, and the reason this cannot be an unconditional
+    /// prepend. A song that already carries drums must NOT gain a second DAC
+    /// entry: two would shift every FM entry down one slot, so FM1's data
+    /// would land in FM2's slot and the last FM entry would run off the end of
+    /// the six FM/DAC slots into `zSongPSG1`
+    /// (`skdisasm/Sound/Z80 Sound Driver.asm:176-184`).
+    #[test]
+    fn a_song_that_already_has_drums_does_not_get_a_second_drum_entry() {
+        let asm = f37_asm(&[
+            ChannelAssignment::Dac(0), ChannelAssignment::Fm(0), ChannelAssignment::Fm(1),
+        ]);
+        let entries = header_channel_entries(&asm);
+        let dacs: Vec<_> = entries.iter().filter(|(k, _)| k == "DAC").collect();
+        assert_eq!(
+            dacs.len(), 1,
+            "a song with its own drum track already fills slot 0; a second DAC entry \
+             would push every FM entry one slot down. Entries were {entries:?}",
+        );
+        assert_eq!(
+            dacs[0].1, "Snd_F37_DAC1, $00, $00",
+            "the surviving entry must be the song's OWN drum track, not a synthesized \
+             silent one; entries were {entries:?}",
+        );
+        assert!(
+            asm.contains("smpsHeaderChan\t\t$03, $00"),
+            "1 DAC + 2 FM = $03, unchanged by this parcel; header was:\n{}",
+            asm.lines().take(8).collect::<Vec<_>>().join("\n"),
+        );
+    }
+
+    /// Control: the synthesized entry must point at a track the driver can
+    /// actually run, and its body is taken from a shipped song rather than
+    /// invented.
+    ///
+    /// Exactly one of the 60 songs in `skdisasm/Sound/Music/` is drumless, and
+    /// it is the shipped precedent for this entry: `Chaos Emerald.asm`
+    /// declares `smpsHeaderDAC Snd_Emerald_DAC` at line 7 like every other
+    /// song, and its track body (lines 74-78) is
+    ///
+    ///     ; DAC Data
+    ///     Snd_Emerald_DAC:
+    ///     ; PSG3 Data
+    ///     Snd_Emerald_PSG3:
+    ///             smpsStop
+    ///
+    /// -- a bare label falling straight into a single `smpsStop`. That is one
+    /// byte, `$F2` (`skdisasm/Sound/_smps2asm_inc.asm:580-582`), and the
+    /// driver's handler for it, `cfStopTrack`, does
+    /// `res 7, (ix+zTrack.PlaybackControl)`
+    /// (`skdisasm/Sound/Z80 Sound Driver.asm:3443-3444`), which is exactly the
+    /// bit `zUpdateMusic` tests before calling `zUpdateDACTrack`
+    /// (`ibid.:717-719`). So the slot is entered once, stops, and is never
+    /// updated again: no hang, and no sample ever played. A body that rested
+    /// forever or looped on a rest would instead keep the slot alive for the
+    /// whole song; the shipped song does not do that, so neither does this.
+    ///
+    /// The label must also be DEFINED, not merely referenced -- `smpsHeaderDAC`
+    /// runs its operand through `CheckedChannelPointer`
+    /// (`_smps2asm_inc.asm:317-318`), so a dangling label is an assembly
+    /// failure, i.e. an export that cannot be built at all.
+    #[test]
+    fn the_synthesized_drum_track_is_a_lone_smps_stop_and_its_label_is_defined() {
+        let asm = f37_asm(&[ChannelAssignment::Fm(0)]);
+        let entries = header_channel_entries(&asm);
+        let (_, operand) = entries.first().expect("a drumless song must still emit entries");
+        let label = operand.split(',').next().unwrap().trim().to_string();
+
+        let body_start = asm
+            .lines()
+            .position(|l| l.trim_end() == format!("{label}:"))
+            .unwrap_or_else(|| panic!(
+                "header references `{label}` but no such label is defined; the export \
+                 would not assemble. ASM was:\n{asm}"
+            ));
+        let body: Vec<&str> = asm.lines().skip(body_start + 1)
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty() && !l.starts_with(';'))
+            .take_while(|l| !l.ends_with(':'))
+            .collect();
+        assert_eq!(
+            body, vec!["smpsStop"],
+            "the silent DAC track is one `smpsStop`, as in `Chaos Emerald.asm:74-78`",
+        );
+    }
+
+    /// Control, and the ruling's uniformity clause made checkable. A drumless
+    /// song with NO FM tracks at all still gets the entry: one code path, not
+    /// a conditional. The audible result is unchanged for such a song -- there
+    /// is no first FM instrument to misroute -- but the header still describes
+    /// the format's slot 0 correctly.
+    #[test]
+    fn a_drumless_song_with_no_fm_tracks_still_gets_the_entry() {
+        let asm = f37_asm(&[ChannelAssignment::Psg(0), ChannelAssignment::Psg(1)]);
+        let entries = header_channel_entries(&asm);
+        assert_eq!(
+            entries.first().map(|(k, _)| k.as_str()),
+            Some("DAC"),
+            "entries were {entries:?}",
+        );
+        assert!(
+            asm.contains("smpsHeaderChan\t\t$01, $02"),
+            "0 FM + 1 synthesized DAC = $01, and 2 PSG; header was:\n{}",
+            asm.lines().take(8).collect::<Vec<_>>().join("\n"),
+        );
+    }
+
+    /// Control: a song that exports correctly today must be untouched. Same
+    /// shape as the F30 control, but asserts the full entry ORDER, which is
+    /// what the driver actually reads.
+    #[test]
+    fn a_song_with_drums_keeps_its_exact_header_entry_order() {
+        let asm = f37_asm(&[
+            ChannelAssignment::Dac(0),
+            ChannelAssignment::Fm(0), ChannelAssignment::Fm(1), ChannelAssignment::Fm(2),
+            ChannelAssignment::Fm(3), ChannelAssignment::Fm(4),
+            ChannelAssignment::Psg(0), ChannelAssignment::Psg(1), ChannelAssignment::Psg(2),
+        ]);
+        let kinds: Vec<String> = header_channel_entries(&asm)
+            .into_iter().map(|(k, _)| k).collect();
+        assert_eq!(
+            kinds,
+            vec!["DAC", "FM", "FM", "FM", "FM", "FM", "PSG", "PSG", "PSG"],
+            "the S3K header shape -- 1 DAC then 5 FM then 3 PSG, as in \
+             `skdisasm/Sound/Music/MGZ1.asm:4-15` -- must be unchanged",
+        );
+        assert!(
+            asm.contains("smpsHeaderChan\t\t$06, $03"),
+            "header was:\n{}",
+            asm.lines().take(8).collect::<Vec<_>>().join("\n"),
+        );
     }
 }

@@ -2665,3 +2665,79 @@ For any future session executing this queue:
   **Housekeeping:** the one remaining cargo warning (`sum_r`, `audio/engine.rs:1330`) is
   **pre-existing** — present in this session's pre-F29 log, and `engine.rs` is untouched by
   every commit today (checked with `git log --name-only`, not assumed).
+- 2026-08-30 (cont.): **F30 LANDED — the export that reaches the game now REFUSES a song that
+  uses a voice the driver does not have, and the booked defect was mis-framed in a way that
+  mattered.** Merged `02fe728`, pushed, `origin/main` verified moved and equal to HEAD.
+  Merged-tree lanes, exit codes read directly: cargo **287 passed / 0 failed** (was 281; +6),
+  `npm run build` exit 0 with zero warning or error lines, vitest **352/352 across 33 files**,
+  no `src/bindings.ts` drift. Three cargo warnings, all pre-existing and enumerated (`sum_r`
+  x2 in `audio/engine.rs`, `track_idx` in `import/smps_mapper.rs`); no new ones.
+  **THE BOOKING SAID "emits both an FM and a DAC header for index 5". THE COUNT BYTE AND THE
+  ENTRY COUNT ACTUALLY AGREE** — the agent reproduced first and the evidence corrected the
+  brief, which had inherited the booking's framing and my own. What is malformed is that an
+  entry exists for a voice that does not, and **the driver's damage is POSITIONAL, not
+  arithmetic**: `zBGMLoad` fills the FM/DAC slots in order from `zTracksStart`, and there are
+  exactly six of them (`zSongFM6_DAC, zSongFM1..zSongFM5`, then `zSongPSG1`), with slot 0
+  driven unconditionally as the DAC. So an "FM6" entry lands on whichever slot its position
+  reaches — FM1, in the DAC-plus-FM6 case — and a song wanting six FM voices plus DAC needs a
+  seventh entry where the driver has six, running off the end into `zSongPSG1`.
+  **VERIFIED FIRSTHAND HERE, not taken from the agent's report:** `Z80 Sound Driver.asm`
+  176-183 (the six slots and `zSongPSG1` immediately after), 717-719 (slot 0 driven as DAC
+  unconditionally), 1836-1839 (`ld b, (iy+2) ; b = number of FM + DAC channels`), 1859-1862
+  (PSG count at `(iy+3)`), 1905-1908 (`db 80h, 6 ; FM6 music track (does not exist in this
+  driver)`, inside `if fix_sndbugs=0`).
+  **SECOND FINDING, CHECKED AND CORRECT, SO DOCUMENTED RATHER THAN CHANGED.** `smpsHeaderChan`'s
+  first byte does count DAC together with FM, so `fm_count + dac_count` was right all along.
+  The derivation is now a comment at the site with its sources. **Corroborated here by a
+  DIFFERENT ENUMERATION PARAMETER (bar 19):** the agent counted files whose declared header
+  matched their entry counts; this lane counted every `smpsHeaderChan` declaration across all
+  60 files in `skdisasm/Sound/Music/` and got **59 x `$06, $03`, 1 x `$07, $03`**. Same answer,
+  different parameter, so this is corroboration rather than echo.
+  **THE OUTLIER IS EVIDENCE, NOT NOISE, AND IT IS SHIPPED SEGA CODE.** `Chaos Emerald.asm`
+  declares `$07` = 1 DAC + 6 FM — exactly the seventh-entry case above, in a real S3K song.
+  It pairs with the driver's `db 80h, 6` sitting behind `if fix_sndbugs=0`: the unfixed driver
+  hands out seven init bytes over six slots. So the overflow the fix now refuses is not
+  hypothetical; the original game has an instance of it.
+  **WHAT LANDED.** `ChannelLayout::channel_name()` and `channel_names()` in `model/driver.rs`
+  as the single authority on whether a driver has a channel; `validate_for_export` takes a
+  `&dyn DriverProfile` and refuses any track whose channel the layout does not name, reporting
+  the track, the channel, the driver and the channels it does have. **Derived from the profile,
+  never from the literal 5** — the guard test iterates `driver::default_registry().profiles()`
+  (F34's single registration site) and refuses one index past each profile's own list, so it
+  never names 5 and covers a driver added later.
+  **F27 WAS NOT TOUCHED AND THAT WAS THE POINT.** No steal, merge, priority or drop rule was
+  invented. The export refuses and says why; what such a song should SOUND like stays the
+  owner's parked call.
+  **THE CONTROL THAT PROVES THE FIX IS NOT DESTRUCTIVE, and it is the one worth copying.**
+  Every pre-F31 project carries a leftover EMPTY FM6 lane, because lanes were seeded from the
+  layout that then offered six FM voices. The check is gated on `has_notes`, matching
+  `generate_music_asm`'s own inclusion rule (`!t.muted && ...any(|r| !r.notes.is_empty())`), and
+  `an_empty_leftover_fm6_lane_does_not_block_the_export` asserts it. **Without that gate the fix
+  would have blocked export of every project saved before this morning.** Verified here that the
+  muted half matches too: `validate_for_export` skips muted tracks, as `generate_music_asm` does.
+  Six tests, all poisoned red-first, two of them controls.
+  **BOOKED, FOUND AND DELIBERATELY NOT FIXED — F36 and F37, both behavioural design calls
+  adjacent to F27 rather than defects with an obvious right answer:**
+  **F36** — FM header entries are POSITIONAL in the driver but emitted in `song.tracks` order,
+  while `zBGMLoad` hands out fixed channel bytes in slot order (`zFMDACInitBytes`), so a song
+  using only FM2 and FM5, or ordering FM3 before FM1, exports labels that do not match the
+  hardware channel that will play them. Matters for FM3 special mode (README-8's feature row).
+  **F37** — a song with FM tracks and NO DAC track puts its first FM track on the DAC, because
+  slot 0 is `zSongFM6_DAC` and is driven unconditionally through `zUpdateDACTrack`; the driver
+  never asks whether entry 0 is a DAC entry. All 60 shipped S3K songs carry exactly one
+  `smpsHeaderDAC` first, so the format effectively requires it. Seraph happily exports a
+  DAC-less song today. **This is plausibly larger than F30 itself.**
+  **F38 (small)** — `ChannelLayout::channel_name` now states the same `Psg`/`PsgNoise` binding
+  convention as `ProjectManager::default_lane_name`; delegating that method to the new helper
+  removes the second copy. Exactly F34's class, left alone because it is another file's parcel.
+  **ENVIRONMENT FINDING FOR FUTURE WORKTREE PARCELS.** A bare `cargo test` in a worktree under
+  `seraph/.claude/worktrees/<agent>/` fails `psg_table_still_matches_the_driver_it_claims_to_match`
+  with *"S3K disassembly not found at ../../skdisasm"* — from a worktree, `../../` is
+  `seraph/.claude/worktrees/`, not `sonic_hacks/`. Path arithmetic, not a regression: the agent
+  used the test's own `SERAPH_SKDISASM_DIR` escape hatch, and the merged-tree run here needed no
+  env var at all, which is what confirms it is worktree-only. **Booked as F39:** resolve that
+  path via `git rev-parse --show-toplevel` so the test is worktree-portable, since the next
+  agent will hit it too.
+  **TAGGED, NOT ATTEMPTED (no emulator from a background agent):** what an out-of-order or
+  DAC-less header actually sounds like on hardware. Only F36 and F37 would want it, and only
+  before ruling on them.

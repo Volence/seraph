@@ -1,5 +1,5 @@
 {
-  "focus": "Nine defects cleared, including the intermittent test failure that has been unidentified for weeks.",
+  "focus": "Everything I can do without you is done. Four things are waiting on your call.",
   "inFlight": [],
   "blockedOnOwner": [
     {
@@ -13,7 +13,7 @@
       "since": "2026-08-30"
     }
   ],
-  "nextBoundary": "At a boundary now. Everything startable without you is done; what remains needs your call.",
+  "nextBoundary": "At a boundary now. Everything startable without you is done.",
   "queue": [
     {
       "id": "F27",
@@ -24,10 +24,11 @@
     },
     {
       "id": "PITCH-FORMAT",
-      "title": "The engine lane's board says you chose that the music driver stores musical pitch rather than raw chip numbers, and that it needs a joint plan with this lane. Relayed off their board, not witnessed here",
+      "title": "My half of the joint plan with the engine lane is written and handed over. Still needs you to confirm this is mine rather than theirs",
       "state": "open",
       "size": "L",
-      "blockedBy": "a joint plan with the aeon lane, and confirming with you that this is really yours to me and not just theirs"
+      "blockedBy": "confirming with you that this is really yours to me and not just theirs; the engine lane reviews my half at its next boundary",
+      "project": "SOUND-TRUTH"
     },
     {
       "id": "S0",
@@ -45,7 +46,7 @@
       "blockedBy": "where overlap warnings should appear is a design call, and the FM3 one is a feature not a fix"
     }
   ],
-  "updatedAt": "2026-08-30T02:03:29Z",
-  "awaiting": "your call on d-9 and d-10, and on F27. Everything I could do without you is done. d-10 is the small one and I recommend deferring it.",
+  "updatedAt": "2026-08-30T02:06:40Z",
+  "awaiting": "every remaining item needs you: d-9 (which drivers the foundation targets), d-10 (drums in VGM, small, I recommend deferring), F27 (the channel 6 playback call), and README-8's product call on where overlap warnings should appear. Nothing is half-done.",
   "atBoundary": true
 }

@@ -30,22 +30,32 @@ describe("NewProjectDialog recent locations", () => {
     return screen.getByPlaceholderText("/path/to/projects") as HTMLInputElement;
   }
 
-  it("prefills Location with the most recent remembered location", () => {
+  // The dialog loads its driver list from a promise in a mount effect, so every
+  // render() leaves two setStates (drivers, driverId) in flight. A test that
+  // asserts synchronously and returns finishes while they are still pending, and
+  // they then land with React unaware a test is running. Wait for the list to
+  // paint -- the same real precondition the create/browse tests below wait on.
+  async function renderSettled() {
+    render(<NewProjectDialog onClose={() => {}} onCreated={() => {}} />);
+    await screen.findByText("Flamedriver");
+  }
+
+  it("prefills Location with the most recent remembered location", async () => {
     rememberLocation("/home/me/older");
     rememberLocation("/home/me/songs");
-    render(<NewProjectDialog onClose={() => {}} onCreated={() => {}} />);
+    await renderSettled();
     expect(locationInput().value).toBe("/home/me/songs");
   });
 
-  it("leaves Location empty when nothing is remembered", () => {
-    render(<NewProjectDialog onClose={() => {}} onCreated={() => {}} />);
+  it("leaves Location empty when nothing is remembered", async () => {
+    await renderSettled();
     expect(locationInput().value).toBe("");
   });
 
-  it("shows remembered locations as suggestions on focus and fills on click", () => {
+  it("shows remembered locations as suggestions on focus and fills on click", async () => {
     rememberLocation("/home/me/older");
     rememberLocation("/home/me/songs");
-    render(<NewProjectDialog onClose={() => {}} onCreated={() => {}} />);
+    await renderSettled();
     fireEvent.focus(locationInput());
     const older = screen.getByRole("option", { name: "/home/me/older" });
     expect(screen.getByRole("option", { name: "/home/me/songs" })).toBeInTheDocument();

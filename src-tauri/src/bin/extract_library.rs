@@ -31,13 +31,20 @@ fn main() {
     let get = |k: &str| -> String {
         opts.get(k).cloned().unwrap_or_else(|| { eprintln!("missing --{k}"); exit(2) })
     };
-    let out = PathBuf::from(get("out"));
+    // `--out` is resolved INSIDE each arm, not before the match. Hoisting it
+    // meant `get("out")` ran first on every invocation, so `--help` (and any
+    // unknown or misspelled subcommand) died on "missing --out" and the
+    // `usage()` arm below was unreachable -- the one path a confused user
+    // takes was the one path that could not print help (README pass, item 1).
     let res = match cmd.as_str() {
-        "smps" => extract::extract_smps_dir(&PathBuf::from(get("in")), &get("game"), &out),
-        "gyb" => extract::extract_gyb(&PathBuf::from(get("in")), &get("game"), &out),
-        "zyrinx" => extract::extract_zyrinx(&PathBuf::from(get("rom")), &get("game"), &out),
-        "psg-table" => extract::extract_psg_table(&out),
-        "uvb" => extract::extract_uvb(&out),
+        "smps" => extract::extract_smps_dir(
+            &PathBuf::from(get("in")), &get("game"), &PathBuf::from(get("out"))),
+        "gyb" => extract::extract_gyb(
+            &PathBuf::from(get("in")), &get("game"), &PathBuf::from(get("out"))),
+        "zyrinx" => extract::extract_zyrinx(
+            &PathBuf::from(get("rom")), &get("game"), &PathBuf::from(get("out"))),
+        "psg-table" => extract::extract_psg_table(&PathBuf::from(get("out"))),
+        "uvb" => extract::extract_uvb(&PathBuf::from(get("out"))),
         _ => usage(),
     };
     match res {

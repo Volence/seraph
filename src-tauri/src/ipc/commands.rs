@@ -1173,12 +1173,21 @@ pub fn export_song(
 pub fn export_wav(
     project_state: State<'_, ProjectState>,
     output_path: String,
-    duration_seconds: f64,
+    // `duration_seconds: None` exports the whole song. The UI passes `None`; a
+    // caller wanting a fixed-length excerpt can still ask for one (README
+    // pass, item 3, which was a hardcoded 60 at the call site).
+    duration_seconds: Option<f64>,
 ) -> Result<String, String> {
     use crate::audio::engine::AudioEngine;
 
     let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let snapshot = mgr.build_snapshot();
+    let duration_seconds = match duration_seconds {
+        Some(d) => d,
+        None => mgr
+            .song_duration_seconds()
+            .ok_or("No project open, so the song's length is unknown")?,
+    };
     drop(mgr);
 
     let sample_rate: u32 = 44100;

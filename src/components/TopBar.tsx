@@ -99,7 +99,9 @@ export function TopBar({
     if (!path) return;
     setExporting(true);
     try {
-      await ipc.exportWav(path, 60);
+      // null = the whole song. This used to be a hardcoded 60, which
+      // truncated anything longer and padded anything shorter with silence.
+      await ipc.exportWav(path, null);
       alert(`Exported to ${path}`);
     } catch (e) {
       alert(`Export failed: ${e}`);

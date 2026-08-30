@@ -197,7 +197,13 @@ impl DriverProfile for FlamedriverProfile {
     }
 
     fn export_formats(&self) -> Vec<&str> {
-        vec!["smps2asm", "binary"]
+        // "binary" was advertised here with nothing implementing it (README
+        // pass, item 5). Withdrawn rather than stubbed: this lane's standing
+        // rule is that the app must not promise what it cannot do. Note the
+        // method itself currently has NO callers, so this corrects a false
+        // claim rather than a behaviour -- which is exactly why it could sit
+        // here being wrong without anything failing.
+        vec!["smps2asm"]
     }
 
     fn export_song(

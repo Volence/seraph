@@ -515,6 +515,37 @@ impl ProjectManager {
         self.project_path.as_deref()
     }
 
+    /// How long the open song actually is, in seconds, including a short tail
+    /// so the last note's release is not clipped.
+    ///
+    /// Exists because WAV export hardcoded 60 seconds at the UI call site
+    /// (README pass, item 3), which silently TRUNCATED any song longer than a
+    /// minute and padded every shorter one with silence. The IPC always took a
+    /// duration; nothing could supply a correct one.
+    ///
+    /// Measured from both region extents and note extents, because a note may
+    /// legitimately run past its region's declared duration.
+    pub fn song_duration_seconds(&self) -> Option<f64> {
+        let song = self.song()?;
+        let mut end_tick: u64 = 0;
+        for track in &song.tracks {
+            for region in &track.regions {
+                end_tick = end_tick.max(region.start_tick + region.duration_ticks);
+                for note in &region.notes {
+                    end_tick = end_tick.max(region.start_tick + note.tick + note.duration_ticks);
+                }
+            }
+        }
+        let tempo = song.metadata.tempo;
+        let tpb = song.metadata.ticks_per_beat as f64;
+        if tempo <= 0.0 || tpb <= 0.0 {
+            return None;
+        }
+        // Let FM releases ring out rather than cutting at the last note-off.
+        const RELEASE_TAIL_SECONDS: f64 = 2.0;
+        Some(end_tick as f64 * 60.0 / (tempo * tpb) + RELEASE_TAIL_SECONDS)
+    }
+
     pub fn driver_registry(&self) -> &DriverRegistry {
         &self.driver_registry
     }
@@ -1634,6 +1665,58 @@ mod tests {
 
     fn cleanup(path: &Path) {
         let _ = fs::remove_dir_all(path);
+    }
+
+    /// README pass, item 3. WAV export hardcoded 60 seconds at the UI call
+    /// site, so any song over a minute was silently truncated and every
+    /// shorter one padded with silence. The duration is now derived from the
+    /// song itself.
+    ///
+    /// Expectation DERIVED, not transcribed: at 120 BPM with 480 ticks per
+    /// beat, one beat is 0.5 s, so a region spanning 1920 ticks is 4 beats =
+    /// 2.0 s, plus the 2.0 s release tail = 4.0 s.
+    #[test]
+    fn song_duration_is_measured_from_the_song_not_hardcoded() {
+        let path = temp_project_path("duration");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Timed", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.song().unwrap().tracks[0].id;
+        mgr.add_region(track_id, 0, 1920).unwrap();
+
+        let secs = mgr.song_duration_seconds().expect("a project is open");
+        assert!(
+            (secs - 4.0).abs() < 1e-9,
+            "1920 ticks at 120bpm/480tpb is 2.0s of music plus a 2.0s tail = 4.0s, got {secs}",
+        );
+        assert!(
+            secs != 60.0,
+            "the whole point of this fix is that the duration is not a fixed 60",
+        );
+
+        cleanup(&path);
+    }
+
+    /// Control: the duration must TRACK the song rather than being any other
+    /// constant. A second region twice as far out must double the music part.
+    #[test]
+    fn song_duration_grows_with_the_song() {
+        let path = temp_project_path("duration_grows");
+        let mut mgr = ProjectManager::new(test_registry());
+        mgr.create(&path, "Timed2", "flamedriver", 120.0, (4, 4)).unwrap();
+
+        let track_id = mgr.song().unwrap().tracks[0].id;
+        mgr.add_region(track_id, 0, 1920).unwrap();
+        let short = mgr.song_duration_seconds().unwrap();
+        mgr.add_region(track_id, 1920, 1920).unwrap();
+        let long = mgr.song_duration_seconds().unwrap();
+
+        assert!(
+            (long - short - 2.0).abs() < 1e-9,
+            "adding 1920 more ticks must add exactly 2.0s, got {short} then {long}",
+        );
+
+        cleanup(&path);
     }
 
     #[test]

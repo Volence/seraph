@@ -39,7 +39,14 @@ impl DriverProfile for FlamedriverProfile {
                 FmChannelInfo { index: 2, name: "FM3".into(), supports_special_mode: true },
                 FmChannelInfo { index: 3, name: "FM4".into(), supports_special_mode: false },
                 FmChannelInfo { index: 4, name: "FM5".into(), supports_special_mode: false },
-                FmChannelInfo { index: 5, name: "FM6/DAC".into(), supports_special_mode: false },
+                // No FM6 music voice. The driver says so itself at
+                // `skdisasm/Sound/Z80 Sound Driver.asm:1907`
+                // (`db 80h, 6 ; FM6 music track (does not exist in this driver)`),
+                // its track RAM puts `zSongFM6_DAC` ahead of FM1..FM5 as ONE
+                // shared slot (177-182), and its own "Number of FM tracks" is
+                // `(zSongPSG1-zSongFM1)/zTrack.len` = 5 (2252). Channel 6 is the
+                // DAC, declared once below. Advertising it here as well offered
+                // seven voices on a six-voice chip (audit F31).
             ],
             psg_channels: vec![
                 PsgChannelInfo { index: 0, name: "PSG1".into(), is_noise: false },
@@ -345,12 +352,50 @@ mod tests {
     fn test_channel_layout() {
         let driver = FlamedriverProfile;
         let layout = driver.channel_layout();
-        assert_eq!(layout.fm_channels.len(), 6);
+        // Five, not six: this driver has no FM6 music voice. Channel 6 is the
+        // DAC and is declared once, in `dac_channels` (audit F31).
+        assert_eq!(layout.fm_channels.len(), 5);
         assert_eq!(layout.psg_channels.len(), 4);
         assert_eq!(layout.dac_channels.len(), 1);
         assert!(layout.fm_channels[2].supports_special_mode);
         assert!(!layout.fm_channels[0].supports_special_mode);
         assert!(layout.psg_channels[3].is_noise);
+        assert!(
+            !layout.fm_channels.iter().any(|c| c.index == 5),
+            "FM index 5 is the DAC slot on this driver and must not also be \
+             offered as a music voice",
+        );
+    }
+
+    /// The guard F31 was missing. The YM2612 has six FM slots and the DAC
+    /// takes over the sixth, so a profile's music voices plus its DAC
+    /// channels can never exceed six. `FlamedriverProfile` advertised six FM
+    /// voices (including one named "FM6/DAC") *plus* a separate DAC channel:
+    /// seven voices on a six-voice chip.
+    ///
+    /// SCOPE, stated because the wording matters: this covers the profiles
+    /// registered *below*, which today is the tree's only one. It does NOT
+    /// inherit automatically, because the app registers its drivers inline in
+    /// `lib.rs` with no shared constructor to borrow. A second profile (the
+    /// Memra one F31 notes is absent) must be added here by hand. Making that
+    /// automatic means extracting a shared registry constructor, which is a
+    /// change to `lib.rs` and outside F31.
+    #[test]
+    fn fm_voices_plus_dac_never_exceed_the_chips_six_slots() {
+        let profiles: Vec<Box<dyn DriverProfile>> = vec![Box::new(FlamedriverProfile)];
+        for driver in &profiles {
+            let layout = driver.channel_layout();
+            let total = layout.fm_channels.len() + layout.dac_channels.len();
+            assert!(
+                total <= 6,
+                "driver `{}` advertises {} FM voices plus {} DAC channels = {}, \
+                 but the chip has only 6 FM slots and the DAC occupies one of them",
+                driver.id(),
+                layout.fm_channels.len(),
+                layout.dac_channels.len(),
+                total,
+            );
+        }
     }
 
     #[test]

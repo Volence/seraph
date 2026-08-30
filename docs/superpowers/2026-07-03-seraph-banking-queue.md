@@ -3332,3 +3332,49 @@ For any future session executing this queue:
   (unpushed rewriting would buy nothing and they match tonight's majority); **the trailer resumes
   from this commit forward.** Recorded because a wrong premise that happens to reach a defensible
   action is still a wrong premise, and because the lapse it revealed was the controller's.
+- 2026-08-30 (cont.): **F49 + F48 LANDED — and the parcel found a THIRD door onto unsaved work that
+  no guard covers.** Merged and pushed at `ae803f0`, `origin/main` verified moved and equal to
+  HEAD. Merged-tree lanes, exit codes read directly: vitest **382 passed / 38 files** (was 369/36;
+  +13), `npm run build` exit 0 zero warning or error lines, `npx tsc --noEmit` exit 0, cargo **293
+  passed / 0 failed** untouched, all three prior guards (`reporterPin`, `canvasStub`,
+  `App.closeGuard`) passing **unedited**, no `src/bindings.ts` drift.
+  **THE FINDING — F50, AND IT IS A REAL DATA-LOSS PATH, NOT A COVERAGE GAP.** `confirmDiscard` has
+  **two** callers, not three: New (`App.tsx:266`) and Open (`:271`). **Import has none** —
+  `onImport` (`:354`) is a bare `() => setShowImportDialog(true)` — yet a completed import replaces
+  the open project, and `handleImported`'s own comment says *"Import closes the old project and
+  opens the imported one — same boundary as open/new"*. **The code asserts the boundary is the same
+  while the guard is absent.** Verified firsthand here, all four line cites. So: with unsaved
+  changes, importing discards them with no prompt, while New and Open ask. The agent covered the
+  gap as documented-not-endorsed rather than closing it, correctly — the brief scoped it out —
+  and flagged it. **Booked F50; the fix is arguably consistency rather than a design change, since
+  the guard and the boundary both already exist.**
+  **LOG LINES ROSE 68 to 122, AND THAT IS THE BENIGN CLASS — triaged by the discriminator banked
+  from aurora earlier tonight rather than by how the lines look.** The four new `close-confirm
+  failed:` / `discard-confirm failed:` lines come from tests **named for the condition** (e.g.
+  *"reports a rejected quit dialog instead of failing silently"*), which is exactly the
+  is-there-a-test-named-for-this test, and the opposite of F47's thirteen. The single asserted
+  `close-confirm unavailable` line is unchanged at 1. First use of that discriminator in anger
+  here, on this lane's own output.
+  **F48's SCOPE HELD: reporting was added, and nothing was DECIDED.** Both handler bodies are now
+  wrapped and report; **neither catch changes an outcome** — a failed close still leaves the window
+  open, a failed discard still abandons the action. One genuine bug fixed in passing: `return
+  ask(...)` became `return await ask(...)`, because a bare return settles outside the `try` and
+  would have made the new catch **dead code** — proven by a dedicated break rather than reasoned.
+  **PARKED AS d-12** (filed with options and a recommendation): when the confirmation dialog itself
+  fails, should the app stay safe-but-stuck, let the action through, or say so on screen. Both
+  deciding lines carry a comment naming themselves as the line to change, so reversing is one edit
+  each. Recommendation: leave as-is.
+  **RED-FIRST DISCIPLINE, and one methodological point worth copying.** Nine breaks across the two
+  items, `src/App.tsx` sha256-verified byte-identical after each. **B3 and B4 red exactly one
+  caller each** — which is the entire reason the tests are split per caller rather than asserting
+  on `confirmDiscard`'s return value; neither stands in for the other. Reproduced independently
+  here: making New Project ignore the answer fails **only** `abandons New Project when the user
+  declines` (`1 failed | 6 passed`), App.tsx restored byte-identical.
+  **THE AGENT FIXED A TRIPWIRE IN ITS OWN TEST FILE, and the lesson generalises:** a first draft
+  asserted inside the shared render helper that `ask` had not yet been called, which made one break
+  red **all seven** cases. **A break that reds a whole file teaches nothing** — the helper now
+  clears the call log after setup, which is what made three of the breaks discriminating.
+  **CORRECTION TO MY OWN BRIEF, from the agent:** I wrote that the suite's lone `dirty: true` test
+  "never opens or creates a project". It **does** open one; what it never does is click New or Open
+  *afterwards*, so `confirmDiscard` is only ever entered clean. The conclusion held, the stated
+  reason was wrong, and it was checked rather than accepted.

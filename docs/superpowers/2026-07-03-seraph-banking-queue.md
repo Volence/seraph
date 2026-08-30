@@ -3081,3 +3081,68 @@ For any future session executing this queue:
   `cargo test` **293 passed / 0 failed**, exit 0 (untouched, run to prove it); `git status` shows
   only `vitest.config.ts`, `src/test/reporterPin.test.ts`, `docs/OVERSEER.md` and this file — no
   `src/bindings.ts` drift.
+- 2026-08-30 (cont.): **F45 LANDED — the runner no longer hides output from agent sessions, and
+  the "agent reporter" turned out to be an ALIAS, which is what made the trade one-sided.**
+  Merged and pushed at `ce0a57a`, `origin/main` verified moved and equal to HEAD. Merged-tree
+  lanes, exit codes read directly: vitest **355 passed / 34 files** (was 352/33; +3 and +1 are
+  this parcel's own guard), `npm run build` exit 0 zero warning or error lines, `npx tsc
+  --noEmit` exit 0, cargo **293 passed / 0 failed** untouched, no `src/bindings.ts` drift.
+  **THE FINDING THAT DECIDED IT, verified firsthand here rather than taken from the report:**
+  vitest's reporter map has **`"agent": MinimalReporter`** — a plain alias — and the selection is
+  `resolved.reporters.push([isAgent ? "agent" : "default", {}])`
+  (`node_modules/vitest/dist/chunks/index.UpGiHP7g.js:4241` and `coverage.DM_a_rWm.js:455`). So
+  the agent reporter is **not** a compact machine-readable format bought at the price of console
+  output; against `default` in a non-TTY session it differs in exactly two ways — it drops
+  passing-test console output and skips the per-file line. **Pinning it away gives up
+  compactness and nothing else.**
+  **WHY THE CONFIG KNOB NEVER WORKED, precisely:** `BaseReporter` does `this.silent =
+  options.silent` then `this.silent ??= this.ctx.config.silent`, so a reporter supplying its own
+  value means the config fallback never fires. Reporter *options* do override it
+  (`[["agent", { silent: false }]]` works) — so the earlier workaround-only reading was correct
+  about the symptom and wrong about the ceiling.
+  **NOISE QUANTIFIED BEFORE RECOMMENDING, which is what the brief asked for and what makes the
+  choice defensible:** full-suite line counts — `agent` **1250**, `[["agent",{silent:false}]]`
+  **1326**, `default` **1363**. Visibility costs about **+69 lines**, the per-file listing about
+  **+36** more, roughly 8% of a run. The trade was not close, so the general fix was taken and
+  **F44's targeted stderr-and-fail routing was NOT needed as a fallback** — it stays anyway,
+  belt and braces, as the one diagnostic that fails a test rather than merely printing.
+  **PROVEN BOTH DIRECTIONS with the environment held live:** a passing scratch test's
+  `console.log`/`console.warn` appeared **0** times before and **both** after, with `CLAUDECODE=1`
+  and `AI_AGENT` set throughout; with those unset via `env -u` the output is identical but for
+  ANSI colour. Scratch removed.
+  **THE CONSTRAINT HELD: the summary lines are unchanged in shape** — ` Test Files  N passed (N)`
+  / `      Tests  N passed (N)`, same padding, wording and position — so nothing in this lane's
+  landing procedure needed updating. It was called out explicitly rather than left for someone to
+  discover, which was the point of naming it in the brief.
+  **NEW GUARD, POISONED FIRSTHAND HERE:** `src/test/reporterPin.test.ts` reads `vitest.config.ts`
+  as text and fails if the pin is missing or names `agent`/`minimal`. Setting the pin back to
+  `["agent"]` on the merged tree fails it with *"expected '\"agent\"' not to match
+  /[\"']agent[\"']/"*, restored after. It also emits a canary `console.warn` from a passing
+  test, so the guard proves the visibility it guards.
+  **WHAT SURFACED ONCE THE CHANNEL WAS UNMUTED — reported, not silenced, and none is new.**
+  (1) `close-confirm unavailable: TypeError ... 'metadata'` (`src/App.tsx:186`) **13 times** with
+  stacks — the deliberate non-Tauri `catch`, but it means **the `onCloseRequested` dirty-guard
+  branch is exercised by no test at all**; (2)+(3) two `voice-overlap` rejection logs from tests
+  named for surfacing them. **No React key warnings, no act() warnings, no deprecation notices —
+  and that is the first time this repo can say so from an unmuted channel.**
+  **NEW ROW BOOKED — F46, AND IT IS A BIGGER CONTEXT COST THAN THE WHOLE REPORTER QUESTION.**
+  **1237 of 1364 log lines — 91% of every test log this repo hands a session — are one repeated
+  sentence**, jsdom's `Not implemented: HTMLCanvasElement's getContext()`. Measured firsthand on
+  the merged tree, not carried from the report. It is identical under every reporter because it
+  comes from jsdom's own virtual console and bypasses vitest entirely, so no reporter choice
+  touches it; it was never hidden and this parcel did not create it. Booked rather than folded in.
+  **DOC CORRECTION IN THE SAME COMMIT, and this is the perishable-guidance rule catching its own
+  entry from four hours earlier:** `docs/OVERSEER.md`'s verification-lanes section had just been
+  updated to instruct every session to *"measure warnings with `--reporter=verbose` or not at
+  all"*. That became **wrong the moment this landed**, and would have kept future sessions on a
+  workaround for a fixed defect. Updated with the parcel rather than left to rot.
+  **THE AURORA DATUM: CORROBORATION, NOT ECHO, and both halves are now anchored.** The hub
+  relayed that aurora had the same fix, proven by plant on **4.1.4**; it was passed to the agent
+  mid-flight **marked unverified and not to be adopted on relay**, and it reproduced independently
+  here at **4.1.10**. Different versions, different repos, different motivating defects — aurora
+  arrived from *"a skip that cannot be told from a pass is a silent zero"*, this lane from a
+  warning silent for the suite's lifetime — and neither brief carried the other's conclusion, so
+  the enumeration parameters genuinely differ (bar 19). **Aurora's half stays marked relayed, not
+  witnessed; the 4.1.10 half is firsthand.** Their reason also supplied the tiebreak toward
+  `default` over the narrower `[["agent",{silent:false}]]`: a fully skipped file must stay
+  distinguishable from a passing one.

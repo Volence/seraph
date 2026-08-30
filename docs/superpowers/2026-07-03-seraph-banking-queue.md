@@ -2334,3 +2334,59 @@ For any future session executing this queue:
   **NOT TOUCHED, still open:** an existing FM6 track still *exports*, which is F30's
   double-header defect and F27's playback question. F31 was upstream of both and is wrong
   however F27 resolves, which is why it went first.
+
+- 2026-08-30 (cont.): **F29 PART ONE LANDED — the drumless VGM now says it is drumless.
+  PART TWO IS PARKED WITH THE OWNER AS d-10, AND THE BOOKED SIZE WAS WRONG.** Merged
+  `fd6d21b`, pushed, `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit
+  codes read directly: cargo **268 passed / 0 failed** (was 265; +3 new tests), `npm run
+  build` exit 0 with zero warning or error lines, vitest **352/352 across 33 files**, no
+  `src/bindings.ts` drift.
+  **WHAT LANDED:** `export_vgm_data` returns `VgmExport { data, skipped_dac_tracks }` and
+  `export_vgm` appends a warning naming the tracks left out. No bindings change was needed,
+  because `export_vgm` already returned a free-text success string. The drop site now carries
+  a comment saying it is still a drop and why.
+  **WHAT DID NOT LAND, AND WHY THE BOOKED SIZE (M) IS WRONG — this is the finding.**
+  Representing DAC in VGM is **not a register write**. It is a `0x67` PCM data block plus a
+  stream of `0x8n` write-and-wait commands that must interleave **sample-accurately** with
+  every FM and PSG event, which means converting `export_vgm_data`'s **tick-based** event
+  loop into a **sample-accurate** one. That is a restructure, not an added match arm.
+  **Re-sized M -> L.** Parked as **d-10** with three options and a recommendation.
+  **THE FACT THAT DECIDES d-10, VERIFIED FIRSTHAND RATHER THAN TAKEN FROM README-7's
+  BOOKING:** the VGM export **UI path is dead**. `exportVgm` exists in `src/bindings.ts`
+  (551) and `src/api/ipc.ts` (411) and **no component calls it** — so no VGM can leave the
+  app by any route the owner has today, and the drumless gap costs him nothing right now.
+  Hence the recommendation: do the DAC work **as part of wiring the button** (README-7), not
+  before, so the first reachable VGM is complete on the first try. **README-7's VGM row is
+  therefore gated behind d-10, not merely behind F29.**
+  **INTERACTION WORTH RECORDING: F31 LANDING FIRST SHRANK THIS PROBLEM.** A faithful DAC
+  export must write `$2B`, whose semantics are F27's parked design call. But F31 corrected
+  Flamedriver to offer **no FM6 music voice**, so for any song authored after it there is no
+  FM6-versus-DAC conflict to rule on. Only a **legacy song carrying an `Fm(5)` track** still
+  reaches F27's question. Sequencing F31 ahead of F29 was not merely tidy; it removed a
+  design dependency.
+  **NEW FINDING BOOKED — F33, SAME SILENT-DROP CLASS, IN SMPS EXPORT.** `export/smps.rs:794`
+  does `Path::new(&inst.pcm_file)` and guards on `pcm_src.exists()` **with no `else`**. But
+  `pcm_file` is a **bare filename** (`commands.rs:546` writes `format!("{id}.pcm")`) which
+  every other consumer resolves as `<project>/instruments/dac/<pcm_file>`
+  (`manager.rs:427`, `import/mod.rs:200`, `commands.rs:548`). So the path is resolved against
+  the process CWD, essentially never exists, and **SMPS export silently copies no DAC sample
+  at all**. Found while sizing F29; not fixed here, because it is a different export path and
+  folding it in would have widened F29's landing. Severity looks high: it is the export that
+  actually reaches the game.
+  **NEW ROW BOOKED — F34, from F31's landing:** extract a shared driver-registry constructor
+  so the `fm_voices_plus_dac_never_exceed_the_chips_six_slots` guard covers every registered
+  driver instead of only the ones its own test registers. `lib.rs:180-181` registers inline.
+  Becomes live when the absent Memra profile is added.
+  **METHOD FAILURE, THIRD ZSH QUOTING BITE OF THIS SESSION, AND THIS ONE REACHED A PUSHED
+  COMMIT.** F29's commit message contained a backtick-quoted word inside a **double-quoted**
+  `-m`, so zsh ran it as command substitution: the shell printed `continue:1: not in while,
+  until, select, or repeat loop` and the word was **deleted from the message**, which now
+  reads "Reinstating the bare  fires". The commit is pushed and the owner's push grant
+  forbids rewriting pushed history, so it is **corrected here rather than amended**. The
+  other two bites this session were unquoted `--include=*.rs` globs making `grep` never run
+  (twice), one of which produced a clean-looking empty result that was nearly read as an
+  answer. **Standing lesson for this lane: in `zsh`, backticks and globs are live inside
+  double quotes and inside an UNQUOTED heredoc.** Use `<<'EOF'`, quote every glob, and prefer
+  writing prose through `python3` heredocs, which is why the `.jsonl` files were unaffected.
+  **Integrity checked, not assumed:** the F28 and F31 Log entries and both `lane-log.jsonl`
+  entries were re-read after this was found and are intact.

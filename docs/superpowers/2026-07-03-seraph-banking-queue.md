@@ -2741,3 +2741,55 @@ For any future session executing this queue:
   **TAGGED, NOT ATTEMPTED (no emulator from a background agent):** what an out-of-order or
   DAC-less header actually sounds like on hardware. Only F36 and F37 would want it, and only
   before ruling on them.
+- 2026-08-30 (cont.): **F39 + F38 LANDED, AND THE AGENT WAS RIGHT AGAINST THE BRIEF ON THE
+  MECHANISM — the controller's prescribed fix does not work.** Merged `dbab096`, pushed,
+  `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit codes read directly:
+  cargo **287 passed / 0 failed** (unchanged — this parcel repaired reachability and removed a
+  duplicate rather than adding tests, which is the honest reading of a count that did not move),
+  `npm run build` exit 0 with zero warning or error lines, vitest **352/352 across 33 files**,
+  no `src/bindings.ts` drift. Three pre-existing cargo warnings, none added.
+  **THE BRIEF SAID `git rev-parse --show-toplevel`. THAT IS WRONG INSIDE A LINKED WORKTREE**,
+  where it reports the WORKTREE's root and lands in the same wrong directory the defect was
+  about. The agent found it, said so, and used `--git-common-dir` instead — the one path every
+  worktree shares. **Ratified explicitly (bar 7), and verified firsthand here** rather than
+  taken on report:
+  `git rev-parse --show-toplevel` in a worktree returns
+  `/home/volence/sonic_hacks/seraph/.claude/worktrees/agent-…`, while `--git-common-dir`
+  returns `/home/volence/sonic_hacks/seraph/.git` from the worktree and the RELATIVE `.git`
+  from the main checkout.
+  **A CORRECTION TO THE AGENT'S OWN REASONING, and it is why the tag could not just be
+  accepted.** Worktree isolation blocked it from running the test in the main checkout, so it
+  simulated the layout and argued the main-checkout case *"consumes the same `--git-common-dir`
+  value the worktree already produced, so it is the same computation on the same input"*. It is
+  **not the same input**: from `src-tauri/` git answers `../.git`, a RELATIVE path, so the main
+  checkout exercises the *other* branch of the resolver (join-against-`CARGO_MANIFEST_DIR`),
+  which the worktree case never touches. Checked here directly — that branch resolves to
+  `/home/volence/sonic_hacks/skdisasm` and the driver file exists — and then closed properly by
+  the merged-tree run, where **`psg_table_still_matches_the_driver_it_claims_to_match` appears
+  BY NAME in the run's own log with no env var set** (bar 25's corrective: a green log is not
+  evidence the gate ran; its name in the log is).
+  **The resolver returns `None` rather than guessing** when git cannot answer, falling back to
+  the old literal so the panic still names something, and the unreachable-source FAILURE was
+  preserved: a bogus `SERAPH_SKDISASM_DIR` still exits 101 with instructions. An unreachable
+  source must never become a pass, which was the property most at risk in a path change.
+  **F38: the two implementations were compared case by case BEFORE the dedupe, and agreed
+  everywhere** (`Fm`, `Psg`, `PsgNoise`, `Dac`, absent channel, duplicate entries, plus the
+  manager's two guards which sit ahead of the match and stay verbatim). One caller,
+  `unbind_instrument_from_tracks`, all three of its outcomes preserved; **no test needed
+  editing, which was the stated tripwire for having changed behaviour.** Delegation proven live
+  rather than dead by sabotaging `channel_name` and watching
+  `test_delete_instrument_resets_lane_name_to_channel_default` go red (*left: "Library Lead"
+  right: "FM1"*), then restoring `driver.rs` byte-identical to HEAD.
+  **NEW FINDING BOOKED — F40, AND IT IS A VACUOUS-COVERAGE ONE.** Inverting the `PsgNoise` arm
+  of the now-single convention (`find(|c| c.is_noise)` → `find(|c| !c.is_noise)`), so noise
+  resolves to a TONE channel, leaves **all 287 tests green**. FM is covered, noise is not.
+  Cheap now that the convention lives in one place: one test against that arm guards both call
+  sites. Found by the agent poisoning code it had just written, which is the habit worth having.
+  **ALSO BOOKED — F41 (small):** `ZYRINX_ROM_DEFAULT` (`import/mod.rs:1461`) hardcodes one
+  user's home directory. No worktree defect, since it is absolute, and it is already guarded by
+  `SERAPH_ZYRINX_ROM` plus a loud panic — but the same helper would make it machine-portable.
+  Different defect from F39's, so it was correctly left alone.
+  **Sweep recorded because a null result is the thing nobody writes down:** the agent swept
+  `src/` for `"../`, `/home/`, `~/`, `dirs::`, `env::var`, `include_str!`, `CARGO_MANIFEST_DIR`
+  and `PathBuf::from`; exactly two paths leave the repo (the one fixed and `ZYRINX_ROM_DEFAULT`),
+  everything else is repo-internal and already worktree-correct.

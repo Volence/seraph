@@ -380,6 +380,24 @@ Repo-specific quality bars (each has caught a real defect here):
   `aa08151` — but a worktree checked out at an older SHA needs it in the
   environment. Any "app dies instantly on launch" report from an agent: check this
   first before reading it as signal.
+- **Converting a process start time to UTC: the obvious correction FAILS SILENTLY, in both
+  spellings** *(measured here 2026-08-30 while answering a shared-machine timing question from
+  another lane; I made the error twice in consecutive commands)*. This machine is **EDT
+  (UTC-4)** and `ps lstart` prints **local**, which this file already warned about. The part
+  that was missing is the repair: `TZ=UTC date -d '<local string>'` parses a local string as
+  UTC, and **`date -u -d '<local string>'` does too**, because `-u` applies to *parsing* as
+  well as output. Both hand back the number you fed them, so the conversion looks performed
+  and does nothing — a four-hour error wearing a normalisation's clothes.
+  **Use a timezone-free instrument:** `ps -o etimes=` (elapsed seconds; subtract from
+  `date -u +%s`), or put an explicit zone token in the string
+  (`date -u -d 'Sun Aug 30 08:38:09 2026 EDT'`). Measured agreement of the two correct forms
+  against one live pid: **12:38:09/10Z**, where both naive forms said `08:38:09Z`.
+  **Why it is worth a bullet rather than a footnote:** a timing answer is used to include or
+  exclude a lane as the cause of something, so a silent four-hour skew turns a true negative
+  about the wrong minutes into an alibi or an accusation. Same family as the `ls` probe above
+  and as protocol bar 16(d): a command that quietly answers a different question than the one
+  asked, and returns something that looks like an answer.
+
 - **`ls <path>` IS A BROKEN EXISTENCE PROBE IN THIS WORKSPACE, and it fails identically
   for paths that exist and paths that do not** *(relayed by the aurora lane 2026-08-30 as a
   hazard notice, anchors empyrean `e159721850d77a64081ad577b3ac1890e5476a2a` and sigil

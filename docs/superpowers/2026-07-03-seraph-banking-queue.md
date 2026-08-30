@@ -2861,3 +2861,70 @@ For any future session executing this queue:
   dispatch**; (2) **do not hand an agent a baseline number at all — tell it to derive the
   baseline from its own tree**, which is bar 1 applied to briefs. A copied number is exactly what
   bar 1 forbids in gates, and I put one in two consecutive briefs.
+- 2026-08-30 (cont.): **F40 + F41 + F43 LANDED TOGETHER — and the push was held a SECOND time
+  tonight for the same reason, deliberately.** Merged and pushed at `19e6a16`, `origin/main`
+  verified moved and equal to HEAD. Merged-tree lanes, exit codes read directly: cargo **293
+  passed / 0 failed** (was 292; +1), `npm run build` exit 0 with zero warning or error lines,
+  vitest **352/352 across 33 files on four runs executed as TWO CONCURRENT PAIRS**, no
+  `src/bindings.ts` drift.
+  **THE LANES WERE RUN UNDER CONTENTION ON PURPOSE.** F43's defect is invisible on an idle box —
+  the agent measured its own three pre-change runs as clean — so idle green would have been the
+  weakest possible evidence. Two full suites were run simultaneously, twice. This is the
+  instrument matching the subject rather than the subject being made convenient for the
+  instrument.
+  **F40 — the noise arm is now covered, and the red-first run RE-CONFIRMED the gap.** Inverting
+  `find(|c| c.is_noise)` produced `292 passed / 1 failed` with the new test as the **only**
+  failure, which independently reproduces the finding that the rest of the suite is blind to it.
+  The expectation is derived from each registered profile's own layout and asserted as a
+  RELATIONSHIP in both directions (the resolved name must be an entry the layout flags noise,
+  and must not be one it flags tone), so an inverted arm cannot satisfy it regardless of naming.
+  Anti-vacuity guard fails loudly if no registered profile advertises a noise channel. Production
+  code byte-identical to before (`git diff` shows zero deleted lines).
+  **F41 — the hardcoded home directory is gone and the loud-when-absent behaviour was verified
+  HERE, not taken on report.** `ZYRINX_ROM_DEFAULT` is replaced by a relative leaf joined to a
+  resolved root; `test_support::sibling_root()` is now the single place holding the
+  `--git-common-dir` reasoning, consumed by both `audio::frequency` and `import` — factored
+  rather than copied, which is F38's lesson applied one day later. Re-run firsthand on the merged
+  tree: `SERAPH_ZYRINX_ROM=/nonexistent/... cargo test zyrinx` exits **101** with the full
+  instructions, no skip. `git grep "/home/volence" -- src-tauri/src src` now returns **nothing**.
+  *(Cross-lane note: the hub counted this pattern at every tip — sigil 142, aurora 138, aeon 28,
+  empyrean 15, seraph 1, oracle 0 — and asked whether seraph's one was a row. Answered no, with
+  the discriminator stated: a hardcoded path that PANICS is a portability nuisance; one that
+  `return`s early is a test reporting green having checked nothing.)*
+  **F43 — THE MECHANISM IS NOT WHAT ANYONE GUESSED, INCLUDING ME, AND THE STARTING POINTS WERE
+  PARTLY REFUTED.** The failing assertion was a guard an earlier parcel added on purpose, and it
+  fired correctly. My brief offered "the `tracks` state is not populated" and "or a cross-file
+  interaction". **Both wrong.** `tracks` WAS populated in the committed render, and cross-file
+  leakage was refuted by checking the resolved config rather than assuming it (`pool=forks`,
+  `isolate=true`, so module state is not shared; the reproduction also survives
+  `resetClipboardForTest()` immediately before each mount).
+  **WHAT WAS ACTUALLY ABSENT WAS THE LISTENER, NOT THE DATA.** Ctrl+C is served by a `window`
+  listener installed in a `useEffect` closing over `tracks`. Painting the header and
+  re-registering that listener are two different steps — commit in a microtask, passive-effect
+  flush on React's scheduler via a MessageChannel macrotask — and `findByText` resolves off the
+  first. RTL's `asyncWrapper` bridges the gap with a `setTimeout(0)` **bet** that it will lose to
+  the scheduler; the agent measured that bet winning 20/20 idle. Under CPU contention the
+  scheduler's 5ms host-yield budget lets it be preempted and repost AFTER the bet, leaving the
+  MOUNT-TIME listener on `window` with `tracks == []`; the region lookup misses and
+  `copyRegions([])` is a documented no-op. Instrumented proof over 600 mounts, every stale
+  iteration reading `keydownAdds=1 keydownRemoves=0 headerInDom=true`.
+  **THE A/B IS THE EVIDENCE, NOT THE STREAK, AND THE AGENT SAID SO ITSELF:** load-matched
+  interleaved, **4 stale in 300 undrained mounts, 0 in 300 drained**. The fix removes the timing
+  bet rather than lengthening it — inside `act`, React queues passive effects on the act queue and
+  flushes them before act resolves. Four cases shared the exposure; the fourth is the interesting
+  one, because it would have **passed for the wrong reason** (a stale handler copies nothing, so
+  "nothing pastes" holds even if the behaviour under test were broken). Cases reading only props
+  were correctly left alone.
+  **A NON-FIX RULED OUT AND STATED:** setting `IS_REACT_ACT_ENVIRONMENT` would NOT have fixed
+  this, because `asyncWrapper` forces it false for the duration of every `waitFor`/`findBy`.
+  **NEW ROW BOOKED — F44, and it is a lost diagnostic across the whole frontend suite.**
+  `IS_REACT_ACT_ENVIRONMENT` is never set anywhere, and `vitest.config.ts` does not enable
+  `globals`, so RTL's auto-configuration never runs and **React's "update not wrapped in act"
+  warnings are silenced across all 33 test files.** Verified firsthand here (`git grep` finds no
+  assignment; the config has no `globals` key). Turning it on will likely surface warnings
+  repo-wide, so it is its own parcel rather than a rider.
+  **PROCESS, REPEATED ON PURPOSE:** F40/F41 were merged and green on cargo while vitest was
+  intermittently red for an unrelated reason. Held unpushed until F43 explained it, then all
+  three went out together. `git diff --name-only` established in one command that the held work
+  could not be the cause (only Rust and docs had changed). Second time tonight; "it is only
+  intermittent" is precisely how a lane talks itself into pushing over red.

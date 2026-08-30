@@ -2390,3 +2390,44 @@ For any future session executing this queue:
   writing prose through `python3` heredocs, which is why the `.jsonl` files were unaffected.
   **Integrity checked, not assumed:** the F28 and F31 Log entries and both `lane-log.jsonl`
   entries were re-read after this was found and are intact.
+
+- 2026-08-30 (cont.): **F33 LANDED — and it was the most consequential defect of the day,
+  because it silently destroyed output on the path that actually reaches the game.** Merged
+  `c47a938`, pushed, `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit
+  codes read directly: cargo **271 passed / 0 failed** (was 268; +3), `npm run build` exit 0
+  with zero warning or error lines, vitest **352/352 across 33 files**, no `src/bindings.ts`
+  drift.
+  **THE DEFECT:** `DacInstrument::pcm_file` is a **bare filename** (`commands.rs` writes
+  `format!("{id}.pcm")`), resolved by every other consumer as
+  `<project>/instruments/dac/<pcm_file>`. `export/smps.rs` did `Path::new(&inst.pcm_file)` —
+  the process **CWD** — and guarded the copy on a bare `.exists()` **with no `else`**. So an
+  SMPS export of a song with drums copied **no sample at all** and reported success.
+  **THE FIX:** thread the open project's directory through. `DriverProfile::export_song` and
+  `smps::write_export` now take `project_dir: Option<&Path>`, read from
+  `ProjectManager::project_path()` at the single call site (`commands.rs:1161`). **No IPC
+  signature changed, so `bindings.ts` is untouched** — confirmed by the drift check, not
+  assumed. Every silent skip in that block is now a reported failure.
+  **THE UPSTREAM CHECK THAT KEPT THIS HONEST (bar 13 — reachability is an enumeration).** Two
+  of the four skips are `instrument_id` absent and instrument-not-in-bank. Rather than assume
+  they were dead, `validate_for_export` was read: it already errors with *"No instrument
+  assigned"* and *"Assigned instrument not found"*, and `write_export` returns early on any
+  validation error. So they are genuinely defensive — **kept, converted from silent skips to
+  reported errors, and NOT deleted**, since a defensive branch that skips silently is how F33
+  hid in the first place.
+  **WHY A FULLY GREEN SUITE NEVER SAW IT: no test had ever exercised the DAC copy path.**
+  That is the transferable lesson, not the path bug. Threading the new parameter through
+  broke **zero** tests, which is itself the finding — a code path with no test is invisible to
+  every future refactor as well as to this one. Three tests added, poisoned red-first:
+  restoring `Path::new` fails `the_dac_sample_is_copied_into_the_export` with the sample
+  *"expected it at `6696a359-...pcm`"* — **a bare filename with no directory, which is the
+  CWD lookup made visible in the failure message itself**. Two are controls: a missing sample
+  must be **reported, not skipped**, and an unsaved project must say *save first* rather than
+  drop the drums.
+  **CONSEQUENCE FOR THE OWNER, stated in the lane log rather than buried here:** any song he
+  exported to the game before today that had drums was exported **without them**, and needs
+  re-exporting.
+  **METHOD NOTE — the zsh lesson from the previous entry was applied and worked.** This
+  commit message was written with `git commit -F -` over a **quoted** heredoc, and its
+  backticked and `Path::new`-bearing lines survived intact (verified by grepping the committed
+  message, not by assuming). The F29 message damaged earlier in this session stays damaged,
+  because it is pushed.

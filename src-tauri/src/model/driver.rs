@@ -39,6 +39,46 @@ pub struct ChannelLayout {
     pub dac_channels: Vec<DacChannelInfo>,
 }
 
+impl ChannelLayout {
+    /// The layout's own name for `channel`, or `None` when this driver has no
+    /// such channel.
+    ///
+    /// THE authority on which channels a driver actually has. Deliberately
+    /// derived from the layout and never from a hardcoded index: Flamedriver's
+    /// sixth FM slot is the DAC (audit F31), but that is a fact about *that*
+    /// profile, and a check written against the literal 5 would silently stop
+    /// being true for the next profile registered in
+    /// `driver::default_registry()`.
+    ///
+    /// The `Psg(n)` / `PsgNoise` split matches the convention the rest of the
+    /// app already uses (`ProjectManager::default_lane_name`): a numbered PSG
+    /// lane binds to a non-noise entry, and `PsgNoise` binds to whichever
+    /// entry is flagged `is_noise`.
+    pub fn channel_name(&self, channel: &super::song::ChannelAssignment) -> Option<&str> {
+        use super::song::ChannelAssignment;
+        match channel {
+            ChannelAssignment::Fm(n) => self
+                .fm_channels.iter().find(|c| c.index == *n).map(|c| c.name.as_str()),
+            ChannelAssignment::Psg(n) => self
+                .psg_channels.iter().find(|c| !c.is_noise && c.index == *n).map(|c| c.name.as_str()),
+            ChannelAssignment::PsgNoise => self
+                .psg_channels.iter().find(|c| c.is_noise).map(|c| c.name.as_str()),
+            ChannelAssignment::Dac(n) => self
+                .dac_channels.iter().find(|c| c.index == *n).map(|c| c.name.as_str()),
+        }
+    }
+
+    /// Every channel this driver offers, named as the layout names them, in
+    /// SMPS header order (DAC, then FM, then PSG). For telling an author what
+    /// they *can* use when they have used something the driver lacks.
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.dac_channels.iter().map(|c| c.name.as_str())
+            .chain(self.fm_channels.iter().map(|c| c.name.as_str()))
+            .chain(self.psg_channels.iter().map(|c| c.name.as_str()))
+            .collect()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FmChannelInfo {

@@ -219,19 +219,27 @@ describe("ArrangementView", () => {
       await screen.findByText("Bass Lane");
 
       fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+      expect(getRegionClipboard()).toHaveLength(1);
       fireEvent.keyDown(window, { key: "v", ctrlKey: true });
 
       const snapped = Math.floor(2000 / oneBar) * oneBar;
       expect(snapped).toBe(oneBar); // the case must actually exercise snapping
-      await waitFor(() =>
-        expect(ipc.duplicateRegion).toHaveBeenCalledWith(fmTrack.id, region.id, snapped),
-      );
-      await waitFor(() => expect(ipc.reloadSequence).toHaveBeenCalled());
-      await waitFor(() =>
-        expect(onSelectRegions).toHaveBeenCalledWith([
-          expect.objectContaining({ regionId: "region-dup", startTick: snapped }),
-        ]),
-      );
+
+      // Drained, not polled. This case used three `waitFor`s, and under a
+      // loaded full-suite run the first one spent its whole 1000ms default
+      // budget and reported "Number of calls: 0" -- which reads as the paste
+      // never happening rather than as the assertion giving up. That was THE
+      // known flake: ~1 failure in 6 full runs, never reproducible when this
+      // file runs alone (12/12 clean), because alone there is no load to blow
+      // the budget. The paste chain is entirely mocked promises with no
+      // timers, so one async act() settles it with no timeout to exceed --
+      // the same reasoning the sibling cases below already carry.
+      await act(async () => {});
+      expect(ipc.duplicateRegion).toHaveBeenCalledWith(fmTrack.id, region.id, snapped);
+      expect(ipc.reloadSequence).toHaveBeenCalled();
+      expect(onSelectRegions).toHaveBeenCalledWith([
+        expect.objectContaining({ regionId: "region-dup", startTick: snapped }),
+      ]);
     });
 
     it("region copy defers to the piano roll while it owns a note selection", async () => {

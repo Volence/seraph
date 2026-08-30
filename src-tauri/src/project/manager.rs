@@ -625,19 +625,18 @@ impl ProjectManager {
     /// driver — the same `ChannelLayout` source `default_tracks_for_layout`
     /// reads (never hardcoded). None when no project is open, the driver is
     /// unknown, or the channel isn't in the layout.
+    ///
+    /// Which layout entry a channel binds to — a numbered `Psg(n)` to a
+    /// non-noise entry, `PsgNoise` to whichever entry carries `is_noise` — is
+    /// a convention, and this function used to spell it out a second time
+    /// alongside `ChannelLayout::channel_name` (audit F38). Two copies of a
+    /// convention can drift apart while both keep compiling, so the lookup
+    /// lives on the layout and this only adds what is local to a project: the
+    /// two ways there may be no layout to ask.
     fn default_lane_name(&self, channel: &ChannelAssignment) -> Option<String> {
         let driver_id = &self.metadata.as_ref()?.driver_id;
         let layout = self.driver_registry.get(driver_id)?.channel_layout();
-        match channel {
-            ChannelAssignment::Fm(n) => layout
-                .fm_channels.iter().find(|c| c.index == *n).map(|c| c.name.clone()),
-            ChannelAssignment::Psg(n) => layout
-                .psg_channels.iter().find(|c| !c.is_noise && c.index == *n).map(|c| c.name.clone()),
-            ChannelAssignment::PsgNoise => layout
-                .psg_channels.iter().find(|c| c.is_noise).map(|c| c.name.clone()),
-            ChannelAssignment::Dac(n) => layout
-                .dac_channels.iter().find(|c| c.index == *n).map(|c| c.name.clone()),
-        }
+        layout.channel_name(channel).map(str::to_string)
     }
 
     /// Clear `instrument_id` on any track bound to `id`. Lanes survive

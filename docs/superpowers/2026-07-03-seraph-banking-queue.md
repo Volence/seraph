@@ -2204,3 +2204,33 @@ For any future session executing this queue:
    paths, never `-A`; never leave master broken.
 4. **User gates:** by-ear passes in S3 Task 5 and S6 Task 4; everything else
    is mechanical against the written gates.
+
+- 2026-08-30: **SIGIL RELINK BROADCAST — COSTS THIS LANE NOTHING, CHECKED RATHER THAN
+  ASSUMED.** The sigil lane broadcast that the shared `sigil/target/release/sigil` was
+  relinked at 2026-08-30T00:33:36Z to sigil master `85a5726c` (md5 `504b0c0a…` →
+  `3fb008c8…`), having been 19 crate-commits stale, with the caveat that anything
+  regenerated from a newer assembler should be pinned to its export revision rather than
+  assumed reproducible. **Verified firsthand here that seraph consumes no sigil-built
+  artifact:** `grep -rani "sigil"` over `src/`, `src-tauri/` and `tools/` (`*.rs`, `*.ts`,
+  `*.tsx`, `*.toml`, `*.json`, `*.py`, `*.sh`) returns zero hits, and `git ls-files` shows
+  no tracked `.bin`/`.blob`/`.sym`/`.vgm` or manifest. The only aeon coupling in the tree is
+  **two source comments** citing driver behaviour at aeon `1ee8f8e6`
+  (`sound_fm.emp:1092-1099`), in `src-tauri/src/audio/overlap_audibility.rs` and
+  `src-tauri/src/project/manager.rs` — behaviour pinned to a revision, not a figure
+  regenerated from an assembler, so a newer sigil does not reach them. Note per the
+  protocol's stale-ruling-in-a-comment bar: those two are already anchored at a SHA, which
+  is the right shape, but they are the kind of claim to re-ground rather than trust when
+  the ch6 work opens.
+  **This becomes real only at S3** (driver-in-the-loop), which consumes the blob and symbol
+  artifacts sigil's `emit_sound_blob` emits; S3 sits behind S0 and S1, so nothing is owed
+  today and nothing should be scheduled. Same shape as the emulator forward-notice already
+  in `OVERSEER.md`: recorded so the session that opens S3 re-checks it firsthand instead of
+  concluding there is no coupling.
+  **METHOD NOTE, and this lane's own near-miss.** The first run of that enumeration used
+  unquoted `--include=*.rs` under zsh, so the shell failed the glob and **grep never ran** —
+  printing `no matches found` and an exit status that read as a clean empty result. The
+  conclusion happened to be right and the command was broken, which is bar 16's shape
+  arriving in the instrument rather than the subject: an empty result that is really an
+  unexecuted command is indistinguishable from an empty result that is an answer. Quote the
+  globs, and treat "no hits" from a glob-bearing grep as unverified until the command is
+  known to have run. Passed to the sigil lane in the reply rather than kept here.

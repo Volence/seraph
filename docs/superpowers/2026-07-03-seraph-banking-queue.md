@@ -2988,3 +2988,96 @@ For any future session executing this queue:
   **Branch-name note:** the dispatched branch name did not pre-exist, so the agent renamed its
   auto-named worktree branch to the briefed `parcel/f44-act-warnings` rather than inventing a
   different target, and flagged it for confirmation. Confirmed correct; that is the intended name.
+- 2026-08-30 (cont.): **F45 RESOLVED branch-side — the reporter is pinned, and the real noise
+  turned out to be somewhere else entirely.** Branch `parcel/f45-agent-reporter-output`, not
+  merged, not pushed. One-line fix in `vitest.config.ts`: `reporters: ["default"]`.
+  **WHAT THE "AGENT REPORTER" ACTUALLY IS, and it is the finding that decided the trade.** It is
+  not a compact machine-readable format that we would be giving up. In
+  `node_modules/vitest/dist/chunks/index.UpGiHP7g.js` the `ReportersMap` reads
+  `"agent": MinimalReporter, "minimal": MinimalReporter` — `"agent"` is a plain **alias for
+  `MinimalReporter`**, whose constructor is
+  `super({ silent: "passed-only", ...options, summary: false })`. Against `default` in a
+  non-TTY session it differs in exactly two ways: it drops passing-test console output, and it
+  skips the per-file `✓` line. `summary: false` costs nothing, because `DefaultReporter` already
+  does `if (!this.isTTY) this.options.summary = false` — that flag is the live TTY progress
+  display, not the `Test Files` / `Tests` block. **So pinning it away gives up compactness and
+  nothing else.**
+  **WHY `silent: false` IN CONFIG NEVER WORKED, precisely.** `BaseReporter` does
+  `this.silent = options.silent` then `this.silent ??= this.ctx.config.silent`. The reporter
+  supplies its own `silent`, so the `??=` fallback to config never fires. Reporter *options* do
+  override it — `reporters: [["agent", { silent: false }]]` was tested here and works — so the
+  narrow option was real, not hypothetical.
+  **THE NUMBERS, because the brief asked for the trade quantified and not asserted.** Full suite,
+  same tree, logs captured whole (never through `tail`):
+
+  | reporter | total lines | jsdom canvas noise | real lines |
+  |---|---|---|---|
+  | `agent` (what every session got) | 1250 | 1237 | **13** |
+  | `[["agent", {silent:false}]]` | 1326 | 1237 | 89 |
+  | `default` (pinned) | 1363 | 1237 | 126 |
+
+  Making console output visible costs **~+69 real lines**; the per-file `✓` listing costs
+  **~+36** on top. Total ~+105 on a run that was already 1250 lines — about **8%**. The trade is
+  not close, and it is not close for a reason nobody had measured.
+  **CHOSE `default` OVER THE NARROWER `[["agent", {silent:false}]]`**, paying 36 lines for it:
+  agents and humans then see byte-identical structure, and the per-file listing is what lets a
+  fully-skipped file be told apart from a passing one. That second reason is aurora's, arrived at
+  independently — see the corroboration note below.
+  **PROVEN IN BOTH DIRECTIONS, under the agent condition, with a control.** Scratch test with a
+  passing `console.log`/`console.warn`, `CLAUDECODE=1` and `AI_AGENT` set throughout. Before:
+  **0** occurrences of either marker. After: **both** printed, under `stdout |` and `stderr |`
+  headers naming the test. With `CLAUDECODE` and `AI_AGENT` **unset** via `env -u`: identical
+  output, differing only in ANSI color (vitest's separate `isAgent → disableDefaultColors()`,
+  left alone). Scratch test removed.
+  **THE SUMMARY LINES ARE UNCHANGED IN SHAPE**, which is the constraint several sessions' landing
+  checks depend on. Before: ` Test Files  33 passed (33)` / `      Tests  352 passed (352)`.
+  After: ` Test Files  34 passed (34)` / `      Tests  355 passed (355)`. Same padding, same
+  wording, same position; the deltas are this parcel's own guard test (+1 file, +3 tests).
+  Nothing for a landing procedure to update.
+  **A GUARD THAT WAS PROVEN TO FIRE, both ways.** `src/test/reporterPin.test.ts` reads
+  `vitest.config.ts` as text and fails if the pin is gone or names `agent`/`minimal`. Poisoned
+  firsthand: pin deleted → `AssertionError` naming the mechanism and `1 failed | 2 passed`; pin
+  set to `["agent"]` → the second assertion fires. Restored after. It also emits a **canary**
+  `console.warn` from a passing test, so its absence from a log is itself the signal. Two dead
+  ends worth recording: importing the config pulls `@vitejs/plugin-react` → esbuild, which throws
+  `TextEncoder ... instanceof Uint8Array is incorrectly false` under jsdom; and `node:fs` fails
+  `tsc` because this project has **no `@types/node`**. Vite's `?raw` import solves both.
+  **BOOKED — F46, and it is the actual token cost of reading a test log here.** **1237 of 1250
+  baseline lines** are one repeated string: `Not implemented: HTMLCanvasElement's getContext()
+  method: without installing the canvas npm package`. It is identical under every reporter
+  (counted at 1237 in all three runs above) because it comes from **jsdom's own virtual console**,
+  not vitest's — vitest's jsdom env defaults `console = false` and passes no `virtualConsole`, so
+  jsdom forwards straight past the reporter. It was never hidden and this parcel did not create
+  it. But **99% of every test log this repo has ever handed an agent is that one sentence**, which
+  is a larger context cost than the entire reporter question. Not fixed here (out of parcel);
+  likely fixes are a `HTMLCanvasElement.prototype.getContext` stub in `src/test/setup.ts` or
+  installing `canvas`.
+  **WHAT SURFACED once passing-test output became visible** — reported, not silenced, per the
+  brief. Three things, and **none is a new defect**: (1) `close-confirm unavailable: TypeError:
+  Cannot read properties of undefined (reading 'metadata')` at `src/App.tsx:186`, **13
+  occurrences** with stack traces (~65 lines — the bulk of the +105). It is the deliberate
+  `catch` at `App.tsx` whose own comment reads *"Non-Tauri environment (tests) or missing
+  permission"*, so it is expected — but it does mean the `onCloseRequested` dirty-guard branch is
+  **never exercised by any test**, which is worth knowing and was previously unknowable.
+  (2) and (3) `Set DAC sample failed: voice-overlap...` and `Set note voice failed:
+  voice-overlap...` — both from tests *named* for surfacing a backend rejection, i.e. working as
+  designed. **No React key warnings, no act() warnings, no deprecation notices appeared**, which
+  is the first time that claim has been made here from an unmuted channel.
+  **CORROBORATION, not echo — worth stating because the two lanes enumerated different things.**
+  Aurora reached the same one-line fix from the opposite direction: they already had a pinned
+  `reporters` array for an adjacent reason (*"a skip that cannot be told from a pass is a silent
+  zero"*), and their enumeration parameter was **config-line-presence on vitest 4.1.4**; this
+  lane's was **reporter selection on 4.1.10**. Same fix, two independent parameters, two versions
+  — so the defect is not version-scoped and the mechanism is confirmed twice. Their reason also
+  supplied the tiebreak between `default` and the narrower option above. **Relayed through the
+  hub, not witnessed by this lane**; the 4.1.10 half was verified firsthand here.
+  **`docs/OVERSEER.md` updated in the same commit**, because its verification-lanes section
+  carried the F44-era standing instruction *"measure warnings with `--reporter=verbose` or not at
+  all"*. That advice is now wrong, and leaving it would have kept every future session on the
+  workaround while the fix sat in the config.
+  **LANES, exit codes read from the runner, never through a pipe.** `npm test` **355 passed /
+  34 files**, exit 0; **contended run** (four concurrent full suites) all **355/355**, exit 0;
+  `npm run build` exit 0 with **zero** warning or error lines; `npx tsc --noEmit` exit 0;
+  `cargo test` **293 passed / 0 failed**, exit 0 (untouched, run to prove it); `git status` shows
+  only `vitest.config.ts`, `src/test/reporterPin.test.ts`, `docs/OVERSEER.md` and this file — no
+  `src/bindings.ts` drift.

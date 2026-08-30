@@ -94,4 +94,11 @@ impl DriverRegistry {
     pub fn list(&self) -> Vec<(&str, &str)> {
         self.drivers.values().map(|d| (d.id(), d.name())).collect()
     }
+
+    /// Every registered profile. Exists so an invariant can be asserted over
+    /// the drivers the app ACTUALLY registers rather than over a list a test
+    /// re-types by hand, which cannot notice a driver added later (audit F34).
+    pub fn profiles(&self) -> impl Iterator<Item = &dyn DriverProfile> {
+        self.drivers.values().map(|d| d.as_ref())
+    }
 }

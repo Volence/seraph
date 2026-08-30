@@ -17,8 +17,6 @@
 use crate::audio::rendered_rms::{
     db_ratio, load_pack_fm, render_snapshot_with_edits, stats_window, TICKS_PER_SEC,
 };
-use crate::driver::FlamedriverProfile;
-use crate::model::driver::DriverRegistry;
 use crate::model::song::ChannelAssignment;
 use crate::project::ProjectManager;
 use crate::sequencer::SequencerSnapshot;
@@ -58,9 +56,7 @@ fn snapshot_mixed(
     unvoiced: &[(u64, u64)],
 ) -> SequencerSnapshot {
     let path = env::temp_dir().join(format!("seraph_test_overlap_{tag}_{}", Uuid::new_v4()));
-    let mut registry = DriverRegistry::new();
-    registry.register(Box::new(FlamedriverProfile));
-    let mut mgr = ProjectManager::new(registry);
+    let mut mgr = ProjectManager::new(crate::driver::default_registry());
     mgr.create(&path, "Overlap", "flamedriver", 120.0, (4, 4))
         .expect("create project");
     let inst_id = mgr.add_fm_instrument(load_pack_fm(voice));

@@ -3146,3 +3146,35 @@ For any future session executing this queue:
   witnessed; the 4.1.10 half is firsthand.** Their reason also supplied the tiebreak toward
   `default` over the narrower `[["agent",{silent:false}]]`: a fully skipped file must stay
   distinguishable from a passing one.
+- 2026-08-30 (cont.): **F46 IS jsdom-SPECIFIC — aurora measured itself IMMUNE, and the negative
+  result is worth as much as the finding.** Relayed from the aurora lane, their measurement, not
+  reproduced here: `jsdom` is **not installed** in that repo at all, `vitest.config.ts` declares
+  no `environment`, and no file carries an `@vitest-environment` pragma, so that suite is
+  node-only by construction. Their full-suite profile for comparison with this lane's 1237/1364:
+  **1007 lines, no dominant repeated message** (top repeat is 80 blank lines, then 16 identical
+  fixture handshake lines). **So the 90% figure is real and specific to a jsdom environment, and a
+  lane without one should not go looking** — recorded because a null result is the thing nobody
+  writes down, and because F46 travelling as a suite-wide hazard would have cost other lanes a
+  hunt for something they cannot have.
+  **THE AUDIT AURORA'S REPLY PROMPTED, RUN FIRSTHAND HERE, because an open channel is not the same
+  claim as nothing being ignored in it.** That distinction is theirs; this lane had reported the
+  channel open without separately auditing what passes through it while tests still go green.
+  Grepping the merged-tree full-suite log for warning-shaped lines outside the canvas noise
+  reproduces the F45 agent's triage **exactly and independently**: **13** x `close-confirm
+  unavailable: TypeError ... 'metadata'`, **1** `Set note voice failed: voice-overlap`, **1** `Set
+  DAC sample failed: voice-overlap`, and **nothing else** — no deprecations, no unhandled
+  rejections, no experimental-warning lines. The two voice-overlap lines come from tests named for
+  surfacing them. **So: open channel, nothing silently ignored — with the one honest exception
+  already booked as F47**, the close-confirm branch that prints 13 stack traces and is exercised by
+  no test.
+  **ATTRIBUTION, settled with aurora and recorded so a later reader does not flatten it:** the
+  4.1.10 measurement and the alias-cost analysis (*"pinning it away gives up compactness and
+  nothing else"*) are **this lane's, firsthand**; the 4.1.4 measurement and the canvas negative are
+  **aurora's, firsthand theirs, relayed here**. Aurora states they had no basis for the cost claim
+  and had measured only *that* they were immune, not *what* immunity costs.
+  **Bar 19, the strongest instance this suite has produced:** aurora's pin was added so a SKIPPED
+  file stays distinguishable from a passing one (*"a skip that cannot be told from a pass is a
+  silent zero"*); this lane's was reached from console visibility for a warning silent for the
+  suite's lifetime. **Two lanes, two unrelated motivations, one remedy** — and this lane cited
+  their reason as its tiebreak before either knew it was the same fix, which is the argument
+  travelling ahead of the agreement rather than the agreement being assumed from it.

@@ -2793,3 +2793,71 @@ For any future session executing this queue:
   `src/` for `"../`, `/home/`, `~/`, `dirs::`, `env::var`, `include_str!`, `CARGO_MANIFEST_DIR`
   and `PathBuf::from`; exactly two paths leave the repo (the one fixed and `ZYRINX_ROM_DEFAULT`),
   everything else is repo-internal and already worktree-correct.
+- 2026-08-30 (cont.): **F37 + F42 LANDED TOGETHER, held and pushed as one because the frontend
+  lane was red between them.** Merged `cafd4af` (F37) and the flake fix, pushed at `ee75529`,
+  `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit codes read directly:
+  cargo **292 passed / 0 failed** (was 287; +5), `npm run build` exit 0 with zero warning or
+  error lines, vitest **352/352 across 33 files on three consecutive runs**, no
+  `src/bindings.ts` drift.
+  **THE PUSH WAS HELD ON PURPOSE.** F37 was merged locally and green on cargo while vitest was
+  red for an unrelated reason. This morning's README batch chained `npm test; git push` and
+  pushed over a red lane; the booked lesson was that a landing must not be able to. So F37 sat
+  unpushed until the frontend lane was green, and both went out together. Establishing that
+  F37 was not the cause took one command: `git diff --name-only` showed it touched
+  **`src-tauri/src/export/smps.rs` and nothing else**, so it could not reach a frontend test.
+  **F37 — THE ARTIFACT IS BETTER THAN A DERIVATION: THE SHIPPED GAME ALREADY DOES THIS.**
+  Verified firsthand rather than taken from the agent: `Chaos Emerald.asm` declares
+  `smpsHeaderDAC Snd_Emerald_DAC` at line 7, and that label (74-78) falls straight into a lone
+  `smpsStop`. `cfStopTrack` (3443-3444) does `res 7, (ix+zTrack.PlaybackControl)` — exactly the
+  bit `zUpdateMusic` tests at 717-719 before calling `zUpdateDACTrack`. The slot is entered
+  once, stops, and is never updated again. So the synthesized entry is not an invention; it is
+  the shape the original game uses for its own drumless song.
+  **AND IT IS THE SAME SONG AS F30's OUTLIER.** `Chaos Emerald` is both the one file of sixty
+  declaring `$07` (the seven-entries-over-six-slots case F30 booked) and the one drumless song
+  (F37's precedent). One shipped song is the worked example of both defects, found on two
+  different days by two different parcels. *(The "only drumless of the 60" count is the agent's,
+  carried not verified here; the shape of that one file is what this lane checked, and it is all
+  the fix rests on.)*
+  Implementation is minimal and gated: `needs_silent_dac = dac_count == 0` folded into the
+  header count, the entry emitted FIRST, the body a lone `smpsStop`. **One line of existing code
+  changed in the whole parcel** and no existing test expectation was edited. Poisoned both
+  directions as the ruling required, plus a control proving the label is DEFINED (`smpsHeaderDAC`
+  runs its operand through `CheckedChannelPointer`, so a dangling label is an assembly failure).
+  **DIFF CLASS, for the owner's reversal if he wants it:** a song with drums is byte-identical
+  and sounds identical; a drumless song's file changes; the SOUND changes only for a drumless
+  song that has FM tracks, which is the case that is wrong today.
+  **F42 — MY DIAGNOSIS WAS WRONG AND THE AGENT REFUTED IT WITH A PROBE.** I read the failure
+  (`App.projectSwitch.test.tsx > New Project clears it`, 1342ms against a 1000ms `waitFor`
+  budget) as this morning's budget-blowout flake at a new site, and briefed it that way with a
+  two-part proof required. **Step 1 did not reproduce**: squeezing the budget to 1ms left the
+  file passing 3/3. The agent then probed and found `handleCreate` calls `ipc.createProject`
+  **synchronously, before its first `await`** — so `waitFor`'s first immediate check either sees
+  it or it never happens, and **the budget cannot be what decides it**. Verified here at
+  `NewProjectDialog.tsx:44-46`: three synchronous guards, and `!driverId` early-returns with
+  *"Select a driver"* without ever reaching line 52's call.
+  **THE REAL MECHANISM:** the helper clicked Create before the dialog's effect had loaded the
+  driver list, so the create was refused and the poll waited for a call that could never come.
+  **1342ms was the PRICE of a doomed assertion, not the cause of a slow one** — which is why the
+  duration looked like corroboration for the wrong story. Bar 5's shape at the diagnostic level:
+  a number that fits the hypothesis is not evidence for it.
+  **THE UNFORCED CATCH IS THE EVIDENCE THAT MATTERS.** The agent ran the ORIGINAL file under 48
+  spinners on 16 cores: clean five times, then `Open Project clears it` failed at 1029ms citing
+  **line 114**, the helper's own `waitFor` — same site, same symptom, same price as production,
+  with nothing instrumented. That is a reproduction of the real thing rather than of a theory.
+  **NOT A PRODUCT DEFECT, and the agent was told to stop if it were.** A real user cannot fill
+  two fields and click Create inside one microtask, and the dialog's refusal to create a
+  driverless project is correct behaviour honestly reported. No product code was touched. All
+  **4 of 4** `waitFor` sites in that file were converted to wait-for-precondition-then-assert;
+  `waitFor` is no longer imported there. Invariant 6 demonstrated by neutering `resetClipboard()`
+  in `App.tsx` and watching all three cases go red, then restoring.
+  **A BRIEFING DEFECT OF MINE, AND IT IS THE SECOND INSTANCE OF ONE ROOT CAUSE TODAY.** I gave
+  the agent a cargo baseline of **292**; its tree produced **287**, and it flagged the mismatch
+  rather than assuming. Both numbers were right: **an agent worktree branches from the last
+  PUSHED commit, not from my local unpushed merge.** The same root cause produced the earlier
+  `d-11` report — I cited a decision record to the F37 agent that I had written but not yet
+  committed, so it was structurally invisible in that agent's tree, and the agent correctly
+  refused to invent it or to write my ledger for me.
+  **STANDING LESSON FOR THIS LANE, both halves:** (1) **commit anything you cite before you
+  dispatch**; (2) **do not hand an agent a baseline number at all — tell it to derive the
+  baseline from its own tree**, which is bar 1 applied to briefs. A copied number is exactly what
+  bar 1 forbids in gates, and I put one in two consecutive briefs.

@@ -15,6 +15,16 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn().mockResolvedValue("/tmp/projects"),
   save: vi.fn().mockResolvedValue(null),
 }));
+// App's close-confirm effect reaches for the real Tauri window otherwise, which
+// throws inside Tauri's own code here and printed a stack per test in this file.
+// Same shape as App.test.tsx's; the guard's behaviour is tested in
+// App.closeGuard.test.tsx, this only keeps the effect quiet and inert.
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    onCloseRequested: vi.fn().mockResolvedValue(() => {}),
+    destroy: vi.fn(),
+  }),
+}));
 
 // jsdom has no ResizeObserver; TimelineRuler observes its container.
 vi.stubGlobal(

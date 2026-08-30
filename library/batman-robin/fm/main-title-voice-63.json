@@ -1,27 +1,27 @@
 {
   "schema": 1,
-  "name": "Silence voice 69",
+  "name": "Main Title voice 63",
   "tags": [],
   "provenance": {
     "game": "Batman & Robin",
     "songs": [
-      "Silence",
       "Main Title",
-      "Not Much Time"
+      "Not Much Time",
+      "Dark Studio"
     ],
-    "slot": 69,
-    "hash": "sha256:d753847223d88ef084f9c9f88401fbcc86d2d602f62e3c7c2270b44769c91da3"
+    "slot": 63,
+    "hash": "sha256:3117ecbb466def127fbecd4b94c8454234158e5566fd4b3250a0d48a6911f8e7"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Silence voice 69",
+    "name": "Main Title voice 63",
     "algorithm": 5,
     "feedback": 7,
     "operators": [
       {
         "detune": 0,
-        "multiple": 6,
+        "multiple": 0,
         "rateScale": 0,
         "attackRate": 31,
         "ampMod": false,

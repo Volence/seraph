@@ -238,13 +238,17 @@ pub fn extract_gyb(file: &Path, game: &str, out_dir: &Path) -> Result<ExtractSta
     Ok(stats)
 }
 
-/// AoBR: iterate all 20 songs, collect + dedup voices.
+/// AoBR: iterate the 19 real songs (1-19), collect + dedup voices.
+/// Slot 0 is the silence/stop slot, not a song -- see F35.
 pub fn extract_zyrinx(rom_path: &Path, game: &str, out_dir: &Path) -> Result<ExtractStats, String> {
     let rom = fs::read(rom_path).map_err(|e| e.to_string())?;
     let mut stats = ExtractStats::default();
     let mut entries: HashMap<String, LibraryEntryFile> = HashMap::new();
     let mut order: Vec<String> = Vec::new(); // stable insertion order
-    for game_id in 0..zyrinx_parser::GAME_SONG_NAMES.len() as u8 {
+    // From 1, not 0: slot 0 is the silence/stop slot pointing at Main Title's
+    // own data, and iterating from 0 meant it was seen first and NAMED every
+    // one of Main Title's voices after a song that does not exist (F35).
+    for game_id in 1..zyrinx_parser::GAME_SONG_NAMES.len() as u8 {
         let zy = match zyrinx_parser::parse_zyrinx_song(&rom, game_id) {
             Ok(z) => z,
             // Some songs fail to parse (bank quirks) — skip, don't abort.

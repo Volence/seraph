@@ -300,7 +300,24 @@ pub const GAME_SONG_NAMES: [&str; 20] = [
 
 pub fn parse_zyrinx_song(rom: &[u8], game_id: u8) -> Result<ZyrinxSong, String> {
     if game_id as usize >= SONG_INDEX.len() {
-        return Err(format!("invalid game song ID: {} (valid: 0-19)", game_id));
+        return Err(format!("invalid game song ID: {} (valid: 1-19)", game_id));
+    }
+    // Slot 0 is the game's silence / stop-music command, not a song. The
+    // index maps it to (0, 0), the SAME bank and song as slot 1 "Main
+    // Title" -- the table's only duplicate, and not a gap, since every
+    // bank's songs are contiguous with none unmapped. Parsing it therefore
+    // returned Main Title's data under the name "Silence", and because
+    // library extraction iterated from 0 it saw those voices FIRST and won
+    // the naming: 23 of the 212 Batman library instruments shipped as
+    // "Silence voice NN", each with provenance ["Silence", "Main Title"]
+    // (audit F35, measured). Refuse it rather than hand back another song's
+    // data wearing a name no song has.
+    if game_id == 0 {
+        return Err(
+            "song 0 is the silence/stop-music slot, not a song: it points at the same \
+             data as song 1 (Main Title). Valid song IDs are 1-19."
+                .to_string(),
+        );
     }
 
     let (bank_idx, song_idx) = SONG_INDEX[game_id as usize];
@@ -449,4 +466,63 @@ pub fn parse_zyrinx_song(rom: &[u8], game_id: u8) -> Result<ZyrinxSong, String> 
         channels,
         voices,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// F35. Song slot 0 is the game's silence/stop-music command, and the
+    /// index maps it to `(0, 0)` -- the same bank and song as slot 1 "Main
+    /// Title", the table's only duplicate. Parsing it therefore handed back
+    /// Main Title's data under a name no song has, and because library
+    /// extraction iterated from 0 it saw those voices first and named 23 of
+    /// the 212 Batman instruments "Silence voice NN".
+    ///
+    /// Needs no ROM: the refusal is checked before any ROM access, so this
+    /// runs on every tree (unlike the ROM-gated tests, see F32).
+    #[test]
+    fn song_slot_zero_is_refused_because_it_is_not_a_song() {
+        let err = parse_zyrinx_song(&[], 0)
+            .map(|_| ())
+            .expect_err("slot 0 must be refused, not parsed as Main Title");
+        assert!(
+            err.contains("silence") && err.contains("Main Title"),
+            "the refusal must say what slot 0 is and which song it aliases, got {err:?}",
+        );
+    }
+
+    /// Control: the refusal must be specific to slot 0, not a blanket refusal
+    /// that would also reject real songs. Without this, returning Err for
+    /// every id would satisfy the test above.
+    #[test]
+    fn a_real_song_id_gets_past_the_slot_zero_guard() {
+        // Empty ROM, so this must fail LATER (reading the bank header), never
+        // with the slot-0 message.
+        let err = parse_zyrinx_song(&[], 1)
+            .map(|_| ())
+            .expect_err("an empty ROM cannot parse");
+        assert!(
+            !err.contains("silence/stop-music"),
+            "song 1 must pass the slot-0 guard and fail on ROM data instead, got {err:?}",
+        );
+    }
+
+    /// The index table's shape is the evidence for the above: 20 slots, 19
+    /// distinct songs, exactly one duplicate, and no bank with a gap. If a
+    /// future correction remaps slot 0 to real data, this fails and the
+    /// reasoning above must be revisited rather than silently outlived.
+    #[test]
+    fn slot_zero_aliases_slot_one_and_is_the_tables_only_duplicate() {
+        assert_eq!(
+            SONG_INDEX[0], SONG_INDEX[1],
+            "slot 0 is expected to alias slot 1; if this changed, F35's reasoning is stale",
+        );
+        let distinct: std::collections::HashSet<_> = SONG_INDEX.iter().collect();
+        assert_eq!(
+            distinct.len(), SONG_INDEX.len() - 1,
+            "exactly one duplicate expected in SONG_INDEX, found {} distinct of {}",
+            distinct.len(), SONG_INDEX.len(),
+        );
+    }
 }

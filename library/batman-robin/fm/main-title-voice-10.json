@@ -1,34 +1,33 @@
 {
   "schema": 1,
-  "name": "Silence voice 67",
+  "name": "Main Title voice 10",
   "tags": [],
   "provenance": {
     "game": "Batman & Robin",
     "songs": [
-      "Silence",
       "Main Title",
-      "Not Much Time",
-      "Dark Studio"
+      "Joker's Theme",
+      "Extreme Boss"
     ],
-    "slot": 67,
-    "hash": "sha256:e566dc43bbe2fad9dcad0e88c2c1e0306226ab4e24f0b234c424415fd21c05ce"
+    "slot": 10,
+    "hash": "sha256:85aa3c331274375be91d8d4d22c44a1946f92783ac40f37b0e4714e7d3e6ad97"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Silence voice 67",
-    "algorithm": 5,
+    "name": "Main Title voice 10",
+    "algorithm": 3,
     "feedback": 7,
     "operators": [
       {
         "detune": 0,
-        "multiple": 4,
-        "rateScale": 0,
+        "multiple": 1,
+        "rateScale": 3,
         "attackRate": 31,
         "ampMod": false,
-        "d1r": 25,
-        "d2r": 16,
-        "sustainLevel": 2,
+        "d1r": 19,
+        "d2r": 10,
+        "sustainLevel": 0,
         "releaseRate": 15,
         "totalLevel": 0,
         "ssgEg": 0
@@ -36,40 +35,40 @@
       {
         "detune": 0,
         "multiple": 0,
-        "rateScale": 0,
+        "rateScale": 3,
         "attackRate": 31,
         "ampMod": false,
-        "d1r": 24,
+        "d1r": 16,
         "d2r": 5,
         "sustainLevel": 12,
         "releaseRate": 15,
-        "totalLevel": 0,
+        "totalLevel": 7,
         "ssgEg": 0
       },
       {
         "detune": 0,
-        "multiple": 0,
-        "rateScale": 0,
+        "multiple": 2,
+        "rateScale": 3,
         "attackRate": 31,
         "ampMod": false,
-        "d1r": 18,
-        "d2r": 16,
-        "sustainLevel": 2,
+        "d1r": 14,
+        "d2r": 5,
+        "sustainLevel": 8,
         "releaseRate": 15,
-        "totalLevel": 0,
+        "totalLevel": 22,
         "ssgEg": 0
       },
       {
         "detune": 0,
-        "multiple": 0,
-        "rateScale": 0,
+        "multiple": 5,
+        "rateScale": 3,
         "attackRate": 31,
         "ampMod": false,
-        "d1r": 0,
-        "d2r": 1,
-        "sustainLevel": 0,
+        "d1r": 20,
+        "d2r": 11,
+        "sustainLevel": 5,
         "releaseRate": 15,
-        "totalLevel": 14,
+        "totalLevel": 9,
         "ssgEg": 0
       }
     ],

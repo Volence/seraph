@@ -1,27 +1,26 @@
 {
   "schema": 1,
-  "name": "Silence voice 56",
+  "name": "Main Title voice 119",
   "tags": [],
   "provenance": {
     "game": "Batman & Robin",
     "songs": [
-      "Silence",
       "Main Title",
-      "Moving Trucks"
+      "Gotham by Night"
     ],
-    "slot": 56,
-    "hash": "sha256:61781b0641018739b02a381763712d25e6f81430f4d310866bd10cd19f2b532f"
+    "slot": 119,
+    "hash": "sha256:baac72b51446fdc7ab3aacccccb025e9e42fd8ccfff66dbfab68b3d50620272c"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Silence voice 56",
+    "name": "Main Title voice 119",
     "algorithm": 5,
     "feedback": 7,
     "operators": [
       {
         "detune": 0,
-        "multiple": 8,
+        "multiple": 12,
         "rateScale": 0,
         "attackRate": 27,
         "ampMod": false,
@@ -34,7 +33,7 @@
       },
       {
         "detune": 0,
-        "multiple": 8,
+        "multiple": 12,
         "rateScale": 0,
         "attackRate": 31,
         "ampMod": false,
@@ -47,7 +46,7 @@
       },
       {
         "detune": 0,
-        "multiple": 12,
+        "multiple": 8,
         "rateScale": 0,
         "attackRate": 24,
         "ampMod": false,
@@ -60,7 +59,7 @@
       },
       {
         "detune": 0,
-        "multiple": 4,
+        "multiple": 8,
         "rateScale": 0,
         "attackRate": 27,
         "ampMod": false,
@@ -68,7 +67,7 @@
         "d2r": 15,
         "sustainLevel": 6,
         "releaseRate": 15,
-        "totalLevel": 0,
+        "totalLevel": 14,
         "ssgEg": 0
       }
     ],

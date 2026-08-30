@@ -1,27 +1,32 @@
 {
   "schema": 1,
-  "name": "Silence voice 41",
+  "name": "Main Title voice 40",
   "tags": [],
   "provenance": {
     "game": "Batman & Robin",
     "songs": [
-      "Silence",
       "Main Title",
+      "Gotham by Night",
+      "Big Boss",
+      "Moving Trucks",
+      "Two-Face's Theme",
+      "Not Much Time",
       "Flying Over The City",
+      "Final Boss",
       "Ending"
     ],
-    "slot": 41,
-    "hash": "sha256:160f5307d7601ca3b967bedf60c883d45322076173f45b40c440f67af90354cd"
+    "slot": 40,
+    "hash": "sha256:f8e01c791055a8ba0351de87b12db2eb3317becf09d1701587f67de3de91e528"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Silence voice 41",
+    "name": "Main Title voice 40",
     "algorithm": 5,
     "feedback": 7,
     "operators": [
       {
-        "detune": 3,
+        "detune": 7,
         "multiple": 8,
         "rateScale": 2,
         "attackRate": 31,
@@ -34,7 +39,7 @@
         "ssgEg": 0
       },
       {
-        "detune": 7,
+        "detune": 1,
         "multiple": 8,
         "rateScale": 0,
         "attackRate": 31,
@@ -47,7 +52,7 @@
         "ssgEg": 0
       },
       {
-        "detune": 2,
+        "detune": 0,
         "multiple": 4,
         "rateScale": 3,
         "attackRate": 31,
@@ -60,7 +65,7 @@
         "ssgEg": 0
       },
       {
-        "detune": 2,
+        "detune": 7,
         "multiple": 4,
         "rateScale": 2,
         "attackRate": 31,

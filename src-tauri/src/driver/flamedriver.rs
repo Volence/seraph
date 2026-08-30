@@ -374,16 +374,20 @@ mod tests {
     /// voices (including one named "FM6/DAC") *plus* a separate DAC channel:
     /// seven voices on a six-voice chip.
     ///
-    /// SCOPE, stated because the wording matters: this covers the profiles
-    /// registered *below*, which today is the tree's only one. It does NOT
-    /// inherit automatically, because the app registers its drivers inline in
-    /// `lib.rs` with no shared constructor to borrow. A second profile (the
-    /// Memra one F31 notes is absent) must be added here by hand. Making that
-    /// automatic means extracting a shared registry constructor, which is a
-    /// change to `lib.rs` and outside F31.
+    /// SCOPE: this now covers **every driver the app registers**, not a list
+    /// re-typed here. F31 shipped it over a hand-written vec and said so; F34
+    /// extracted `driver::default_registry()` as the single registration site,
+    /// so a profile added there is covered by this guard automatically and a
+    /// new driver cannot quietly escape it.
     #[test]
     fn fm_voices_plus_dac_never_exceed_the_chips_six_slots() {
-        let profiles: Vec<Box<dyn DriverProfile>> = vec![Box::new(FlamedriverProfile)];
+        let registry = crate::driver::default_registry();
+        let profiles: Vec<&dyn DriverProfile> = registry.profiles().collect();
+        assert!(
+            !profiles.is_empty(),
+            "the registry must contain at least one driver, or this guard \
+             passes by having nothing to check",
+        );
         for driver in &profiles {
             let layout = driver.channel_layout();
             let total = layout.fm_channels.len() + layout.dac_channels.len();

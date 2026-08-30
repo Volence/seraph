@@ -1625,9 +1625,7 @@ mod tests {
     use std::env;
 
     fn test_registry() -> DriverRegistry {
-        let mut reg = DriverRegistry::new();
-        reg.register(Box::new(FlamedriverProfile));
-        reg
+        crate::driver::default_registry()
     }
 
     fn temp_project_path(name: &str) -> PathBuf {

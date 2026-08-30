@@ -14,7 +14,6 @@ mod ym2612;
 use std::sync::Mutex;
 
 use audio::AudioThread;
-use driver::FlamedriverProfile;
 use ipc::{
     AudioState, ProjectState,
     // Phase 1
@@ -63,7 +62,6 @@ use ipc::{
     library_roots_get, library_root_add, library_root_remove,
 };
 use library::state::LibraryState;
-use model::driver::DriverRegistry;
 use project::ProjectManager;
 use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
@@ -177,9 +175,7 @@ pub fn run() {
     let position_tick = audio_thread.position_tick().clone();
     let spectrum_buffer = audio_thread.spectrum_buffer().clone();
 
-    let mut registry = DriverRegistry::new();
-    registry.register(Box::new(FlamedriverProfile));
-    let project_manager = ProjectManager::new(registry);
+    let project_manager = ProjectManager::new(crate::driver::default_registry());
 
     let specta_builder = build_specta();
 

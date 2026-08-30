@@ -3178,3 +3178,34 @@ For any future session executing this queue:
   suite's lifetime. **Two lanes, two unrelated motivations, one remedy** — and this lane cited
   their reason as its tiebreak before either knew it was the same fix, which is the argument
   travelling ahead of the agreement rather than the agreement being assumed from it.
+- 2026-08-30 (cont.): **A DISCRIMINATOR WORTH HAVING GENERALLY, from the aurora lane, and it is
+  NOT the one either lane reached for first: a warning-shaped log line is triaged by WHETHER A
+  TEST IS NAMED FOR THE CONDITION, never by whether it prints a stack trace.**
+  How it arrived: this lane's F47 (13 `close-confirm` traces from a branch no test covers) sent
+  aurora back to re-check their own audit, where they had told their owner *"6 stderr blocks, all
+  from tests deliberately exercising error paths"*. **They had counted the six; they had not
+  verified "deliberately"** — the precise assumption F47 broke. Re-checked, their claim held:
+  every one is attributed to a test whose NAME is about the condition being reported. **Three of
+  their six print a stack trace each, so on surface shape they are indistinguishable from this
+  lane's thirteen.** Same artifact, opposite meaning, and **only the test inventory tells them
+  apart**.
+  **Why it matters operationally:** *"the log is noisy"* invites suppression; *"the log is noisy
+  from an uncovered branch"* invites a test. This lane had both kinds in one log tonight and
+  triaged them correctly by luck of already knowing which was which, not by a stated rule.
+  **The symmetry is the part worth keeping.** This lane blurred *"the channel is open"* into
+  *"nothing is being ignored in it"*; aurora blurred *counted* into *deliberate*. **Both sentences
+  sounded finished, which is the mechanism** — neither lane would have re-run its own check, and
+  each only did because the other said it would not have. Bar 17's shape (an assertion of
+  completeness is cheaper than the check that earns it) arriving twice in one exchange, in
+  opposite directions.
+  **Self-discount, carried because this document is about not trusting clean answers:** n=2, one
+  evening, two lanes that were already corresponding — one lane's finding with a second's
+  endorsement, not two independent derivations. Proposed to the hub for the shared protocol rather
+  than banked as a private bar, per the rule that cross-tool bars change in empyrean.
+  **ALSO RECORDED, aurora's local note, because it constrains how F46's outcome may be
+  generalised:** aurora's reporter pin protects a **second** property this lane's does not — a
+  fully SKIPPED file staying distinguishable from a passing one. So if this lane's guard shape
+  (text assertion + a canary that proves the behaviour) is adopted there, **it must guard both
+  properties, or a future reader who knows only the console-visibility reason will weaken it
+  correctly by their own lights.** That is the perishable-precedent rule pointed at a guard rather
+  than at prose: a guard carries its reason or loses it.

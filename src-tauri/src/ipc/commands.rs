@@ -1302,13 +1302,26 @@ pub fn export_vgm(
     let mgr = project_state.manager.lock().map_err(|e| format!("mutex poisoned: {e}"))?;
     let song = mgr.song().ok_or("No project open")?;
     let instruments = song.instruments.clone();
-    let data = crate::export::vgm::export_vgm_data(&song, &instruments, Some(duration_seconds))?;
+    let export = crate::export::vgm::export_vgm_data(&song, &instruments, Some(duration_seconds))?;
     drop(mgr);
 
-    std::fs::write(&output_path, &data)
+    std::fs::write(&output_path, &export.data)
         .map_err(|e| format!("failed to write VGM: {e}"))?;
 
-    Ok(format!("Exported VGM ({} bytes) to {}", data.len(), output_path))
+    // Never report a bare byte count when percussion was left out (F29): a
+    // successful-looking export of a drum track that contains no drums is the
+    // defect, not the drop itself.
+    let mut msg = format!("Exported VGM ({} bytes) to {}", export.data.len(), output_path);
+    if !export.skipped_dac_tracks.is_empty() {
+        let n = export.skipped_dac_tracks.len();
+        msg.push_str(&format!(
+            ". WARNING: this VGM contains no percussion. VGM export cannot yet \
+             represent DAC tracks, so {} left out: {}",
+            if n == 1 { "1 drum track was".to_string() } else { format!("{n} drum tracks were") },
+            export.skipped_dac_tracks.join(", "),
+        ));
+    }
+    Ok(msg)
 }
 
 #[tauri::command]

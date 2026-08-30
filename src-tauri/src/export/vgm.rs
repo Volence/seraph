@@ -116,12 +116,27 @@ fn pan_to_byte(pan: &Pan) -> u8 {
     }
 }
 
+/// A finished VGM export, plus what it could not represent.
+///
+/// `skipped_dac_tracks` exists because this exporter drops DAC (drum) tracks
+/// and used to do it in complete silence: an export of a song with drums
+/// succeeded, reported a byte count, and contained no percussion at all
+/// (audit F29). Dropping them is still the behaviour; dropping them WITHOUT
+/// SAYING SO is not. Callers must surface this list.
+pub struct VgmExport {
+    pub data: Vec<u8>,
+    /// Names of the audible DAC tracks absent from `data`. Empty when the
+    /// song has none, which is a positive statement that nothing was lost.
+    pub skipped_dac_tracks: Vec<String>,
+}
+
 pub fn export_vgm_data(
     song: &Song,
     instruments: &InstrumentBank,
     duration_seconds: Option<f64>,
-) -> Result<Vec<u8>, String> {
+) -> Result<VgmExport, String> {
     let mut events: Vec<TimelineEvent> = Vec::new();
+    let mut skipped_dac_tracks: Vec<String> = Vec::new();
 
     for track in &song.tracks {
         if track.muted { continue; }
@@ -129,7 +144,21 @@ pub fn export_vgm_data(
             ChannelAssignment::Fm(n) => (ChType::Fm, n),
             ChannelAssignment::Psg(n) => (ChType::Psg, n),
             ChannelAssignment::PsgNoise => (ChType::PsgNoise, 3),
-            ChannelAssignment::Dac(_) => continue,
+            // STILL DROPPED, but no longer silently. Representing DAC in VGM
+            // is not a register write: it is a timed byte stream (a 0x67 PCM
+            // data block, then 0x8n write-and-wait commands) that has to
+            // interleave sample-accurately with every FM and PSG event, which
+            // means restructuring this tick-based event loop into a
+            // sample-accurate one. That is the real F29 fix and it is parked
+            // as its own parcel. Until then the caller is told what is
+            // missing, so a VGM with no percussion cannot be mistaken for a
+            // complete one.
+            ChannelAssignment::Dac(_) => {
+                if track.regions.iter().any(|r| !r.notes.is_empty()) {
+                    skipped_dac_tracks.push(track.name.clone());
+                }
+                continue;
+            }
         };
 
         for region in &track.regions {
@@ -224,7 +253,7 @@ pub fn export_vgm_data(
     }
 
     writer.end();
-    Ok(writer.build())
+    Ok(VgmExport { data: writer.build(), skipped_dac_tracks })
 }
 
 fn program_fm_note(
@@ -403,7 +432,7 @@ mod tests {
             tracks: vec![],
             instruments: InstrumentBank::default(),
         };
-        let data = export_vgm_data(&song, &song.instruments, Some(1.0)).unwrap();
+        let data = export_vgm_data(&song, &song.instruments, Some(1.0)).unwrap().data;
         assert_eq!(&data[0..4], b"Vgm ");
     }
 
@@ -460,11 +489,100 @@ mod tests {
             },
         };
 
-        let data = export_vgm_data(&song, &song.instruments, Some(2.0)).unwrap();
+        let data = export_vgm_data(&song, &song.instruments, Some(2.0)).unwrap().data;
         assert_eq!(&data[0..4], b"Vgm ");
         // Should contain YM2612 writes (0x52)
         assert!(data[0x40..].iter().any(|&b| b == 0x52));
         // Should end with 0x66
         assert_eq!(*data.last().unwrap(), 0x66);
+    }
+
+    /// Builds a one-note song on `channel`, with the track named `name`.
+    fn song_with_one_note(name: &str, channel: ChannelAssignment) -> Song {
+        Song {
+            metadata: SongMetadata {
+                name: "DacDrop".into(),
+                tempo: 120.0,
+                time_signature: (4, 4),
+                ticks_per_beat: 480,
+                driver_id: "flamedriver".into(),
+            },
+            tracks: vec![Track {
+                id: uuid::Uuid::new_v4(),
+                name: name.into(),
+                channel,
+                instrument_id: None,
+                regions: vec![Region {
+                    id: uuid::Uuid::new_v4(),
+                    start_tick: 0,
+                    duration_ticks: 480,
+                    notes: vec![Note {
+                        tick: 0,
+                        pitch: 60,
+                        velocity: 100,
+                        duration_ticks: 240,
+                        instrument_id: None,
+                        detune: 0,
+                        pan_override: None,
+                        modulation: None,
+                    }],
+                    instrument_id: None,
+                }],
+                muted: false,
+                solo: false,
+                volume: 127,
+                pan: Pan::Center,
+                pitch_offset: 0,
+                modulation: None,
+            }],
+            instruments: InstrumentBank::default(),
+        }
+    }
+
+    /// F29. A song whose drums vanish from the VGM must SAY so. The defect was
+    /// never that DAC is unsupported; it was that `export_vgm` returned a
+    /// cheerful byte count for a file with no percussion in it, so the booked
+    /// README-7 VGM wiring would have shipped a working button whose first
+    /// output was silently drumless.
+    #[test]
+    fn an_audible_dac_track_is_reported_as_skipped() {
+        let song = song_with_one_note("Kick", ChannelAssignment::Dac(0));
+        let export = export_vgm_data(&song, &song.instruments, Some(2.0)).unwrap();
+        assert_eq!(
+            export.skipped_dac_tracks,
+            vec!["Kick".to_string()],
+            "a DAC track carrying notes must be named in skipped_dac_tracks, \
+             otherwise its absence from the VGM is undetectable by the caller",
+        );
+    }
+
+    /// The control the assertion above cannot provide on its own: a song with
+    /// no DAC track must report an EMPTY list, not merely a list that happens
+    /// to lack a name. Without this, `skipped_dac_tracks` could be populated
+    /// unconditionally and the test above would still pass.
+    #[test]
+    fn a_song_without_drums_reports_nothing_skipped() {
+        let song = song_with_one_note("FM1", ChannelAssignment::Fm(0));
+        let export = export_vgm_data(&song, &song.instruments, Some(2.0)).unwrap();
+        assert!(
+            export.skipped_dac_tracks.is_empty(),
+            "a song with no DAC track must report nothing skipped, got {:?}",
+            export.skipped_dac_tracks,
+        );
+    }
+
+    /// A DAC track with no notes is not a loss and must not raise a warning
+    /// the user cannot act on. Distinguishes "has drums, dropped them" from
+    /// "has an empty drum lane", which the roster gives every new project.
+    #[test]
+    fn an_empty_dac_track_is_not_reported() {
+        let mut song = song_with_one_note("Drums", ChannelAssignment::Dac(0));
+        song.tracks[0].regions[0].notes.clear();
+        let export = export_vgm_data(&song, &song.instruments, Some(2.0)).unwrap();
+        assert!(
+            export.skipped_dac_tracks.is_empty(),
+            "an empty DAC lane loses nothing and must not warn, got {:?}",
+            export.skipped_dac_tracks,
+        );
     }
 }

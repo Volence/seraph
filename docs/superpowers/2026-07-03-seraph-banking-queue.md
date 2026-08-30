@@ -3209,3 +3209,53 @@ For any future session executing this queue:
   properties, or a future reader who knows only the console-visibility reason will weaken it
   correctly by their own lights.** That is the perishable-precedent rule pointed at a guard rather
   than at prose: a guard carries its reason or loses it.
+- 2026-08-30 (cont.): **F46 LANDED — and the noise was CONCEALING a finding rather than merely
+  costing context: NO CANVAS DRAWING CODE IN THIS REPO HAS EVER EXECUTED UNDER TEST.** Merged and
+  pushed, `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit codes read
+  directly: vitest **361 passed / 35 files** (was 355/34; +6 is this parcel's guard), `npm run
+  build` exit 0 zero warning or error lines, `npx tsc --noEmit` exit 0, cargo **293 passed / 0
+  failed** untouched, `reporterPin.test.ts` still passing and unedited, no `src/bindings.ts` drift.
+  **THE MEASUREMENT: 1365 log lines to 128, canvas line 1237 to 0.** Verified firsthand on the
+  merged tree, not carried from the report.
+  **THE FINDING, and it is the reason this was worth doing beyond tidiness.** Every one of the
+  **12** `getContext("2d")` call sites in `src/` is followed by `if (!ctx) return;` — checked here
+  with a grep over all twelve, not sampled. Under jsdom `getContext` returns null, so **all 1237
+  messages marked a draw that aborted on its second line.** The drawing code was not merely
+  untested; it had never run at all. The agent proved the change with a throwaway probe (since
+  deleted): a `Knob` render that previously issued zero canvas operations now issues twenty. **A
+  crash in any of that code is reachable by the suite for the first time. Nothing crashed.**
+  **THE FIX MAKES jsdom's STATEMENT FALSE RATHER THAN UNSAYABLE**, which was the parcel's binding
+  constraint: a recording 2D stub (`src/test/canvasStub.ts`) installed from the existing setup.
+  Nothing is filtered, muted or reporter-configured, so F44 and F45 stay intact. **Suppression
+  would have undone the two parcels before it in the same breath**, and the brief said so.
+  **REJECTED WITH REASONS, recorded so nobody re-litigates:** the `canvas` npm package (a native
+  Cairo build on every machine and CI, for a Tauri app that needs none at runtime);
+  `vitest-canvas-mock` (equally fake, third-party, less control over how honestly it documents
+  itself); and narrowing which tests mount canvas components (**deleting coverage to quiet a
+  log** — the same defect class in a new costume, and `PianoRollRuler.scale.test.tsx` exists
+  precisely to run the real component).
+  **TWO DESIGN CALLS WORTH KEEPING.** The surface is an **explicit allowlist, not a Proxy**, so
+  `ctx.filRect(...)` throws a TypeError as a browser would rather than being swallowed — verified
+  here in the file's own comments. And **only `"2d"` is stubbed**; every other context type still
+  delegates to jsdom and is still reported unimplemented, **because it still is**.
+  **WHAT THE STUB DOES NOT ESTABLISH, stated in the file header and repeated here so it cannot
+  drift into a stronger claim:** it rasterises nothing, `measureText` returns a nominal estimate
+  rather than a measurement, and `clip`/transforms/alpha are recorded but not applied. **It is not
+  evidence that anything looks right on screen.**
+  **THE F6 RENDERING GATE IS NOW APPROACHABLE BUT IS NOT CLOSED, AND IT REMAINS THE OWNER'S.**
+  The queue has carried a third F6 gate — whether a painted run of notes RENDERS correctly —
+  as unclosable precisely because jsdom had no 2D context. `canvasOps(canvas)` now makes drawing
+  commands observable in order, which **opens a path to asserting a command was ISSUED** at given
+  coordinates with a given fill. That is strictly more than existed. **It is not the gate.** The
+  agent deliberately wrote no test whose name implies rendering was verified, and named its guard
+  for the environment supplying a context instead — the right call, and the one most likely to
+  have been fudged.
+  **NOTHING NEW BECAME VISIBLE, checked by diffing message classes rather than eyeballed:** 13
+  `close-confirm` (F47, as booked) and 3 `voice-overlap` occurrences, byte-identical counts before
+  and after; zero act warnings. Confirmed independently here (16 matching lines on the merged
+  tree). **F47's 13 traces are now ~10% of a 128-line log rather than 1% of a 1365-line one**, so
+  the booked item is now conspicuous — which is what an unmuted channel is for.
+  **A VACUOUS ASSERTION THE AGENT CAUGHT IN ITS OWN GUARD:** one of the six new tests passed as
+  `null === null` and was given a non-null assertion so it cannot. Guard proven red-first without
+  the stub (`expected null not to be null`), and `tsc` caught a real typing bug in the test before
+  either lane ran.

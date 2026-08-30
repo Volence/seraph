@@ -706,7 +706,40 @@ pub fn validate_for_export(
         for (ri, region) in track.regions.iter().enumerate() {
             for (ni, note) in region.notes.iter().enumerate() {
                 let skip_pitch_check = matches!(track.channel, ChannelAssignment::Dac(_) | ChannelAssignment::PsgNoise);
-                if !skip_pitch_check && midi_to_smps_note(note.pitch).is_none() {
+                // PSG has its OWN range and it is not the FM one. The check
+                // below used `midi_to_smps_note` (MIDI 12-106) for every
+                // pitched channel, which was wrong for PSG in BOTH directions:
+                //
+                //   * MIDI 12-35 PASSED validation and was then silently
+                //     retuned -- `smps_note_name_psg` clamps with `.max(0)` and
+                //     `midi_to_psg_period` returns the bottom entry -- so a low
+                //     PSG bass note exported and previewed as a DIFFERENT note
+                //     with nothing said. App and export agreed with each other
+                //     while neither matched what the author wrote.
+                //   * MIDI 107-119 was REJECTED even though the table and
+                //     `smps_note_name_psg` both handle it.
+                //
+                // Range derived from the driver's own table, not chosen here:
+                // `PSG_PERIOD_TABLE` spans z80 index 0-83 mapped as
+                // midi = index + 36, i.e. 36-119.
+                if matches!(track.channel, ChannelAssignment::Psg(_)) {
+                    if !crate::audio::frequency::psg_pitch_is_representable(note.pitch) {
+                        errors.push(ExportError {
+                            track_name: track.name.clone(),
+                            region_index: Some(ri),
+                            note_index: Some(ni),
+                            message: format!(
+                                "Pitch {} is outside the PSG range (MIDI {}-{}). It would be \
+                                 silently retuned to the nearest note this driver can play, \
+                                 not left out, so the exported song would differ from what \
+                                 you wrote.",
+                                note.pitch,
+                                crate::audio::frequency::PSG_MIDI_LOW,
+                                crate::audio::frequency::PSG_MIDI_HIGH,
+                            ),
+                        });
+                    }
+                } else if !skip_pitch_check && midi_to_smps_note(note.pitch).is_none() {
                     errors.push(ExportError {
                         track_name: track.name.clone(),
                         region_index: Some(ri),
@@ -854,6 +887,108 @@ mod tests {
     use crate::model::instrument::{DacInstrument, InstrumentMetadata};
     use crate::model::song::{Note, Region, Song, SongMetadata};
     use std::fs;
+
+    fn psg_song_with_pitch(pitch: u8) -> Song {
+        use crate::model::instrument::PsgInstrument;
+        let inst_id = Uuid::new_v4();
+        Song {
+            metadata: SongMetadata {
+                name: "PsgRange".into(),
+                tempo: 120.0,
+                time_signature: (4, 4),
+                ticks_per_beat: 480,
+                driver_id: "flamedriver".into(),
+            },
+            tracks: vec![Track {
+                id: Uuid::new_v4(),
+                name: "PSG1".into(),
+                channel: ChannelAssignment::Psg(0),
+                instrument_id: Some(inst_id),
+                regions: vec![Region {
+                    id: Uuid::new_v4(),
+                    start_tick: 0,
+                    duration_ticks: 480,
+                    notes: vec![Note {
+                        tick: 0, pitch, velocity: 100, duration_ticks: 240,
+                        instrument_id: Some(inst_id), detune: 0,
+                        pan_override: None, modulation: None,
+                    }],
+                    instrument_id: None,
+                }],
+                muted: false, solo: false, volume: 127, pan: Pan::Center,
+                pitch_offset: 0, modulation: None,
+            }],
+            instruments: InstrumentBank {
+                fm: vec![],
+                psg: vec![PsgInstrument {
+                    id: inst_id,
+                    name: "P".into(),
+                    volume_sequence: vec![0],
+                    loop_point: None,
+                    silence_on_end: false,
+                    noise_mode: None,
+                    smps_envelope_index: None,
+                    metadata: InstrumentMetadata::default(),
+                }],
+                dac: vec![],
+            },
+        }
+    }
+
+    fn psg_pitch_errors(pitch: u8) -> Vec<String> {
+        let song = psg_song_with_pitch(pitch);
+        let params = compute_tempo_params(120.0, 480);
+        validate_for_export(&song, &song.instruments, &params)
+            .into_iter()
+            .map(|e| e.message)
+            .collect()
+    }
+
+    /// A PSG note below the driver's table used to PASS validation and then be
+    /// silently retuned: `smps_note_name_psg` clamps with `.max(0)` and
+    /// `midi_to_psg_period` returns the bottom entry, so the export and the
+    /// preview agreed with each other while neither matched what was written.
+    #[test]
+    fn a_psg_note_below_the_drivers_range_is_reported_not_silently_retuned() {
+        let msgs = psg_pitch_errors(20);
+        assert!(
+            msgs.iter().any(|m| m.contains("outside the PSG range") && m.contains("retuned")),
+            "MIDI 20 on PSG must be reported as retunable, got {msgs:?}",
+        );
+    }
+
+    /// The other direction of the same defect: MIDI 107-119 IS representable on
+    /// PSG (the table spans 36-119) but the old channel-agnostic check used
+    /// FM's 12-106 bound and rejected it.
+    #[test]
+    fn a_high_psg_note_the_driver_can_play_is_no_longer_falsely_rejected() {
+        let msgs = psg_pitch_errors(115);
+        assert!(
+            !msgs.iter().any(|m| m.contains("range")),
+            "MIDI 115 is within the PSG table (36-119) and must not be refused, got {msgs:?}",
+        );
+    }
+
+    /// Control: the fix must not simply stop checking PSG pitches.
+    #[test]
+    fn a_psg_note_above_the_drivers_range_is_still_reported() {
+        let msgs = psg_pitch_errors(125);
+        assert!(
+            msgs.iter().any(|m| m.contains("outside the PSG range")),
+            "MIDI 125 is past the PSG table's top (119) and must be reported, got {msgs:?}",
+        );
+    }
+
+    /// Control: an in-range PSG note must raise nothing at all, or the three
+    /// assertions above could pass with a check that fires unconditionally.
+    #[test]
+    fn an_in_range_psg_note_raises_nothing() {
+        let msgs = psg_pitch_errors(60);
+        assert!(
+            msgs.is_empty(),
+            "MIDI 60 on PSG is ordinary and must raise nothing, got {msgs:?}",
+        );
+    }
 
     /// Builds a saved-project layout on disk with one DAC sample, plus a song
     /// whose single DAC track uses it. Returns (project_dir, song, bank).

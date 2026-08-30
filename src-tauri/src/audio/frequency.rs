@@ -77,8 +77,121 @@ pub fn midi_to_psg_period(midi_note: u8) -> u16 {
     }
 }
 
+/// The lowest and highest MIDI notes this driver's PSG table can represent.
+/// Outside this range `midi_to_psg_period` CLAMPS: below `PSG_MIDI_LOW` every
+/// note returns the same period as the bottom of the table, and above
+/// `PSG_MIDI_HIGH` it returns the top. The note is not silenced -- it is
+/// silently RETUNED, which is worse, because the app and the export agree
+/// with each other while neither matches what the author wrote.
+pub const PSG_MIDI_LOW: u8 = 36;
+pub const PSG_MIDI_HIGH: u8 = 119;
+
+/// Whether this pitch is representable on PSG without being retuned.
+pub fn psg_pitch_is_representable(midi_note: u8) -> bool {
+    (PSG_MIDI_LOW..=PSG_MIDI_HIGH).contains(&midi_note)
+}
+
 #[cfg(test)]
 mod tests {
+    /// Default location of the S3K disassembly this table claims to match.
+    /// Overridable with `SERAPH_SKDISASM_DIR`. Relative to `src-tauri/`.
+    const SKDISASM_DEFAULT: &str = "../../skdisasm";
+
+    /// Recomputes `PSG_PERIOD_TABLE` from the DRIVER'S OWN SOURCE and fails on
+    /// any disagreement.
+    ///
+    /// The table is a transcription -- its comment says "matches
+    /// Flamedriver/S3K Z80 driver exactly" -- and a transcription can drift
+    /// from the thing it claims to match without anything failing. Nothing
+    /// checked that claim until this test.
+    ///
+    /// The driver does not store periods at all: it stores FREQUENCIES IN HZ
+    /// and computes periods at assembly time with
+    /// `zMakePSGFrequency = min(3FFh, round(PSG_Sample_Rate / (frequency*2)))`,
+    /// where `PSG_Sample_Rate = Z80_Clock/16` and `Z80_Clock = Master_Clock/15`.
+    /// So this test parses the Hz list and the clock constants out of the
+    /// disassembly and applies the driver's own formula, rather than comparing
+    /// one copied table against another copied table -- which would prove
+    /// nothing.
+    ///
+    /// Follows F32's rule: a test that cannot reach its input FAILS with
+    /// instructions rather than passing silently. Skipping needs
+    /// `SERAPH_SKIP_ROM_TESTS` set deliberately, the same switch the ROM tests
+    /// use, so there is one knob rather than two.
+    #[test]
+    fn psg_table_still_matches_the_driver_it_claims_to_match() {
+        let dir = std::path::PathBuf::from(
+            std::env::var("SERAPH_SKDISASM_DIR").unwrap_or_else(|_| SKDISASM_DEFAULT.to_string()),
+        );
+        let driver = dir.join("Sound/Z80 Sound Driver.asm");
+        let consts = dir.join("sonic3k.constants.asm");
+        if !driver.exists() || !consts.exists() {
+            if std::env::var("SERAPH_SKIP_ROM_TESTS").is_ok() {
+                eprintln!("SERAPH_SKIP_ROM_TESTS set; skipping PSG drift check ({})", dir.display());
+                return;
+            }
+            panic!(
+                "S3K disassembly not found at {}.\n\
+                 PSG_PERIOD_TABLE claims to match that driver and this test is the only \
+                 thing that checks it, so it FAILS rather than passing silently.\n\
+                 Set SERAPH_SKDISASM_DIR, or SERAPH_SKIP_ROM_TESTS=1 to skip deliberately.",
+                dir.display(),
+            );
+        }
+
+        let consts_src = std::fs::read_to_string(&consts).expect("read constants");
+        let master: u64 = consts_src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("Master_Clock")?.split('=').nth(1))
+            .and_then(|v| v.split(';').next())
+            .and_then(|v| v.trim().parse().ok())
+            .expect("Master_Clock not found in the disassembly's constants");
+        // Integer division, matching the assembler's own expressions.
+        let psg_sample_rate = (master / 15) / 16;
+
+        let driver_src = std::fs::read_to_string(&driver).expect("read driver");
+        let block = driver_src
+            .split("zPSGFrequencies:")
+            .nth(1)
+            .expect("zPSGFrequencies label not found")
+            .split("; ---")
+            .next()
+            .unwrap();
+        let freqs: Vec<f64> = block
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("zMakePSGFrequencies"))
+            .flat_map(|args| args.split(','))
+            .filter_map(|t| t.trim().parse::<f64>().ok())
+            .collect();
+
+        assert_eq!(
+            freqs.len(),
+            PSG_PERIOD_TABLE.len(),
+            "parsed {} frequencies from the driver but the table has {} entries; \
+             the parse is wrong or the driver's table changed shape",
+            freqs.len(),
+            PSG_PERIOD_TABLE.len(),
+        );
+
+        let mut mismatches = Vec::new();
+        for (i, (&f, &ours)) in freqs.iter().zip(PSG_PERIOD_TABLE.iter()).enumerate() {
+            // AS `roundFloatToInteger` is round-half-away-from-zero.
+            let computed = ((psg_sample_rate as f64 / (f * 2.0)) + 0.5).floor() as u32;
+            let expected = computed.min(0x3FF) as u16;
+            if expected != ours {
+                mismatches.push(format!("index {i}: driver {expected:#05x} vs table {ours:#05x}"));
+            }
+        }
+        assert!(
+            mismatches.is_empty(),
+            "PSG_PERIOD_TABLE has DRIFTED from the driver it claims to match \
+             ({} of {} entries): {:?}",
+            mismatches.len(),
+            PSG_PERIOD_TABLE.len(),
+            mismatches,
+        );
+    }
+
     use super::*;
 
     #[test]

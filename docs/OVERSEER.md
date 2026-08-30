@@ -87,15 +87,27 @@ a cold boot that reads only this file would never learn either file exists.
   When you file one of those, put the provenance and its overturnable-on-read-back status in
   `detail`, and leave `said` off — he did not speak, and quoting a peer's reasoning into a
   field defined as his words would forge one.
-- **`docs/lane-log.jsonl` DOES NOT EXIST here yet, and that is now CORRECT.**
+- **`docs/lane-log.jsonl` EXISTS here** — opened at F28's landing (`639a68b`, 2026-08-29),
+  which is exactly where the rule said it should open. **The paragraph this replaces said
+  the file did not exist and that its absence was correct; that was true when written and
+  had been false for a day when a boot read it.** Kept as a worked example of this file's
+  own top-of-section warning: a snapshot ages while the thing it describes moves.
   `contract/LANE_LOG.md` **rule 8**: open the log at your next landing, never backfill.
   A lane that has landed nothing writes nothing — the file records landings, it is not a
-  heartbeat, and an empty ceremonial first entry is worse than an absent one. So do not
-  read the absence here as a defect and do not "fix" it. **Anchor: empyrean `2e50643`**,
+  heartbeat. **Anchor: empyrean `2e50643`**,
   the commit that actually adds rule 8 to `LANE_LOG.md` (`--stat`-checked; the hub cited
   the branch tip `2c587f2`, which carries rule 10 and does not touch that file — a path
   has a time, so cite the commit that carries the rule, not the tip that can read it).
-  F28's landing is the natural first entry here.
+- **Appending to either `.jsonl` has a RECIPE and it is not `>>` alone.** `LANE_LOG.md`
+  **rule 7** and `DECISIONS.md` **rule 8**, anchor empyrean `a7b91b4d`
+  (`-S 'has a recipe'`-located, verified an ancestor of `origin/main` here): heal a missing
+  final newline first, append one newline-terminated line, then parse the WHOLE file — a
+  parse failure is a stop, not a note. Read the recipe there rather than from any copy; the
+  hazard is that a file not ending in `0a` glues the new record onto the last one and
+  destroys BOTH, in a file whose contract forbids rewriting, with nothing in the format
+  detecting it. **Measured here 2026-08-30T09:5xZ: `decisions.jsonl` 12 lines,
+  `lane-log.jsonl` 21 lines, both ending `0a`, every line parsing.** Re-measure rather than
+  trusting that line.
 
 - `at` and `updatedAt` come from `date -u +%Y-%m-%dT%H:%M:%SZ` and nowhere else.
 - No em dashes or en dashes in either file's prose fields (standing owner

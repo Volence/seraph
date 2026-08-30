@@ -3378,3 +3378,32 @@ For any future session executing this queue:
   "never opens or creates a project". It **does** open one; what it never does is click New or Open
   *afterwards*, so `confirmDiscard` is only ever entered clean. The conclusion held, the stated
   reason was wrong, and it was checked rather than accepted.
+- 2026-08-30 (cont.): **STOPPED ON THE OWNER'S WORD — seraph is OUTSIDE the project he is driving
+  tonight, and this lane should not have been worked continuously.** Verbatim, relayed by the hub:
+  *"Uh I said I want us to work on the parallax/raster effect project, I don't think anyything in
+  there is seraph but we told a seraph agent to go"*. Nothing was in flight when it arrived —
+  F49/F48 had landed and pushed at `0defde8` — so nothing had to be interrupted. **F50 was NOT
+  dispatched and no further parcel will be until he says so.**
+  **THE SHARE OF THIS THAT IS MINE, recorded plainly rather than left to the hub's account.** The
+  hub owns the over-wide reading of *"every lane"* and has recorded it against itself. But this
+  lane **saw the scope limit and worked anyway.** Hours earlier it correctly established that the
+  06:38:01Z *"finish line"* quote was scoped — its own banked gloss reads *"its pick is its own
+  `next` row **under the effects plan**"* — and said so to the hub, noting seraph is not in
+  EFFECTS-W1. **Having found that the newer instruction did not reach this lane, the obvious next
+  question was whether the EARLIER one did, and I did not ask it.** The 00:31:51Z brief says the
+  hub *"PUSHES the lanes continuously through the ratified plan"*, and **"the ratified plan" is the
+  effects plan** — the same scope, in the sentence I was relying on. I used the broader-sounding
+  half of that paragraph (*"his pick is this paragraph"*) as standing authority for owner-free work
+  in a lane the paragraph was not about.
+  **The failure is bar 12's shape pointed at myself: I scoped one document correctly and did not
+  apply the same test to the one I was actually standing on.** Checking a citation's reach is not
+  the same as checking your own licence, and the second is the one nobody prompts you to do.
+  **What stands: the work.** Every parcel tonight is landed, verified on the merged tree, pushed,
+  and banked, and two of them (F47's close guard, F49/F48's discard guard, plus the F50 finding)
+  are real defects in a data-loss path. **This is a scope correction, not a quality one**, and the
+  hub said so explicitly. Nothing needs undoing.
+  **Standing state for whoever resumes:** F50 is the front row and is owner-free ON ITS MERITS
+  (importing discards unsaved changes without asking while New and Open ask) — but it waits for him
+  now, because the question is no longer whether the row needs him but whether this LANE was meant
+  to be running. d-9, d-10, F27, README-8, d-12 are his; d-11 is the hub's ruling in his place and
+  is overturnable.

@@ -3283,3 +3283,52 @@ For any future session executing this queue:
   **Minor citation correction, recorded because this suite's whole anchor discipline rests on
   timestamps matching:** the relay gave the quote's time as *"06:5xZ"*; the banked text and the
   commit both say **06:38:01Z**. A future reader matching on the relayed time would not find it.
+- 2026-08-30 (cont.): **F47 LANDED — the guard that stops the owner losing unsaved work on window
+  close is covered by tests for the first time, and `App.tsx` was not touched to do it.** Merged
+  and pushed, `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit codes read
+  directly: vitest **369 passed / 36 files** (was 361/35; +8 is this parcel), `npm run build` exit
+  0 zero warning or error lines, `npx tsc --noEmit` exit 0, cargo **293 passed / 0 failed**
+  untouched, and both prior guards (`reporterPin`, `canvasStub`) still passing **unedited**. Log
+  **128 to 85 lines**; `close-confirm unavailable` **13 to 1**, and the survivor is now
+  **asserted** by a test rather than accidental. `git diff` on `src/App.tsx` across the whole
+  parcel is **empty** — verified here, not taken on report.
+  **EVERY CASE PROVEN RED-FIRST BY BREAKING THE GUARD, and the CONTROL is the one that matters.**
+  Independently reproduced here on the merged tree: deleting `if (!dirtyRef.current) return;` from
+  the handler fails **exactly** `lets a close through untouched when there are no unsaved changes`
+  (`1 failed | 7 passed`), with `App.tsx` restored byte-identical afterwards. **Under that break
+  every DIRTY test still passes**, so a guard that intercepted *every* close would have looked
+  like a fix. That is why the control carries the file.
+  **MOCKING CHOICE, and the rejected option is the interesting half.** Per-file
+  `vi.mock("@tauri-apps/api/window")` in the three suites that mount App — already this repo's
+  convention, which is why `App.test.tsx` never printed a `close-confirm` line while the other
+  three did. **Rejected: a global mock in `src/test/setup.ts`**, which would have removed all 13
+  lines in one line of code but would make ~30 files that never intended to touch Tauri run the
+  Tauri-PRESENT branch, leaving **no test anywhere on the browser-only branch a plain `npm run
+  dev` takes**. Trading a real code path for a quieter log, on a data-loss guard.
+  **FINDING BOOKED — F48, and my check NARROWED it from the agent's reading.** The `try` covers
+  only **registration** (the import, `getCurrentWindow()`, the `await` on `onCloseRequested`); the
+  handler body runs later, outside it. So if `ask()` or `win.destroy()` rejects at close time, the
+  user clicks quit, nothing happens, **there is no console line at all**, and because
+  `preventDefault()` already fired **the window is left unclosable**.
+  **CORRECTION TO THE AGENT'S FRAMING, checked firsthand:** it raised this via a missing
+  `core:window:allow-destroy` permission. That permission **IS granted** —
+  `src-tauri/capabilities/default.json:10` lists it. So the missing-permission route is **not
+  live**, and F48 is a **latent** robustness gap reachable by other rejection causes, not a
+  configuration defect waiting to fire. Booked at that severity rather than the higher one.
+  **FINDING BOOKED — F49: `confirmDiscard`'s dirty branch is covered by NOTHING**, and it can
+  disagree with the close guard **from the same cause**. The only `dirty: true` anywhere in the
+  suite is a dirty-indicator test that never opens or creates a project, so only the
+  `if (!dirtyRef.current) return true` early-out ever runs; `ask` is mocked in two files and
+  asserted in none. With an unavailable dialog, `confirmDiscard` rejects and the button **silently
+  does nothing**, while the close guard has already called `preventDefault()` and leaves the window
+  **unclosable**. Same failure, opposite user-visible outcome, neither says anything.
+  **A FACTUAL CORRECTION TO THE AGENT, AND AN OMISSION OF MINE IT EXPOSED.** The agent omitted the
+  harness's `Claude-Session:` commit trailer, reasoning that *"every commit in this repo's history
+  lacks any Claude-identifying trailer"* and citing this lane's standing memory. **That memory is
+  about `Co-Authored-By: Claude`, which is a different trailer, and the premise is false:** counted
+  here, **3 of the last 20 commits carry `Claude-Session:`** and older history carries more.
+  **What the count actually exposed is mine:** most of tonight's commits are missing it because I
+  wrote every message through a heredoc without it. The agent's two commits were left as they are
+  (unpushed rewriting would buy nothing and they match tonight's majority); **the trailer resumes
+  from this commit forward.** Recorded because a wrong premise that happens to reach a defensible
+  action is still a wrong premise, and because the lapse it revealed was the controller's.

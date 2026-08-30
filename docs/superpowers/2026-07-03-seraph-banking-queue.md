@@ -3407,3 +3407,36 @@ For any future session executing this queue:
   now, because the question is no longer whether the row needs him but whether this LANE was meant
   to be running. d-9, d-10, F27, README-8, d-12 are his; d-11 is the hub's ruling in his place and
   is overturnable.
+- 2026-08-30 (cont.): **BANKED A SHELL HAZARD THAT MAKES EVERY `ls` EXISTENCE PROBE REPORT
+  ABSENT — relayed by aurora, reproduced firsthand here, and SHARPENED past what arrived.**
+  Nothing was asked of this lane and nothing was dispatched; the hold outside the effects
+  project stands and no queue row moved. Banked into `docs/OVERSEER.md`'s environment quirks
+  because it binds every future dispatch brief this repo writes.
+  **Relayed claim:** `ls` is aliased to `eza … --icons`, `--icons` takes an optional value and
+  eats the next argument, so `ls <path>` exits 2 for every path. Anchors empyrean
+  `e159721850d77a64081ad577b3ac1890e5476a2a` and sigil `2aa3e0f5` — **both checked for
+  reachability and class before being written down**: reachable on `origin/main` and
+  `origin/master` respectively, both docs commits, which is the correct class here since what
+  they carry IS the doc text (a code-guarantee anchor would not have been).
+  **Reproduced in this lane's own tool shell, which is the part that matters** — the alias
+  reaches non-interactive Bash tool calls, so this is not an interactive-only curiosity.
+  **The boundary, derived here rather than transcribed, and it is the sharper statement:** the
+  failure is exactly the FLAGLESS `ls <path>` spelling. Six cases measured: `ls <file>` **2**,
+  `ls <dir>` **2**, `ls` no-arg **0**, `ls -l <file>` **0**, `ls -la <dir>` **0**,
+  `/usr/bin/ls <file>` **0**. A leading dash-flag protects everything after it, because an
+  optional value will not consume a token starting with `-`. That is why nobody noticed:
+  every ordinary listing works and only the probe form breaks — and the probe form is the one
+  spelling that has no flag to blame for its own failure.
+  **The dangerous property is not the exit code, it is that the existing path and the missing
+  path produce BYTE-IDENTICAL output and the same exit 2.** So the standard
+  `ls "$P" >/dev/null 2>&1 && present || absent` prints `absent` for everything, with no
+  artifact left anywhere in the run to re-examine. It cost the hub a false *"freeze
+  completed"* the same day.
+  **This is protocol bar 16(d) arriving in this repo's own shell**, and worth noting against
+  the protocol's existing aeon instance, which is the WEAKER form: that one was `ls -t <dir>`,
+  where the rejected token was a flag and a `2>/dev/null` destroyed the correcting signal.
+  Here there is no flag and no suppression — the command is spelled the way a careful person
+  spells it, and still returns a clean-looking answer to a question it never asked.
+  Remedy banked: `[ -f ]`, `[ -e ]`, `stat`, `git ls-files`, or `/usr/bin/ls`; never `ls <path>`
+  in a dispatch brief; and when any cheap probe says ABSENT or FAILED, run it against something
+  known to exist before believing it.

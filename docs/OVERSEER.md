@@ -380,6 +380,34 @@ Repo-specific quality bars (each has caught a real defect here):
   `aa08151` — but a worktree checked out at an older SHA needs it in the
   environment. Any "app dies instantly on launch" report from an agent: check this
   first before reading it as signal.
+- **`ls <path>` IS A BROKEN EXISTENCE PROBE IN THIS WORKSPACE, and it fails identically
+  for paths that exist and paths that do not** *(relayed by the aurora lane 2026-08-30 as a
+  hazard notice, anchors empyrean `e159721850d77a64081ad577b3ac1890e5476a2a` and sigil
+  `2aa3e0f5`, both reachable and both docs commits — the correct class, since what they carry
+  is this text; **reproduced firsthand here**, including the boundary the relay did not state)*.
+  `ls` is aliased to `eza --color=always --group-directories-first --icons`, the alias reaches
+  **non-interactive Bash tool calls** (the shell is initialised from the profile), and
+  `--icons` takes an OPTIONAL value, so it swallows the next argument.
+  **The failure is exactly the flagless `ls <path>` spelling — which is exactly the spelling a
+  probe uses.** Measured here, all six cases: `ls <file>` exit **2**, `ls <dir>` exit **2**,
+  `ls` with no argument exit **0**, `ls -l <file>` exit **0**, `ls -la <dir>` exit **0**,
+  `/usr/bin/ls <file>` exit **0**. A leading dash-flag protects everything after it because an
+  optional value will not consume a token starting with `-`; that is why this survived
+  unnoticed — every ordinary listing works, and only the probe form breaks.
+  **What makes it dangerous rather than annoying: the existing path and the missing path
+  produce BYTE-IDENTICAL output and the same exit 2.** So
+  `ls "$P" >/dev/null 2>&1 && echo present || echo absent` prints `absent` for **everything**,
+  and no artifact anywhere in the run says otherwise. It cost the hub a false
+  *"freeze completed"* the same day.
+  **Use `[ -f "$P" ]`, `[ -e "$P" ]`, `stat`, `git ls-files`, or `/usr/bin/ls`** — and never
+  write `ls <path>` into a dispatch brief.
+  This is protocol **bar 16(d)** landing in this repo's own shell: an absence with nothing to
+  be suspicious of. The bar's standing corrective applies unchanged and is the cheap half —
+  **when a probe says ABSENT or FAILED, run it against something known to exist before
+  believing it.** Note the protocol's own aeon instance is the WEAKER version of this
+  (`ls -t docs/superpowers/`, where the rejected token was a flag); the flagless form
+  documented here fails with no flag to blame, which is why it reads as a clean answer.
+
 - **Fresh worktrees have no `node_modules`** — frontend lanes need `npm install`
   first (Rust lanes don't). First `cargo build` per worktree is slow (own target
   dir); that's expected, not a hang.

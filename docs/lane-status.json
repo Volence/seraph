@@ -1,5 +1,5 @@
 {
-  "focus": "The app's copy of the driver's note table is now checked against the driver, and out-of-range notes are reported.",
+  "focus": "Booted fresh and holding. Nothing running; everything from last night is landed and pushed.",
   "inFlight": [],
   "blockedOnOwner": [
     {
@@ -11,23 +11,42 @@
       "id": "d-10",
       "what": "Whether VGM export should actually carry drums, or wait until the export button is wired up. Nothing can make a VGM today, so this costs you nothing right now",
       "since": "2026-08-30"
+    },
+    {
+      "id": "d-12",
+      "what": "What should happen if the 'you have unsaved changes' prompt itself fails to open. Rare, now reported either way, and my recommendation is to leave it alone",
+      "since": "2026-08-30"
     }
   ],
-  "nextBoundary": "At a boundary now. Everything startable without you is done.",
+  "nextBoundary": "At a boundary now. Nothing started, so any moment is a clean one.",
   "queue": [
     {
-      "id": "F27",
-      "title": "Make playback follow the driver instead of promising both at once. F31 landed, so the profile it reads is now correct",
+      "id": "F50",
+      "title": "Importing a song discards your unsaved changes without asking, while New and Open both ask. The prompt already exists; one of the three doors does not use it",
+      "state": "next",
+      "size": "S",
+      "blockedBy": "not started: you said seraph is outside the project you are driving, so it waits for your word rather than being picked up"
+    },
+    {
+      "id": "F36",
+      "title": "Instrument channels are written in the order your tracks happen to be arranged, but the driver assigns them by position, so a label can name a different channel than the one that plays",
       "state": "open",
       "size": "M",
-      "blockedBy": "your ch6-mode design call, which d-7 deliberately carried forward as unsettled"
+      "blockedBy": "I have verified the mechanism but not its consequence; I will not put it to you until I have"
+    },
+    {
+      "id": "F27",
+      "title": "Make playback follow the driver instead of promising both at once",
+      "state": "open",
+      "size": "M",
+      "blockedBy": "your channel 6 design call, deliberately carried forward as unsettled"
     },
     {
       "id": "PITCH-FORMAT",
       "title": "My half of the joint plan with the engine lane is written and handed over. Still needs you to confirm this is mine rather than theirs",
       "state": "open",
       "size": "L",
-      "blockedBy": "confirming with you that this is really yours to me and not just theirs; the engine lane reviews my half at its next boundary",
+      "blockedBy": "confirming with you that this is really yours to me and not just theirs",
       "project": "SOUND-TRUTH"
     },
     {
@@ -40,13 +59,13 @@
     },
     {
       "id": "README-8",
-      "title": "Two leftovers from the README pass, neither a bug: the app cannot author FM3 special mode (the driver does support it), and channel overlap warnings are computed but never shown anywhere",
+      "title": "Two leftovers from the README pass, neither a bug: the app cannot author FM3 special mode, and channel overlap warnings are computed but never shown anywhere",
       "state": "open",
       "size": "M",
       "blockedBy": "where overlap warnings should appear is a design call, and the FM3 one is a feature not a fix"
     }
   ],
-  "updatedAt": "2026-08-30T02:14:10Z",
-  "awaiting": "every remaining item needs you: d-9 (which drivers the foundation targets), d-10 (drums in VGM, small, I recommend deferring), F27 (the channel 6 playback call), and README-8's product call on where overlap warnings should appear. Nothing is half-done.",
+  "updatedAt": "2026-08-30T10:56:35Z",
+  "awaiting": "your say-so on whether this lane runs at all today. You said seraph is outside the parallax/raster project, so I have started nothing. F50 is ready if you want it (importing a song throws away unsaved changes without asking, while New and Open both ask). d-9, d-10 and d-12 are decisions waiting on you.",
   "atBoundary": true
 }

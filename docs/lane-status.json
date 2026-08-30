@@ -1,5 +1,5 @@
 {
-  "focus": "Everything I can do without you is done. Four things are waiting on your call.",
+  "focus": "The app's copy of the driver's note table is now checked against the driver, and out-of-range notes are reported.",
   "inFlight": [],
   "blockedOnOwner": [
     {
@@ -46,7 +46,7 @@
       "blockedBy": "where overlap warnings should appear is a design call, and the FM3 one is a feature not a fix"
     }
   ],
-  "updatedAt": "2026-08-30T02:06:40Z",
+  "updatedAt": "2026-08-30T02:14:10Z",
   "awaiting": "every remaining item needs you: d-9 (which drivers the foundation targets), d-10 (drums in VGM, small, I recommend deferring), F27 (the channel 6 playback call), and README-8's product call on where overlap warnings should appear. Nothing is half-done.",
   "atBoundary": true
 }

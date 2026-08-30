@@ -2619,3 +2619,49 @@ For any future session executing this queue:
   while that run was red. It was the pre-existing flake and not caused by that parcel
   (nothing committed today touches `ArrangementView`), and main is green now, but the chain
   is the defect: **a landing command must not be able to push over a red lane.**
+
+- 2026-08-30 (cont.): **SOUND-TRUTH: the copied PSG table is now CHECKED against the driver
+  it names, and out-of-range notes are REPORTED instead of silently retuned.** Merged
+  `bebea01`, pushed. Lanes: cargo **281 passed / 0 failed** (was 276; +5), `npm run build`
+  exit 0 zero warnings, vitest **352/352**, no `src/bindings.ts` drift. Both halves are true
+  **for any driver list**, so neither waits on d-9.
+  **DEVIATION FROM THE BRIEF, FLAGGED RATHER THAN DONE QUIETLY (bar 7).** The hub's brief
+  said read the tables from **Memra's** source. This grounds against **skdisasm** instead.
+  Reason: `PSG_PERIOD_TABLE`'s own comment says it *"matches Flamedriver/S3K Z80 driver
+  exactly"*, Seraph's only registered profile is Flamedriver, and **there is no Memra profile
+  in this tree** (F31 booked its absence). Checking an S3K table against a *different*
+  driver's numbers would **manufacture drift rather than detect it** — bar 9's shape, where
+  the instrument is pointed at the wrong subject. Memra source **does** exist
+  (`aeon/engine/sound/`, `aeon/tools/gen_sound_tables.py`) and is the right target the day a
+  Memra profile lands; that is F31's row, not this one.
+  **THE DRIFT CHECK IS NOT COPY-VERSUS-COPY, WHICH WOULD PROVE NOTHING.** The driver does not
+  store periods at all: it stores **frequencies in Hz** and computes periods at assembly time
+  with `zMakePSGFrequency = min(3FFh, round(PSG_Sample_Rate/(frequency*2)))`, where
+  `PSG_Sample_Rate = Z80_Clock/16` and `Z80_Clock = Master_Clock/15` (= 3,579,545 → 223,721).
+  So the test **parses the Hz list and the clock constants out of the disassembly and applies
+  the driver's own formula**. Result today: **84/84 exact** — no live drift, so the value is
+  entirely in catching future drift, which is what was asked for.
+  **Poisoned three ways:** corrupting one entry names it (*"index 11: driver 0x388 vs table
+  0x389"*); an unreachable source **FAILS with instructions** rather than passing (F32's rule
+  applied to a new external-input test the same day it was written); the deliberate opt-out
+  skips. **Reuses `SERAPH_SKIP_ROM_TESTS` so there is ONE knob, not two** — a second switch
+  would be a second thing to leave set by accident.
+  **THE RANGE DEFECT WAS WRONG IN BOTH DIRECTIONS, from one channel-agnostic check.**
+  `validate_for_export` used `midi_to_smps_note` (MIDI **12-106**, FM's range) for every
+  pitched channel. PSG's real range is **36-119**, derived from the driver's own table (z80
+  index 0-83, `midi = index + 36`), not chosen here. So: **MIDI 12-35 PASSED validation and
+  was then silently retuned** — `smps_note_name_psg` clamps with `.max(0)` and
+  `midi_to_psg_period` returns the bottom entry — and **MIDI 107-119 was REJECTED** though
+  the table and the exporter both handle it.
+  **THE BRIEF'S FRAMING IS CORRECTED ON THE EVIDENCE:** it said such a note "will be silent
+  in the game". It is **not silenced, it is RETUNED**, and that is *worse* — silence is
+  noticeable, a wrong note in the right rhythm is not, and the app and the export **agree
+  with each other** while neither matches what the author wrote, so nothing looks
+  inconsistent from any single vantage point. The error message says retuned, not dropped.
+  **Four tests, two of them controls** (an above-range note must still be reported; an
+  ordinary in-range note must raise **nothing**, or the others would pass with a check that
+  fires unconditionally). Poisoned by restoring the channel-agnostic check: MIDI 20 goes back
+  to reporting **nothing at all** (`got []`), MIDI 115 back to being refused.
+  **Housekeeping:** the one remaining cargo warning (`sum_r`, `audio/engine.rs:1330`) is
+  **pre-existing** — present in this session's pre-F29 log, and `engine.rs` is untouched by
+  every commit today (checked with `git log --name-only`, not assumed).

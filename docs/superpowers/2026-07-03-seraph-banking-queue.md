@@ -2474,3 +2474,49 @@ For any future session executing this queue:
   machine has, since the ROM is present here) or no opt-out at all (which breaks the suite
   for any tree without the ROM). **The residual risk is a stale env var in a shell profile
   silently disabling this coverage forever.**
+
+- 2026-08-30 (cont.): **F35 LANDED, AND IT WAS NOT COSMETIC — it had misnamed 23 of the 212
+  shipped Batman library instruments.** Merged `7753832`, pushed, `origin/main` verified
+  moved and equal to HEAD. Merged-tree lanes, exit codes read directly: cargo **274 passed /
+  0 failed** (was 271; +3 guards), `npm run build` exit 0 with zero warning or error lines,
+  vitest **352/352 across 33 files**, no `src/bindings.ts` drift.
+  **THE MECHANISM, established by reading the table rather than inferring from the symptom.**
+  `SONG_INDEX[0]` and `SONG_INDEX[1]` are **both `(0, 0)`** — the table's **only** duplicate,
+  and **not a gap**: 20 slots map to 19 distinct songs and every bank's songs are contiguous
+  with none unmapped (counted, not eyeballed). Slot 0 is the game's silence/stop-music
+  command, pointed at valid data so it parses cleanly. That is why F32's measurement saw
+  "Silence" carrying **6,868 notes, byte for byte slot 1 "Main Title"'s count** — they are
+  the same song.
+  **THE CONSEQUENCE, AND IT IS THE PART A CODE READ WOULD HAVE MISSED.** `library::extract`
+  iterated game ids **from 0**, so slot 0 was seen **first** and **won the naming**:
+  `inst.name = format!("{song} voice {:02}")` fires only on first insertion, later slots
+  merely append to `provenance.songs`. So **23 of 212 tracked library entries shipped as
+  `"Silence voice NN"`**, filenames included (`library/batman-robin/fm/silence-voice-90.json`),
+  each with provenance `["Silence", "Main Title", ...]`. **Verified by RUNNING the
+  extraction** — 23 files named Silence, all 23 also credited to Main Title — not by reading
+  the loop.
+  **THE DATA HALF WAS PROVEN SAFE BEFORE IT WAS APPLIED, which is the part worth copying.**
+  The library is **committed**, so a re-extraction rewrites tracked files. Two checks first:
+  (1) **is there curation to clobber?** Measured **0 tagged and 0 hand-renamed** entries
+  across 212, so the library is entirely machine-generated. (2) **is this really only a
+  rename?** Extracted to a temp dir and diffed against the tracked tree: **hash sets
+  identical (212 = 212)**, 23 files out and 23 in, and **the only instrument field that
+  differs anywhere is `name`** — **zero sound parameters changed** across all 212. Only then
+  applied. Re-running extraction on the applied tree changes nothing further (idempotent, as
+  `OVERSEER.md` says).
+  **A MEASUREMENT MISTAKE MADE AND CAUGHT HERE, worth recording because the wrong number was
+  alarming.** The first curation scan reported **149 of 213 "hand-renamed"**, which would
+  have made the data fix unsafe. That was **my regex, not the data**: `voice \d{2}` requires
+  exactly two digits, so every three-digit name (`voice 119`) counted as a rename, and
+  `_game.json` was not excluded. Corrected to `voice \d+`: **0 renamed, 0 tagged.** A
+  measurement that would have blocked the right action, produced by the instrument rather
+  than the subject — bar 9's shape, arriving in a throwaway script.
+  **GUARDS NEED NO ROM, unlike F32's, because the refusal precedes any ROM access** — so
+  these three run on every tree. Poisoned red-first: deleting the guard makes slot 0 fall
+  through to **`"ROM too short for bank 1 header"`, the same error a real song gives on an
+  empty ROM**, which is precisely why the guard is needed. One is a **control** proving the
+  refusal is specific to slot 0 rather than blanket; one asserts the **index table's shape**
+  (`SONG_INDEX[0] == SONG_INDEX[1]`, exactly one duplicate) so a future remap **fails loudly
+  instead of silently outliving this reasoning** — the perishable-precedent rule applied to
+  this lane's own new comment.
+  **Extraction stats now read `songs=19`, not 20.** One of those twenty was a phantom.

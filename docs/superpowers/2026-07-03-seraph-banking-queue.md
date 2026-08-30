@@ -2280,3 +2280,57 @@ For any future session executing this queue:
   agrees and explicitly declined to rule it); its card already carries the changed
   recommendation (`two-drivers`) and its full `because`, verified this session, so no
   rule-8c append was needed.
+
+- 2026-08-30 (cont.): **F31 LANDED — the profile now advertises FIVE FM music voices, and
+  the number was DERIVED FROM THE DRIVER, not taken from F31's own booking.** Merged
+  `2034560`, pushed, `origin/main` verified moved and equal to HEAD. Merged-tree lanes,
+  exit codes read directly: cargo **265 passed / 0 failed** (was 264; +1 is the new guard,
+  monotonic), `npm run build` exit 0 with zero warning or error lines, vitest **352/352
+  across 33 files**, no `src/bindings.ts` drift.
+  **THE DERIVATION, because bar 1 is the whole reason this is trustworthy.** F31's booking
+  asserted S3K "has no FM6 music voice at all"; that claim was re-derived from
+  `skdisasm/Sound/Z80 Sound Driver.asm` rather than transcribed. Three independent
+  witnesses in that file: line **1907** `db 80h, 6 ; FM6 music track (does not exist in
+  this driver)`, stated by the driver itself; lines **177-182**, where the track RAM lays
+  `zSongFM6_DAC` out **ahead of** `zSongFM1..FM5` as ONE shared slot; and line **2252**,
+  where the driver computes its own *"Number of FM tracks"* as
+  `(zSongPSG1-zSongFM1)/zTrack.len`, a span that excludes the FM6/DAC slot and therefore
+  equals **5**. The booking was right; it is now checkable.
+  **AUTHORITY: this rests on a SETTLED OWNER RULING, not on the hub relay that pushed it.**
+  d-7 (`driver-decides`, answered by the owner through the console 2026-08-24) rules that
+  the driver profile carries the channel-6 behaviour and Seraph follows it, and its own
+  `detail` names **F31 as the first work it implies**. So F31 would have been correct to do
+  on his word alone; the relay only affected ordering. Recorded because it is the
+  distinction that matters if the relay is ever questioned.
+  **MIGRATION EXPOSURE CHECKED, NOT ASSUMED — this was the part that could have made a
+  correct fix destructive.** Removing a channel from the layout is a change to what the app
+  OFFERS, and the question was whether it silently breaks a song that already uses FM6.
+  Enumerated the consumers (`manager.rs` 364 roster build, 602 name lookup, 2196 lane
+  count; `TrackList.tsx`, `AddTrackDialog.tsx`): `default_lane_name` already returns
+  `Option<String>` and its **own doc comment** already documents `None` for a channel absent
+  from the layout, and `ChannelAssignment::Fm(n)` is **never validated against the layout
+  anywhere**. So an existing `Fm(5)` track is neither deleted nor crashed; it simply loses
+  its default name. **Nothing is destroyed, and new projects get the honest roster.**
+  **THE TEST SUITE HAD ENCODED THE DEFECT EXACTLY ONCE.** Only `test_channel_layout` broke
+  (`assert_eq!(fm_channels.len(), 6)`). The roster tests at `manager.rs` 1663/1684/2196 did
+  **not** break, because they derive their expectations from the layout instead of
+  hardcoding a count — bar 1 already practised there, and worth noting as the reason this
+  fix was cheap.
+  **NEW GUARD, POISONED RED-FIRST.** Added `fm_voices_plus_dac_never_exceed_the_chips_six_slots`:
+  FM voices + DAC channels <= 6, the invariant F31 violated. Poison = reintroduce the exact
+  defect; it fires with **`driver `flamedriver` advertises 6 FM voices plus 1 DAC channels
+  = 7, but the chip has only 6 FM slots and the DAC occupies one of them`** — the mismatch
+  named, per bar 2, not "something raised". `test_channel_layout` also grew an explicit
+  "index 5 must not be a music voice" assertion and fired on the same poison.
+  **GUARD SCOPE STATED RATHER THAN OVERCLAIMED, and this is a booked follow-up.** The first
+  draft of that test iterated an invented `crate::driver::all_profiles()`, which does not
+  exist — caught by reading the real API rather than by the compiler alone. `DriverRegistry`
+  offers only `get`/`list`, and `lib.rs:180-181` registers inline with no shared
+  constructor, so the guard covers the profiles **it** registers and does not inherit a
+  driver added later. Its doc comment says so in those words. **BOOKED: extract a shared
+  registry constructor so the guard covers every registered driver** — a `lib.rs` change,
+  deliberately out of F31's scope, and it becomes live the moment the absent Memra profile
+  is added.
+  **NOT TOUCHED, still open:** an existing FM6 track still *exports*, which is F30's
+  double-header defect and F27's playback question. F31 was upstream of both and is wrong
+  however F27 resolves, which is why it went first.

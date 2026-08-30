@@ -700,7 +700,7 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
    * `""` = they all inherit the lane default, a uuid = they all carry that
    * override, `MIXED_VOICE` = they disagree (or nothing is selected).
    */
-  const MIXED_VOICE = " mixed";
+  const MIXED_VOICE = "\0mixed";
   const selectedVoiceValue = (() => {
     if (selectedNotes.size === 0) return MIXED_VOICE;
     let seen: string | null | undefined;

@@ -526,6 +526,24 @@ pub fn generate_music_asm(
     let fm_count = active_tracks.iter().filter(|t| matches!(t.channel, ChannelAssignment::Fm(_))).count();
     let dac_count = active_tracks.iter().filter(|t| matches!(t.channel, ChannelAssignment::Dac(_))).count();
     let psg_count = active_tracks.iter().filter(|t| matches!(t.channel, ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise)).count();
+    // `smpsHeaderChan`'s FIRST byte counts DAC together with FM; it is not an
+    // FM-only count. Checked against artifacts rather than reasoning (F30):
+    //
+    //   * The driver reads it as such -- `ld b, (iy+2) ; b = number of FM +
+    //     DAC channels`, `ld a, (iy+3) ; Get number of PSG tracks`, and
+    //     `ld de, 6 / add hl, de` for where the channel entries start
+    //     (`skdisasm/Sound/Z80 Sound Driver.asm:1836-1839, 1859-1861`), which
+    //     lines up byte-for-byte with the macro layout in
+    //     `_smps2asm_inc.asm:306` (`smpsHeaderChan macro fm,psg / dc.b fm,psg`)
+    //     following the 2-byte `smpsHeaderVoice` pointer.
+    //   * Real S3K songs agree: 59 of the 60 files in `skdisasm/Sound/Music/`
+    //     declare `smpsHeaderChan $06, $03` and carry exactly one
+    //     `smpsHeaderDAC` + five `smpsHeaderFM` + three `smpsHeaderPSG`
+    //     entries (e.g. `MGZ1.asm:4-15`). 6 = 1 DAC + 5 FM, not 5.
+    //
+    // So `fm_count + dac_count` is right. The out-of-driver channel that F30
+    // was booked for is refused in `validate_for_export`, which `write_export`
+    // runs before this function.
     let fm_dac_count = fm_count + dac_count;
 
     asm.push_str(&format!("Snd_{label}_Header:\n"));
@@ -647,15 +665,70 @@ pub fn generate_music_asm(
 // --- Validation ---
 
 /// Validate the song for SMPS export. Returns a list of errors (empty = valid).
+///
+/// `driver` is the profile the song will be exported for. It is needed because
+/// which channels exist is a property of the driver, not of the format: see the
+/// channel-existence check below (audit F30).
 pub fn validate_for_export(
     song: &Song,
     instruments: &InstrumentBank,
+    driver: &dyn DriverProfile,
     params: &SmpsTempoParams,
 ) -> Vec<ExportError> {
     let mut errors = Vec::new();
+    let layout = driver.channel_layout();
 
     for track in &song.tracks {
         if track.muted { continue; }
+
+        let has_notes = track.regions.iter().any(|r| !r.notes.is_empty());
+
+        // F30. A track's channel must be one the driver actually has, or the
+        // song header describes a voice that does not exist.
+        //
+        // `ChannelAssignment::Fm(n)` was never checked against the driver
+        // anywhere in the app, so a project saved before F31 corrected
+        // `FlamedriverProfile::channel_layout()` still carries an `Fm(5)`
+        // track. Exporting it emitted `smpsHeaderFM Snd_<song>_FM6` and
+        // reported success.
+        //
+        // On this driver that entry is not merely cosmetic. `zBGMLoad` fills
+        // the FM/DAC track slots POSITIONALLY -- `ld b, (iy+2)` then a loop
+        // copying into `zTracksStart` onward
+        // (`skdisasm/Sound/Z80 Sound Driver.asm:1837-1857`) -- and the slots
+        // are `zSongFM6_DAC, zSongFM1..zSongFM5` (177-182), six of them, with
+        // slot 0 unconditionally driven as the DAC (717-719). So an "FM6"
+        // entry lands on whatever slot its position happens to reach, and a
+        // song using all six FM voices plus DAC needs seven entries where the
+        // driver has six -- the seventh runs off the end into `zSongPSG1`.
+        //
+        // The check is gated on `has_notes` because that is exactly
+        // `generate_music_asm`'s own rule for which tracks reach the header
+        // (`!t.muted && ...any(|r| !r.notes.is_empty())`). A leftover empty
+        // FM6 lane -- which every pre-F31 project has, since lanes were seeded
+        // from the layout -- emits nothing and must not block an export.
+        //
+        // What such a track should SOUND like (steal a voice? merge onto the
+        // DAC? drop it?) is a parked owner design call (audit F27). This
+        // refuses and says which track and why rather than guessing, and
+        // rather than the current silent success.
+        if has_notes && layout.channel_name(&track.channel).is_none() {
+            errors.push(ExportError {
+                track_name: track.name.clone(),
+                region_index: None,
+                note_index: None,
+                message: format!(
+                    "Channel {}{} does not exist on driver \"{}\". Its channels are: {}. \
+                     Exporting would write a song header entry for a voice this driver \
+                     cannot play. Move this track to a channel the driver has.",
+                    channel_type_label(&track.channel),
+                    channel_index(&track.channel),
+                    driver.name(),
+                    layout.channel_names().join(", "),
+                ),
+            });
+            continue;
+        }
 
         if track.instrument_id.is_none() {
             errors.push(ExportError {
@@ -684,7 +757,6 @@ pub fn validate_for_export(
             continue;
         }
 
-        let has_notes = track.regions.iter().any(|r| !r.notes.is_empty());
         if !has_notes {
             continue;
         }
@@ -779,7 +851,7 @@ pub fn write_export(
 ) -> Result<ExportResult, Vec<ExportError>> {
     let params = compute_tempo_params(song.metadata.tempo, song.metadata.ticks_per_beat);
 
-    let errors = validate_for_export(song, instruments, &params);
+    let errors = validate_for_export(song, instruments, driver, &params);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -938,7 +1010,7 @@ mod tests {
     fn psg_pitch_errors(pitch: u8) -> Vec<String> {
         let song = psg_song_with_pitch(pitch);
         let params = compute_tempo_params(120.0, 480);
-        validate_for_export(&song, &song.instruments, &params)
+        validate_for_export(&song, &song.instruments, &crate::driver::FlamedriverProfile, &params)
             .into_iter()
             .map(|e| e.message)
             .collect()
@@ -1272,7 +1344,7 @@ mod tests {
             instruments: InstrumentBank { fm: vec![], psg: vec![], dac: vec![] },
         };
         let params = compute_tempo_params(120.0, 480);
-        let errors = validate_for_export(&song, &song.instruments, &params);
+        let errors = validate_for_export(&song, &song.instruments, &crate::driver::FlamedriverProfile, &params);
         assert!(!errors.is_empty());
         assert!(errors[0].message.contains("No instrument assigned"));
     }
@@ -1307,7 +1379,7 @@ mod tests {
             },
         };
         let params = compute_tempo_params(120.0, 480);
-        let errors = validate_for_export(&song, &song.instruments, &params);
+        let errors = validate_for_export(&song, &song.instruments, &crate::driver::FlamedriverProfile, &params);
         assert!(errors.iter().any(|e| e.message.contains("outside SMPS range")));
     }
 
@@ -1354,5 +1426,250 @@ mod tests {
         assert!(asm.contains("nC4"));
         assert!(asm.contains("nE4"));
         assert!(asm.contains("smpsStop"));
+    }
+
+    // ---- audit F30: a channel the driver does not have ----
+
+    /// A song with one track per requested channel, each carrying a single
+    /// note, plus a bank holding an instrument of every kind so that no test
+    /// below trips the unrelated "No instrument assigned" path. `with_notes`
+    /// false makes every lane empty, which is how a leftover lane looks.
+    fn f30_song_inner(channels: &[ChannelAssignment], with_notes: bool) -> Song {
+        use crate::model::song::*;
+        use crate::model::instrument::*;
+        let fm_id = Uuid::new_v4();
+        let psg_id = Uuid::new_v4();
+        let dac_id = Uuid::new_v4();
+        let tracks: Vec<Track> = channels.iter().enumerate().map(|(i, ch)| {
+            let inst = match ch {
+                ChannelAssignment::Dac(_) => dac_id,
+                ChannelAssignment::Psg(_) | ChannelAssignment::PsgNoise => psg_id,
+                ChannelAssignment::Fm(_) => fm_id,
+            };
+            let notes = if with_notes {
+                vec![Note { tick: 0, pitch: 60, velocity: 100, duration_ticks: 480, instrument_id: Some(inst), detune: 0, pan_override: None, modulation: None }]
+            } else {
+                vec![]
+            };
+            Track {
+                id: Uuid::new_v4(),
+                name: format!("T{i}"),
+                channel: ch.clone(),
+                instrument_id: Some(inst),
+                regions: vec![Region {
+                    id: Uuid::new_v4(), start_tick: 0, duration_ticks: 480,
+                    notes,
+                    instrument_id: None,
+                }],
+                muted: false, solo: false, volume: 100, pan: Pan::Center,
+                pitch_offset: 0, modulation: None,
+            }
+        }).collect();
+        Song {
+            metadata: SongMetadata {
+                name: "F30".into(), tempo: 120.0, time_signature: (4, 4),
+                ticks_per_beat: 480, driver_id: "flamedriver".into(),
+            },
+            tracks,
+            instruments: InstrumentBank {
+                fm: vec![FmInstrument {
+                    id: fm_id, name: "P".into(), algorithm: 0, feedback: 0,
+                    operators: [FmOperator::default(); 4],
+                    metadata: InstrumentMetadata::default(),
+                }],
+                psg: vec![PsgInstrument {
+                    id: psg_id, name: "S".into(), volume_sequence: vec![0],
+                    loop_point: None, silence_on_end: false, noise_mode: None,
+                    smps_envelope_index: None,
+                    metadata: InstrumentMetadata::default(),
+                }],
+                dac: vec![DacInstrument {
+                    id: dac_id, name: "D".into(), target_sample_rate: 16000,
+                    loop_start: None, loop_length: None,
+                    original_file: String::new(), pcm_file: "d.pcm".into(),
+                    source_is_raw: false, metadata: InstrumentMetadata::default(),
+                }],
+            },
+        }
+    }
+
+    fn f30_song(channels: &[ChannelAssignment]) -> Song {
+        f30_song_inner(channels, true)
+    }
+
+    fn f30_errors(channels: &[ChannelAssignment]) -> Vec<String> {
+        let song = f30_song(channels);
+        let params = compute_tempo_params(120.0, 480);
+        validate_for_export(&song, &song.instruments, &crate::driver::FlamedriverProfile, &params)
+            .into_iter()
+            .map(|e| format!("{}: {}", e.track_name, e.message))
+            .collect()
+    }
+
+    /// The booked defect, alone. `Fm(5)` is the sixth FM voice; this driver has
+    /// no sixth FM music voice (`FlamedriverProfile::channel_layout` offers
+    /// FM1..FM5, derived in F31 from
+    /// `skdisasm/Sound/Z80 Sound Driver.asm:1907` "FM6 music track (does not
+    /// exist in this driver)" and the six-slot track RAM at 177-182). Before
+    /// the fix this exported `smpsHeaderChan $01, $00` /
+    /// `smpsHeaderFM Snd_F30_FM6, ...` and reported success.
+    #[test]
+    fn an_fm_voice_the_driver_does_not_have_is_refused_by_name() {
+        let msgs = f30_errors(&[ChannelAssignment::Fm(5)]);
+        assert!(
+            msgs.iter().any(|m| m.starts_with("T0: ")
+                && m.contains("Channel FM6 does not exist")),
+            "an Fm(5) track must be refused, naming the track and the channel, got {msgs:?}",
+        );
+    }
+
+    /// The same defect with a DAC track present, which is the case the audit
+    /// item names: the DAC and FM6 are one hardware slot
+    /// (`zSongFM6_DAC`, driver 177-182), so the header claims two music voices
+    /// where the driver has one slot to give.
+    #[test]
+    fn an_fm6_track_alongside_a_dac_track_is_refused() {
+        let msgs = f30_errors(&[ChannelAssignment::Dac(0), ChannelAssignment::Fm(5)]);
+        assert_eq!(
+            msgs.iter().filter(|m| m.contains("does not exist")).count(), 1,
+            "exactly the FM6 track is refused, not the DAC track, got {msgs:?}",
+        );
+        assert!(
+            msgs.iter().any(|m| m.starts_with("T1: ") && m.contains("Channel FM6")),
+            "the refusal must name the FM6 track (T1), got {msgs:?}",
+        );
+    }
+
+    /// The refusal must reach the real export entry point, not just the
+    /// validator, and it must leave nothing behind on disk.
+    #[test]
+    fn write_export_refuses_a_song_using_a_voice_the_driver_lacks() {
+        let song = f30_song(&[ChannelAssignment::Fm(5)]);
+        let out = tempfile::tempdir().unwrap();
+        let err = write_export(
+            &song, &song.instruments, &crate::driver::FlamedriverProfile,
+            out.path(), None,
+        ).unwrap_err();
+        assert!(
+            err.iter().any(|e| e.track_name == "T0" && e.message.contains("Channel FM6 does not exist")),
+            "write_export must refuse and say which track, got {:?}",
+            err.iter().map(|e| format!("{}: {}", e.track_name, e.message)).collect::<Vec<_>>(),
+        );
+        let written: Vec<_> = fs::read_dir(out.path()).unwrap().collect();
+        assert!(written.is_empty(), "a refused export must write no files");
+    }
+
+    /// Control. An ordinary S3K-shaped song -- 1 DAC + 5 FM + 3 PSG + noise --
+    /// must still export, and its header must still be the shape real S3K
+    /// songs use. Without this, the three assertions above could be satisfied
+    /// by a check that refuses everything.
+    ///
+    /// The expected `$06` is derived, not copied: the driver reads header byte
+    /// 2 as `b = number of FM + DAC channels`
+    /// (`skdisasm/Sound/Z80 Sound Driver.asm:1839`) and 59 of the 60 files in
+    /// `skdisasm/Sound/Music/` declare `smpsHeaderChan $06, $03` over exactly
+    /// one `smpsHeaderDAC` and five `smpsHeaderFM` (e.g. `MGZ1.asm:4-15`).
+    /// Here PSG is 4 because this driver's layout counts the noise lane
+    /// separately from PSG1..PSG3.
+    #[test]
+    fn an_ordinary_song_on_every_channel_the_driver_has_still_exports() {
+        let all = [
+            ChannelAssignment::Dac(0),
+            ChannelAssignment::Fm(0), ChannelAssignment::Fm(1), ChannelAssignment::Fm(2),
+            ChannelAssignment::Fm(3), ChannelAssignment::Fm(4),
+            ChannelAssignment::Psg(0), ChannelAssignment::Psg(1), ChannelAssignment::Psg(2),
+            ChannelAssignment::PsgNoise,
+        ];
+        let msgs = f30_errors(&all);
+        assert!(msgs.is_empty(), "a song using only real channels must raise nothing, got {msgs:?}");
+
+        let song = f30_song(&all);
+        let params = compute_tempo_params(120.0, 480);
+        let (voice_map, _v) = build_voice_index(&song.tracks, &song.instruments);
+        let asm = generate_music_asm(&song, &song.instruments, &voice_map, &params).unwrap();
+        assert!(
+            asm.contains("smpsHeaderChan\t\t$06, $04"),
+            "1 DAC + 5 FM must be counted together as $06, with 4 PSG lanes; header was:\n{}",
+            asm.lines().take(10).collect::<Vec<_>>().join("\n"),
+        );
+    }
+
+    /// Control, and the reason the check is gated on "has notes". Every
+    /// project saved before F31 carries an empty FM6 lane, because lanes were
+    /// seeded from the layout that then offered six FM voices. An empty lane
+    /// contributes no header entry (`generate_music_asm` filters on
+    /// `!muted && ...any(|r| !r.notes.is_empty())`), so it is not the defect
+    /// and must not block the export.
+    #[test]
+    fn an_empty_leftover_fm6_lane_does_not_block_the_export() {
+        let song = f30_song_inner(
+            &[ChannelAssignment::Fm(0), ChannelAssignment::Fm(5)],
+            false,
+        );
+        let params = compute_tempo_params(120.0, 480);
+        let msgs: Vec<String> = validate_for_export(
+            &song, &song.instruments, &crate::driver::FlamedriverProfile, &params,
+        ).into_iter().map(|e| e.message).collect();
+        assert!(
+            !msgs.iter().any(|m| m.contains("does not exist")),
+            "an empty FM6 lane emits no header entry and must not be refused, got {msgs:?}",
+        );
+    }
+
+    /// The check must come from the driver profile, never from the literal
+    /// index 5. Asserted over every driver `default_registry()` actually
+    /// registers (the single registration site F34 extracted), so a profile
+    /// added later is covered without this test being edited:
+    ///
+    ///   * every channel a profile's own layout offers must validate clean, and
+    ///   * one FM index past the end of that profile's own FM list must be
+    ///     refused -- for Flamedriver that index happens to be 5, but the test
+    ///     never says so.
+    #[test]
+    fn channel_validity_is_read_from_each_registered_driver_not_a_fixed_index() {
+        let registry = crate::driver::default_registry();
+        let profiles: Vec<&dyn DriverProfile> = registry.profiles().collect();
+        assert!(
+            !profiles.is_empty(),
+            "the registry must hold at least one driver, or this guard checks nothing",
+        );
+        let params = compute_tempo_params(120.0, 480);
+
+        for driver in &profiles {
+            let layout = driver.channel_layout();
+
+            let every_real_channel: Vec<ChannelAssignment> =
+                layout.dac_channels.iter().map(|c| ChannelAssignment::Dac(c.index))
+                    .chain(layout.fm_channels.iter().map(|c| ChannelAssignment::Fm(c.index)))
+                    .chain(layout.psg_channels.iter().map(|c| if c.is_noise {
+                        ChannelAssignment::PsgNoise
+                    } else {
+                        ChannelAssignment::Psg(c.index)
+                    }))
+                    .collect();
+            let song = f30_song(&every_real_channel);
+            let refused: Vec<String> = validate_for_export(&song, &song.instruments, *driver, &params)
+                .into_iter()
+                .filter(|e| e.message.contains("does not exist"))
+                .map(|e| e.message)
+                .collect();
+            assert!(
+                refused.is_empty(),
+                "driver `{}` refused a channel its own layout advertises: {refused:?}",
+                driver.id(),
+            );
+
+            let past_end = layout.fm_channels.iter().map(|c| c.index).max().map(|m| m + 1).unwrap_or(0);
+            let song = f30_song(&[ChannelAssignment::Fm(past_end)]);
+            let msgs: Vec<String> = validate_for_export(&song, &song.instruments, *driver, &params)
+                .into_iter().map(|e| e.message).collect();
+            assert!(
+                msgs.iter().any(|m| m.contains("does not exist")),
+                "driver `{}` has {} FM voices, so FM index {past_end} is not one of them \
+                 and must be refused, got {msgs:?}",
+                driver.id(),
+                layout.fm_channels.len(),
+            );
+        }
     }
 }

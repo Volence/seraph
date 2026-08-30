@@ -306,6 +306,21 @@ not just branch-side:
 - **Frontend types + bundle:** `npm run build` (tsc + vite).
 - **Frontend tests:** `npm test` (vitest run; RTL infra exists since the library
   work).
+  **`npm test` FROM AN AGENT SESSION DROPS CONSOLE OUTPUT FROM PASSING TESTS — measure
+  warnings with `--reporter=verbose` or not at all** *(F44, 2026-08-30, verified firsthand
+  with a control pair on vitest 4.1.10)*. vitest 4 picks its reporter as
+  `isAgent ? "agent" : "default"`, and std-env's `isAgent` is true whenever `CLAUDECODE` or
+  `AI_AGENT` is set, which is every Claude session; the agent reporter runs
+  `silent: "passed-only"`, and a config-level `silent: false` does NOT override it.
+  Measured: a passing test's `console.log` appears **0** times under the default reporter and
+  **1** under `--reporter=verbose`, while `process.stderr.write` survives both.
+  **Pass/fail counts and failing names are UNAFFECTED** (failures print under every reporter),
+  so totals reported from an agent session are trustworthy; it is *warning* claims that are
+  not. `npm run build` is also unaffected — that is vite and tsc, not vitest.
+  **Any "no warnings" claim about vitest output from an agent session is therefore a claim
+  about a muted channel**, which is bar 16(d) with a successful command and real output. F45
+  books the general fix; F44 routed only the act() warning around it, to stderr plus a test
+  failure.
 - **Bindings drift check:** `src/bindings.ts` is generated from the specta-annotated
   commands (regeneration lives in `src-tauri/src/lib.rs`; a parity guard test in
   `model/instrument.rs` catches serde-vs-specta divergence). After the Rust lane,

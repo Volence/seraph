@@ -2928,3 +2928,63 @@ For any future session executing this queue:
   three went out together. `git diff --name-only` established in one command that the held work
   could not be the cause (only Rust and docs had changed). Second time tonight; "it is only
   intermittent" is precisely how a lane talks itself into pushing over red.
+- 2026-08-30 (cont.): **F44 LANDED — the act() warning is on again, and the parcel uncovered a
+  MEASUREMENT hazard bigger than the item it was dispatched for.** Merged and pushed at
+  `05ca871`, `origin/main` verified moved and equal to HEAD. Merged-tree lanes, exit codes read
+  directly: cargo **293 passed / 0 failed**, `npm run build` exit 0 with zero warning or error
+  lines, `npx tsc --noEmit` exit 0, vitest **352/352 across 33 files**, plus a **contended pair**
+  (two suites at once) both 352/352 with **zero act warnings**. No `src/bindings.ts` drift.
+  **THE HAZARD, AND IT INVALIDATES A CLASS OF PAST CLAIMS IN THIS REPO.** vitest 4 selects its
+  reporter as `isAgent ? "agent" : "default"`, and std-env's `isAgent` is true whenever
+  `CLAUDECODE` or `AI_AGENT` is set — which is every session like this one. The agent reporter
+  runs `silent: "passed-only"` and **drops console output from PASSING tests entirely**; a
+  config-level `silent: false` does not override it. So a warning printed for a human and printed
+  nothing for an agent, and the agent's own first measurement of this parcel read **0 warnings**,
+  which was false.
+  **VERIFIED FIRSTHAND HERE with a control pair**, because it is a claim about this lane's own
+  instrument: a scratch test emitting both, run twice on this machine with `CLAUDECODE=1` and
+  `AI_AGENT` set, vitest 4.1.10 — `console.log` from a passing test appears **0** times under the
+  default reporter and **1** time under `--reporter=verbose`, while `process.stderr.write`
+  survives **both**. Probe removed after measuring.
+  **CONSEQUENCE, stated plainly rather than softened: any "no warnings" claim about VITEST output
+  made from an agent session in this repo was measuring a muted channel.** Pass/fail counts are
+  unaffected, because failures print under every reporter — so tonight's landings, which reported
+  totals and failing names rather than warning counts, stand. `npm run build`'s zero-warning
+  claims are also unaffected: that is vite and tsc, a different process, not vitest's reporter.
+  **This is bar 16(d)'s absence surface wearing a new costume:** the command succeeded, the output
+  was real, and the emptiness meant "your channel is muted", not "there is nothing there".
+  **WHAT LANDED FOR F44 ITSELF.** `IS_REACT_ACT_ENVIRONMENT` is set in `src/test/setup.ts`.
+  `globals: true` was **rejected with a reason**: it would also inject `describe/it/expect` into
+  every file and make RTL register a SECOND `afterEach(cleanup)` on top of the existing one — a
+  large blast radius to buy one boolean.
+  **THE ENABLEMENT WAS PROVEN TO FIRE, WITH A CONTROL** (an enablement that cannot warn is
+  indistinguishable from none): a scratch component updated outside `act()` produced *"An update
+  to Counter inside a test was not wrapped in act(...)"* with the flag on and **nothing** with it
+  off, same test, same file.
+  **BLAST RADIUS AND TRIAGE: 6 warnings, 1 file, 3 tests — all (a), all the F43 family, zero
+  benign, zero unexplained.** `NewProjectDialog` loads its driver list in a mount effect setting
+  two states; three synchronous location tests rendered, asserted and returned with both still in
+  flight (2 updates x 3 tests = exactly 6). Fixed the F43 way — wait for the real precondition
+  (`await screen.findByText("Flamedriver")`) — not by wrapping the symptom, and assertions were
+  left unchanged. **The two tests in that same file that already awaited a precondition never
+  warned**, which is the same fix arrived at independently and is the corroboration.
+  **ZERO RESIDUAL, WITH A GUARD SO IT STAYS ZERO.** An act warning is re-emitted to
+  `process.stderr` (which vitest does not intercept) **and fails the causing test**, since
+  failures print under every reporter. That design is a direct consequence of the hazard above:
+  a diagnostic that only prints is invisible to exactly the sessions that run this suite most.
+  **A DEFECT THE AGENT FOUND IN ITS OWN GUARD, worth copying:** as two separate hooks, vitest's
+  reverse `afterEach` ordering ran the check BEFORE `cleanup`, and the throw then skipped the
+  unmount, leaking a mounted tree into later tests. Now one hook with `cleanup()` in `try` and the
+  report in `finally`.
+  **POISONED FIRSTHAND HERE, not accepted on report:** reverting `NewProjectDialog.test.tsx` to
+  its pre-fix state on the merged tree produces exactly **6 stderr warnings and `3 failed | 2
+  passed`** — the guard fires, names the component, and is specific rather than blanket. Restored
+  after.
+  **BOOKED — F45:** the reporter suppression is **repo-wide, not act-specific**. Any console-based
+  diagnostic (React key warnings, deprecation notices, anything a library prints from a passing
+  test) is invisible to every agent session running `npm test` here. F44 routed ONE diagnostic
+  around it; the general question — make agent runs use a reporter that does not drop console
+  output, or route other diagnostics to stderr as well — is unresolved and is its own parcel.
+  **Branch-name note:** the dispatched branch name did not pre-exist, so the agent renamed its
+  auto-named worktree branch to the briefed `parcel/f44-act-warnings` rather than inventing a
+  different target, and flagged it for confirmation. Confirmed correct; that is the intended name.

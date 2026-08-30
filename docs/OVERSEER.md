@@ -350,6 +350,23 @@ Repo-specific quality bars (each has caught a real defect here):
 - **Fresh worktrees have no `node_modules`** — frontend lanes need `npm install`
   first (Rust lanes don't). First `cargo build` per worktree is slow (own target
   dir); that's expected, not a hang.
+- **`cargo run` PUTS A WINDOW ON THE OWNER'S SCREEN. There is no headless display on this
+  box, so treat launching the app as an act with an audience** *(banked 2026-08-30; the
+  environment half verified firsthand here, the toolkit half relayed from the aurora lane,
+  their measurement at aurora `3c1639f2`, not reproduced here — reproducing it means
+  launching a window, which is the hazard)*. Measured in this session: `WAYLAND_DISPLAY` is
+  `wayland-0` with its socket live at `/run/user/1000/wayland-0`, `GDK_BACKEND` is **unset**,
+  and **`DISPLAY` is `:0`** — the owner's session, not an Xvfb.
+  Aurora's half, relayed: a toolkit that prefers Wayland lands on the owner's compositor
+  **even with `DISPLAY` pointed at a fresh Xvfb**, and unsetting `WAYLAND_DISPLAY` does not
+  save you (it falls back to the literal `wayland-0`). Tauri on WebKitGTK follows
+  `GDK_BACKEND`'s default, so a harness that wants isolation must set **`GDK_BACKEND=x11`
+  explicitly** and then **verify the screen size from inside the app** before trusting any
+  pixel measurement.
+  **Do not run the windowed case while he is logged in.** Nothing in this repo's test suites
+  launches the window today — but the line immediately below documents `cargo run` as the
+  normal way to start the app, so this is one command away rather than hypothetical, and any
+  session following this file could do it without meaning to.
 - **`cargo run` runs the app** (`default-run = "seraph"`); the extraction CLI is
   the separate `extract_library` bin (`cargo run --bin extract_library`).
   Extraction is idempotent (sha256 content-hash identity) — safe to re-run.

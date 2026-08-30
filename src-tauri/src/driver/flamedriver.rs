@@ -205,8 +205,9 @@ impl DriverProfile for FlamedriverProfile {
         song: &Song,
         instruments: &InstrumentBank,
         output_dir: &Path,
+        project_dir: Option<&Path>,
     ) -> Result<ExportResult, Vec<ExportError>> {
-        crate::export::smps::write_export(song, instruments, self, output_dir)
+        crate::export::smps::write_export(song, instruments, self, output_dir, project_dir)
     }
 }
 

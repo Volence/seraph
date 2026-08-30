@@ -1158,7 +1158,12 @@ pub fn export_song(
     })?;
 
     let path = std::path::PathBuf::from(&output_dir);
-    driver.export_song(&song, &song.instruments, &path).map_err(|errors| ExportFailure { errors })
+    // The project directory resolves DAC sample filenames (F33). It is read
+    // before `mgr` is dropped, and owned so the borrow does not outlive it.
+    let project_dir = mgr.project_path().map(|p| p.to_path_buf());
+    driver
+        .export_song(&song, &song.instruments, &path, project_dir.as_deref())
+        .map_err(|errors| ExportFailure { errors })
 }
 
 // --- WAV Export ---

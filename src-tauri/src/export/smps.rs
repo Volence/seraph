@@ -742,6 +742,7 @@ pub fn write_export(
     instruments: &InstrumentBank,
     driver: &dyn DriverProfile,
     output_dir: &Path,
+    project_dir: Option<&Path>,
 ) -> Result<ExportResult, Vec<ExportError>> {
     let params = compute_tempo_params(song.metadata.tempo, song.metadata.ticks_per_beat);
 
@@ -789,21 +790,58 @@ pub fn write_export(
         }])?;
 
         for track in dac_tracks {
-            if let Some(inst_id) = &track.instrument_id {
-                if let Some(inst) = instruments.dac.iter().find(|i| &i.id == inst_id) {
-                    let pcm_src = Path::new(&inst.pcm_file);
-                    if pcm_src.exists() {
-                        let dest = dac_dir.join(pcm_src.file_name().unwrap_or_default());
-                        if let Err(e) = fs::copy(pcm_src, &dest) {
-                            return Err(vec![ExportError {
-                                track_name: track.name.clone(), region_index: None, note_index: None,
-                                message: format!("Failed to copy DAC sample: {e}"),
-                            }]);
-                        }
-                        files.push(dest.to_string_lossy().into_owned());
-                    }
-                }
+            // `instrument_id` set and present in the bank are both already
+            // guaranteed: `validate_for_export` above errors with "No
+            // instrument assigned" / "Assigned instrument not found" and
+            // `write_export` returns early on any validation error. These
+            // remain as defensive matches, but they must not SKIP silently,
+            // which is how F33 hid.
+            let Some(inst_id) = &track.instrument_id else {
+                return Err(vec![ExportError {
+                    track_name: track.name.clone(), region_index: None, note_index: None,
+                    message: "DAC track has no instrument assigned, so no sample could be exported".into(),
+                }]);
+            };
+            let Some(inst) = instruments.dac.iter().find(|i| &i.id == inst_id) else {
+                return Err(vec![ExportError {
+                    track_name: track.name.clone(), region_index: None, note_index: None,
+                    message: "DAC track's instrument is not in the instrument bank, so no sample could be exported".into(),
+                }]);
+            };
+
+            // F33. `pcm_file` is a BARE FILENAME (`commands.rs` writes
+            // `format!("{id}.pcm")`), and every other consumer resolves it as
+            // `<project>/instruments/dac/<pcm_file>` (`manager.rs`,
+            // `import/mod.rs`, `commands.rs`). This used to do
+            // `Path::new(&inst.pcm_file)`, resolving it against the process
+            // CWD, where it essentially never exists -- and the `.exists()`
+            // guard had no `else`, so every DAC sample was dropped in silence
+            // from the export that actually reaches the game.
+            let Some(project_dir) = project_dir else {
+                return Err(vec![ExportError {
+                    track_name: track.name.clone(), region_index: None, note_index: None,
+                    message: "Cannot export DAC samples because the project has not been saved to disk yet. Save the project, then export.".into(),
+                }]);
+            };
+            let pcm_src = project_dir.join("instruments/dac").join(&inst.pcm_file);
+            if !pcm_src.exists() {
+                return Err(vec![ExportError {
+                    track_name: track.name.clone(), region_index: None, note_index: None,
+                    message: format!(
+                        "DAC sample file is missing: expected it at {}. The export would \
+                         otherwise have produced music with no percussion.",
+                        pcm_src.display(),
+                    ),
+                }]);
             }
+            let dest = dac_dir.join(&inst.pcm_file);
+            if let Err(e) = fs::copy(&pcm_src, &dest) {
+                return Err(vec![ExportError {
+                    track_name: track.name.clone(), region_index: None, note_index: None,
+                    message: format!("Failed to copy DAC sample from {}: {e}", pcm_src.display()),
+                }]);
+            }
+            files.push(dest.to_string_lossy().into_owned());
         }
     }
 
@@ -813,6 +851,135 @@ pub fn write_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::instrument::{DacInstrument, InstrumentMetadata};
+    use crate::model::song::{Note, Region, Song, SongMetadata};
+    use std::fs;
+
+    /// Builds a saved-project layout on disk with one DAC sample, plus a song
+    /// whose single DAC track uses it. Returns (project_dir, song, bank).
+    fn dac_project(sample_bytes: &[u8]) -> (tempfile::TempDir, Song, InstrumentBank) {
+        let proj = tempfile::tempdir().unwrap();
+        let dac_dir = proj.path().join("instruments/dac");
+        fs::create_dir_all(&dac_dir).unwrap();
+        let inst_id = Uuid::new_v4();
+        let pcm_name = format!("{inst_id}.pcm");
+        fs::write(dac_dir.join(&pcm_name), sample_bytes).unwrap();
+
+        let inst = DacInstrument {
+            id: inst_id,
+            name: "Kick".into(),
+            target_sample_rate: 8000,
+            loop_start: None,
+            loop_length: None,
+            original_file: "kick.wav".into(),
+            pcm_file: pcm_name,
+            source_is_raw: false,
+            metadata: InstrumentMetadata::default(),
+        };
+        let song = Song {
+            metadata: SongMetadata {
+                name: "DacSong".into(),
+                tempo: 120.0,
+                time_signature: (4, 4),
+                ticks_per_beat: 480,
+                driver_id: "flamedriver".into(),
+            },
+            tracks: vec![Track {
+                id: Uuid::new_v4(),
+                name: "Drums".into(),
+                channel: ChannelAssignment::Dac(0),
+                instrument_id: Some(inst_id),
+                regions: vec![Region {
+                    id: Uuid::new_v4(),
+                    start_tick: 0,
+                    duration_ticks: 480,
+                    notes: vec![Note {
+                        tick: 0, pitch: 60, velocity: 100, duration_ticks: 240,
+                        instrument_id: Some(inst_id), detune: 0,
+                        pan_override: None, modulation: None,
+                    }],
+                    instrument_id: None,
+                }],
+                muted: false, solo: false, volume: 127, pan: Pan::Center,
+                pitch_offset: 0, modulation: None,
+            }],
+            instruments: InstrumentBank { fm: vec![], psg: vec![], dac: vec![inst] },
+        };
+        let bank = song.instruments.clone();
+        (proj, song, bank)
+    }
+
+    /// F33. The export that actually reaches the game must carry the drum
+    /// sample. It used to resolve `pcm_file` (a bare filename) against the
+    /// process CWD, where it never exists, and skip on a bare `.exists()`
+    /// check with no `else` -- so every DAC sample vanished in silence while
+    /// the export reported success.
+    #[test]
+    fn the_dac_sample_is_copied_into_the_export() {
+        let bytes: Vec<u8> = (0u8..64).collect();
+        let (proj, song, bank) = dac_project(&bytes);
+        let out = tempfile::tempdir().unwrap();
+
+        let result = write_export(
+            &song, &bank, &crate::driver::FlamedriverProfile,
+            out.path(), Some(proj.path()),
+        ).expect("export should succeed");
+
+        let copied = out.path().join("dac").join(&bank.dac[0].pcm_file);
+        assert!(
+            copied.exists(),
+            "the DAC sample must be copied into the export; expected it at {}",
+            copied.display(),
+        );
+        assert_eq!(
+            fs::read(&copied).unwrap(), bytes,
+            "the copied sample must be byte-identical to the source",
+        );
+        assert!(
+            result.files.iter().any(|f| f.contains(".pcm")),
+            "the exported file list must name the sample, got {:?}", result.files,
+        );
+    }
+
+    /// The control: a missing sample must be a REPORTED failure, never a
+    /// silent skip. Without this, the fix above could regress to skipping and
+    /// the export would still "succeed" with no percussion.
+    #[test]
+    fn a_missing_dac_sample_is_reported_not_skipped() {
+        let (proj, song, bank) = dac_project(&[1, 2, 3, 4]);
+        fs::remove_file(proj.path().join("instruments/dac").join(&bank.dac[0].pcm_file)).unwrap();
+        let out = tempfile::tempdir().unwrap();
+
+        let errors = write_export(
+            &song, &bank, &crate::driver::FlamedriverProfile,
+            out.path(), Some(proj.path()),
+        ).expect_err("a missing DAC sample must fail the export, not pass silently");
+
+        assert!(
+            errors.iter().any(|e| e.message.contains("DAC sample file is missing")),
+            "the failure must name the missing sample, got {:?}",
+            errors.iter().map(|e| &e.message).collect::<Vec<_>>(),
+        );
+    }
+
+    /// An unsaved project cannot resolve sample filenames at all. That must be
+    /// a clear instruction, not a silent drop.
+    #[test]
+    fn exporting_dac_from_an_unsaved_project_says_to_save_first() {
+        let (_proj, song, bank) = dac_project(&[9, 9, 9]);
+        let out = tempfile::tempdir().unwrap();
+
+        let errors = write_export(
+            &song, &bank, &crate::driver::FlamedriverProfile,
+            out.path(), None,
+        ).expect_err("no project dir means samples cannot be resolved");
+
+        assert!(
+            errors.iter().any(|e| e.message.contains("has not been saved")),
+            "must tell the user to save first, got {:?}",
+            errors.iter().map(|e| &e.message).collect::<Vec<_>>(),
+        );
+    }
 
     #[test]
     fn test_tempo_120bpm_480tpb() {

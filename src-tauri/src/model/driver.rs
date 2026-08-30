@@ -17,11 +17,17 @@ pub trait DriverProfile: Send + Sync {
     fn fm_from_bytes(&self, bytes: &[u8]) -> Result<FmInstrument, String>;
     fn import_formats(&self) -> Vec<&str>;
     fn export_formats(&self) -> Vec<&str>;
+    /// `project_dir` is the open project's directory, needed to resolve DAC
+    /// sample files: `DacInstrument::pcm_file` is a BARE FILENAME that lives
+    /// at `<project_dir>/instruments/dac/<pcm_file>`. `None` when no project
+    /// is saved on disk, which a driver that needs samples must report rather
+    /// than skip (audit F33).
     fn export_song(
         &self,
         song: &Song,
         instruments: &InstrumentBank,
         output_dir: &Path,
+        project_dir: Option<&Path>,
     ) -> Result<ExportResult, Vec<ExportError>>;
 }
 

@@ -1455,10 +1455,19 @@ mod tests {
         );
     }
 
-    /// Default location of the Zyrinx test ROM on the machine this repo is
-    /// developed on. Overridable with `SERAPH_ZYRINX_ROM`.
-    const ZYRINX_ROM_DEFAULT: &str =
-        "/home/volence/sonic_hacks/The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md";
+    /// Where the Zyrinx test ROM sits RELATIVE TO the directory this repo is
+    /// checked out in. A commercial ROM cannot live in the repo, so like the
+    /// S3K disassembly it is a sibling, resolved against the same parent by
+    /// the same `test_support::sibling_root` (audit F41). Overridable with
+    /// `SERAPH_ZYRINX_ROM`.
+    const ZYRINX_ROM_RELATIVE: &str =
+        "The Adventures of Batman and Robin/Adventures of Batman & Robin, The (USA).md";
+
+    /// Last-ditch root, used only when git cannot answer. Relative to the
+    /// process's working directory, which for `cargo test` is `src-tauri/` in
+    /// the MAIN checkout — right there and wrong from a linked worktree, which
+    /// is exactly why `sibling_root` is tried first.
+    const ZYRINX_ROOT_FALLBACK: &str = "../..";
 
     /// Resolves the Zyrinx test ROM, or **fails the test** explaining how to
     /// proceed (audit F32).
@@ -1471,10 +1480,12 @@ mod tests {
     /// Returning `None` requires the opt-out to be set deliberately, so
     /// skipping is always a conscious act by someone who has read this.
     fn zyrinx_test_rom() -> Option<std::path::PathBuf> {
-        let rom_path = std::path::PathBuf::from(
-            std::env::var("SERAPH_ZYRINX_ROM")
-                .unwrap_or_else(|_| ZYRINX_ROM_DEFAULT.to_string()),
-        );
+        let rom_path = match std::env::var("SERAPH_ZYRINX_ROM") {
+            Ok(explicit) => std::path::PathBuf::from(explicit),
+            Err(_) => crate::test_support::sibling_root()
+                .unwrap_or_else(|| std::path::PathBuf::from(ZYRINX_ROOT_FALLBACK))
+                .join(ZYRINX_ROM_RELATIVE),
+        };
         if rom_path.exists() {
             return Some(rom_path);
         }

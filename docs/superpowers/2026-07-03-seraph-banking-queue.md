@@ -2520,3 +2520,30 @@ For any future session executing this queue:
   instead of silently outliving this reasoning** — the perishable-precedent rule applied to
   this lane's own new comment.
   **Extraction stats now read `songs=19`, not 20.** One of those twenty was a phantom.
+
+- 2026-08-30 (cont.): **F34 LANDED — the F31 guard now covers the REGISTRY, not a hand-typed
+  list.** Merged `72391ef`, pushed, `origin/main` verified moved and equal to HEAD.
+  Merged-tree lanes: cargo **274 passed / 0 failed**, `npm run build` exit 0 with zero
+  warning or error lines, vitest **352/352 across 33 files**, no `src/bindings.ts` drift.
+  **THE PROBLEM WAS AN ENUMERATION ONE (bar 8).** `DriverRegistry` was constructed inline at
+  **three** sites — `lib.rs:180`, `audio/overlap_audibility.rs:61`, `project/manager.rs:1628`
+  — each re-typing the same registration. So an invariant asserted over "the registered
+  drivers" could only ever cover the list the asserting code itself repeated. The absent
+  Memra profile would have been covered by **none** of them **while the guard still looked
+  like it covered everything**, which is the failure mode F31's doc comment named and
+  deliberately left standing.
+  **THE FIX:** `driver::default_registry()` as the single registration site, used at all
+  three, plus `DriverRegistry::profiles()` so the guard iterates what the app **actually**
+  registers. The guard's doc comment no longer has to disclaim its own scope — the earlier
+  disclaimer is deleted rather than left to rot, which is the perishable-comment rule applied
+  to a comment this lane wrote four hours ago.
+  **POISONED TWO WAYS, because "covers every driver" and "can still catch one" are DIFFERENT
+  CLAIMS and only the second is what F31 had proven.** (A) Empty the registry → the guard
+  fails on its explicit emptiness control (*"passes by having nothing to check"*) rather than
+  passing vacuously over zero drivers. (B) Re-add FM6 to Flamedriver → the invariant still
+  fires, now reached **through the registry** rather than a hand-written vec. Neither poison
+  alone would have established the pair.
+  **Housekeeping, stated so the warning count is readable:** removed four imports this change
+  made unused. The remaining `unused variable: track_idx` in `import/smps_mapper.rs` is
+  **pre-existing** — confirmed present in the pre-F29 build log — and untouched, since it is
+  nobody's parcel today.

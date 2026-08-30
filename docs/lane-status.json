@@ -1,60 +1,37 @@
 {
-  "focus": "Answered two cleanup directives; nothing of mine was in his way. Still holding for your pick.",
+  "focus": "Seven defects cleared today. Two questions are waiting on you, and neither is urgent.",
   "inFlight": [],
   "blockedOnOwner": [
     {
       "id": "d-9",
       "what": "S0's driver list. Your wait-for-the-engine point is answered in the card and my recommendation changed because of it",
       "since": "2026-08-22"
+    },
+    {
+      "id": "d-10",
+      "what": "Whether VGM export should actually carry drums, or wait until the export button is wired up. Nothing can make a VGM today, so this costs you nothing right now",
+      "since": "2026-08-30"
     }
   ],
-  "nextBoundary": "At a boundary now. The next one is the stray-byte fix (F28) landed, which also opens this lane's log.",
+  "nextBoundary": "At a boundary now, and a clean one: nothing half-applied, seven defects landed and pushed.",
   "queue": [
     {
-      "id": "F28",
-      "title": "A stray invisible byte in the piano-roll file makes every code search silently skip it. Re-confirmed present this boot, one byte at offset 32584",
-      "state": "next",
-      "size": "S",
-      "blockedBy": null
-    },
-    {
-      "id": "F31",
-      "title": "The one driver profile offers seven voices on a six-voice chip and carries no channel-6 rule. Your ruling makes fixing it step one of the channel-6 work",
-      "state": "open",
-      "size": "M",
-      "blockedBy": null
-    },
-    {
       "id": "F27",
-      "title": "Make playback follow the driver instead of promising both at once. Design ruled by you; the work is unblocked and sits behind F31",
+      "title": "Make playback follow the driver instead of promising both at once. F31 landed, so the profile it reads is now correct",
       "state": "open",
       "size": "M",
-      "blockedBy": "F31, because the driver profile has to be right before playback can read it"
-    },
-    {
-      "id": "F29",
-      "title": "VGM export throws away every drum, silently, and the booked VGM fix would ship that",
-      "state": "open",
-      "size": "M",
-      "blockedBy": null
+      "blockedBy": "your ch6-mode design call, which d-7 deliberately carried forward as unsettled"
     },
     {
       "id": "README-7",
-      "title": "Seven small booked defects from the README pass",
-      "state": "open",
+      "title": "Six small booked defects from the README pass. The seventh, the VGM wiring, is the only one waiting on you",
+      "state": "next",
       "size": "M",
-      "blockedBy": "F29 should land first or the VGM fix ships drumless"
+      "blockedBy": null
     },
     {
       "id": "FLAKE",
       "title": "One test fails about once in six full runs and its name was never captured",
-      "state": "open",
-      "size": "S",
-      "blockedBy": null
-    },
-    {
-      "id": "F32",
-      "title": "Two import tests name a ROM under your home folder and quietly pass themselves when it is missing, so on any other tree they report green having checked nothing",
       "state": "open",
       "size": "S",
       "blockedBy": null
@@ -75,7 +52,7 @@
       "project": "SOUND-TRUTH"
     }
   ],
-  "updatedAt": "2026-08-27T13:36:22Z",
-  "awaiting": "your go on what to pick up (I propose F28). Also two things for you: the F15 worktree is now safely removable and would return 4.1 GB, and there is a 108 MB leftover from a project called megadaw that predates this repo.",
+  "updatedAt": "2026-08-30T01:52:54Z",
+  "awaiting": "nothing from you to keep going. d-9 and d-10 are both yours when you want them; d-10 is the small one and I recommend deferring it.",
   "atBoundary": true
 }

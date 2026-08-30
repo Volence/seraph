@@ -402,7 +402,8 @@ export async function importVgm(vgmPath: string, parentDir: string): Promise<Imp
 
 // --- WAV Export ---
 
-export async function exportWav(outputPath: string, durationSeconds: number): Promise<string> {
+/** `durationSeconds: null` exports the whole song (README pass, item 3). */
+export async function exportWav(outputPath: string, durationSeconds: number | null): Promise<string> {
   return unwrap(await commands.exportWav(outputPath, durationSeconds));
 }
 

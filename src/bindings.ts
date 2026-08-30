@@ -516,7 +516,7 @@ async exportSong(outputDir: string) : Promise<Result<ExportResult, ExportFailure
     else return { status: "error", error: e  as any };
 }
 },
-async exportWav(outputPath: string, durationSeconds: number) : Promise<Result<string, string>> {
+async exportWav(outputPath: string, durationSeconds: number | null) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("export_wav", { outputPath, durationSeconds }) };
 } catch (e) {

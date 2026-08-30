@@ -115,7 +115,8 @@ export function PianoRoll({ region, onClose, playing, projectMeta, seekTick, onS
   }
   useEffect(() => () => { if (hintTimer.current) clearTimeout(hintTimer.current); }, []);
   const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
-  // Draw Mode (F6): a TOOL setting, not a property of the document — like the
+  // Draw Mode (bound to B; "F6" elsewhere is this repo's audit item number,
+  // not a key): a TOOL setting, not a property of the document — like the
   // grid selector it deliberately survives a region switch (Ableton's Draw
   // Mode is likewise global, not per-clip).
   const [drawMode, setDrawMode] = useState(false);

@@ -1,5 +1,5 @@
 {
-  "focus": "Seven defects cleared today. Two questions are waiting on you, and neither is urgent.",
+  "focus": "Nine defects cleared, including the intermittent test failure that has been unidentified for weeks.",
   "inFlight": [],
   "blockedOnOwner": [
     {
@@ -13,7 +13,7 @@
       "since": "2026-08-30"
     }
   ],
-  "nextBoundary": "At a boundary now, and a clean one: nothing half-applied, seven defects landed and pushed.",
+  "nextBoundary": "At a boundary now. Everything startable without you is done; what remains needs your call.",
   "queue": [
     {
       "id": "F27",
@@ -21,20 +21,6 @@
       "state": "open",
       "size": "M",
       "blockedBy": "your ch6-mode design call, which d-7 deliberately carried forward as unsettled"
-    },
-    {
-      "id": "README-7",
-      "title": "Six small booked defects from the README pass. The seventh, the VGM wiring, is the only one waiting on you",
-      "state": "next",
-      "size": "M",
-      "blockedBy": null
-    },
-    {
-      "id": "FLAKE",
-      "title": "One test fails about once in six full runs and its name was never captured",
-      "state": "open",
-      "size": "S",
-      "blockedBy": null
     },
     {
       "id": "PITCH-FORMAT",
@@ -50,9 +36,16 @@
       "size": "L",
       "blockedBy": "d-9, your call on which drivers it targets",
       "project": "SOUND-TRUTH"
+    },
+    {
+      "id": "README-8",
+      "title": "Two leftovers from the README pass, neither a bug: the app cannot author FM3 special mode (the driver does support it), and channel overlap warnings are computed but never shown anywhere",
+      "state": "open",
+      "size": "M",
+      "blockedBy": "where overlap warnings should appear is a design call, and the FM3 one is a feature not a fix"
     }
   ],
-  "updatedAt": "2026-08-30T01:52:54Z",
-  "awaiting": "nothing from you to keep going. d-9 and d-10 are both yours when you want them; d-10 is the small one and I recommend deferring it.",
+  "updatedAt": "2026-08-30T02:03:29Z",
+  "awaiting": "your call on d-9 and d-10, and on F27. Everything I could do without you is done. d-10 is the small one and I recommend deferring it.",
   "atBoundary": true
 }

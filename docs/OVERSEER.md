@@ -105,9 +105,16 @@ a cold boot that reads only this file would never learn either file exists.
   parse failure is a stop, not a note. Read the recipe there rather than from any copy; the
   hazard is that a file not ending in `0a` glues the new record onto the last one and
   destroys BOTH, in a file whose contract forbids rewriting, with nothing in the format
-  detecting it. **Measured here 2026-08-30T09:5xZ: `decisions.jsonl` 12 lines,
-  `lane-log.jsonl` 21 lines, both ending `0a`, every line parsing.** Re-measure rather than
-  trusting that line.
+  detecting it. **Measured here 2026-08-30, between 10:13Z and 10:19Z:
+  `decisions.jsonl` 12 lines, `lane-log.jsonl` 21 lines, both ending `0a`, every line
+  parsing.** Re-measure rather than trusting that line.
+  *(The first version of this sentence said `09:5xZ`. That was written from my head, anchored
+  to a clock read taken about twenty minutes earlier at boot, and it is the exact defect the
+  status contract names for `updatedAt` arriving in a place nobody thought to apply the rule.
+  The bounds above are evidence rather than a second guess: the measurement ran in the same
+  tool batch that verified `a7b91b4d`, so it cannot precede that commit's 10:13:10Z, and the
+  next real clock read was 10:18:46Z. A timestamp is the field that lets a reader discount
+  everything else, so a fabricated one is worse than an absent one.)*
 
 - `at` and `updatedAt` come from `date -u +%Y-%m-%dT%H:%M:%SZ` and nowhere else.
 - No em dashes or en dashes in either file's prose fields (standing owner

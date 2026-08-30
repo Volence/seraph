@@ -64,10 +64,29 @@ a cold boot that reads only this file would never learn either file exists.
   set to the settled id, carrying the **identical** `question`, `options` and
   `recommend`, and what he chose plus what you did in `detail`. No card re-renders,
   because the blocker is already gone. This repo's `d-5` is the worked example.
-  Do not invent an `outcome` or `answered` key: a consumer that rebuilds each item from
-  a fixed key set **drops an unknown key silently**, so such an entry looks complete on
-  disk and loses the outcome at the reader, undetectably from both ends. A first-class
-  `answered` field is booked centrally as a coordinated change with the console.
+  **SUPERSEDED IN PART, 2026-08-30: the `answered` field LANDED and this paragraph's
+  prohibition is now stale for it.** The text above still holds for an invented key; what
+  changed is that `answered` is no longer invented. `DECISIONS.md` **rule 8d** (read at
+  empyrean `origin/main`, verified in force from 2026-08-30T01:58:05Z, Dominion's reader
+  parsing it at dominion `7a8a9b3`) makes it first-class, on the SAME appended entry 8c
+  already requires: `{"at","by","chose","said","did"}`, where `by` is `owner` | `hub` |
+  `lane`, `chose` is validated against the entry's own option keys and is `null` when he
+  answered freehand, `said` quotes his words and is never linted, and `did` is one
+  sentence of lane prose. **A malformed `answered` costs the field, not the line.**
+  Still true and load-bearing: any OTHER invented top-level key is dropped silently by a
+  consumer that rebuilds from a fixed key set, so `outcome` remains barred.
+  **Two things 8d does not do.** It does not make an entry settled — settled-ness still
+  derives from the live `blockedOnOwner` list under rule 9, so an entry carrying
+  `answered` that a blocker still claims renders as an OPEN card with a marker. And it is
+  **not a licence to backfill**: entries closed before 8d stay exactly as written, this
+  repo's `d-5` among them.
+  **This repo's worked example of the new shape is `d-11`** (F37, the silent drum entry),
+  which is also the first entry here filed with its answer already recorded rather than as
+  an open card — legitimate because no blocker was ever owed on it: it was ruled by the hub
+  in the owner's place under his standing delegation, with `by: "hub"` saying exactly that.
+  When you file one of those, put the provenance and its overturnable-on-read-back status in
+  `detail`, and leave `said` off — he did not speak, and quoting a peer's reasoning into a
+  field defined as his words would forge one.
 - **`docs/lane-log.jsonl` DOES NOT EXIST here yet, and that is now CORRECT.**
   `contract/LANE_LOG.md` **rule 8**: open the log at your next landing, never backfill.
   A lane that has landed nothing writes nothing — the file records landings, it is not a

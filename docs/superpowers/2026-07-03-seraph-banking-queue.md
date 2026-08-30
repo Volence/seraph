@@ -3259,3 +3259,27 @@ For any future session executing this queue:
   `null === null` and was given a non-null assertion so it cannot. Guard proven red-first without
   the stub (`expected null not to be null`), and `tsc` caught a real typing bug in the test before
   either lane ran.
+- 2026-08-30 (cont.): **AUTHORITY NOTE FOR ANY FUTURE SERAPH SESSION: this lane's licence to work
+  without a boot stop is the 00:31:51Z RESUME BRIEF, NOT the 06:38:01Z "finish line" quote.**
+  Both are real, both are the owner's own words, both are committed in empyrean's `docs/OVERSEER.md`
+  — and **only the first one reaches this lane.**
+  Verified firsthand: empyrean **`f4f3753`** is reachable on freshly-fetched `origin/main` and is a
+  docs commit (+6 lines), which is the correct class for a ruling record. Its banked text quotes
+  him at **2026-08-30T06:38:01Z** — *"ok, let's just remember to push and make it continue through
+  the parallax/raster project if yyou don't mind..."* — and glosses it as: a lane rebooted
+  mid-project does not stop at its boot stop, **"its pick is its own `next` row under the effects
+  plan"**.
+  **THE SCOPE IS IN THE GLOSS ITSELF: "under the effects plan".** EFFECTS-W1 is aeon, aurora and
+  sigil. **Seraph is outside it, as the hub stated in the same message that relayed the quote.**
+  So the 06:38:01Z quote is about a project this lane is not in, and reading it as authority here
+  would be extending his words past what they say.
+  **This changes nothing operationally and that is exactly why it is worth writing down.** The
+  earlier RESUME BRIEF (00:31:51Z, verified at boot this session) is addressed to every lane and
+  says in his voice *"Do not boot into a stop and wait for a pick: his pick is this paragraph"*.
+  That already authorises continuous owner-free work here, so the behaviour is identical either
+  way — **but the authority is not, and a future session citing the newer quote would be laundering
+  an inference about another project into a ruling about this one.** The relay was in good faith
+  and its practical instruction was right; the provenance is what needed pinning.
+  **Minor citation correction, recorded because this suite's whole anchor discipline rests on
+  timestamps matching:** the relay gave the quote's time as *"06:5xZ"*; the banked text and the
+  commit both say **06:38:01Z**. A future reader matching on the relayed time would not find it.

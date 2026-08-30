@@ -2234,3 +2234,49 @@ For any future session executing this queue:
   unexecuted command is indistinguishable from an empty result that is an answer. Quote the
   globs, and treat "no hits" from a glob-bearing grep as unverified until the command is
   known to have run. Passed to the sigil lane in the reply rather than kept here.
+
+- 2026-08-30 (cont.): **F28 LANDED, AND THE LANE LOG IS OPEN.** `src/components/PianoRoll.tsx`
+  held the tree's only source NUL (offset 32584, in `MIXED_VOICE`); it is gone. Fix spells the
+  sentinel as the escape `"\\0mixed"` rather than a raw byte, so the **runtime string is
+  unchanged** and the sentinel still cannot collide with a real voice id: `"\\0mixed" ===
+  String.fromCharCode(0)+"mixed"` is `true`, length 6, codepoint 0 (checked in node, not
+  reasoned about). `grep -c MIXED_VOICE` now returns 7 and exits 0, the exact inverse of the
+  booked symptom. Merged `3207c0b` (fix `6582a94`), pushed, `origin/main` verified moved and
+  equal to HEAD. Merged-tree lanes, exit codes read directly and never through a pipe: cargo
+  **264 passed / 0 failed** (exit 0), `npm run build` exit 0 with zero warning or error lines,
+  vitest **352/352 across 33 files** (exit 0), no `src/bindings.ts` drift.
+  **THE POINT OF F28 WAS RE-RUNNING THE SWEEPS IT INVALIDATED, AND BOTH CAME BACK CLEAN —
+  recorded because a null result is the one people skip writing down.** (1) F15's evidence
+  (`grep` for `localStorage`, the sweep whose `Where` said "grep (no localStorage)"): 11 hits
+  with `-a`, **none in `PianoRoll.tsx`**, so F15's zero-view-state-persistence conclusion
+  survives and is now verified rather than accidentally-clean. (2) The bar-13 gesture
+  reachability sweep, whose precedent is a live drag outliving the document it began on:
+  `PianoRoll.tsx` is the 907-line drag surface that sweep would have skipped, and it holds
+  both a window-level `keydown` (594) and a `SONG_REVERTED_EVENT` listener (275). Read past
+  the cited lines per bar 11: `openRegionIdRef` (219-220, guarding 228 and 267) is a
+  **correct guard** on async fetch continuations across a region switch, with the
+  out-of-order-reply reasoning stated in its own comment. **No new finding; bar 13's lesson
+  is already applied in this file.**
+  **CONFIRMED PRESENT AND DELIBERATELY NOT FIXED HERE:** the stale `// Draw Mode (F6):`
+  comment at line 118 where the binding is `B` (line 816's tooltip already says `(B)`). It is
+  booked under README-7 and folding a second finding into F28's commit would have widened the
+  landing quietly. Note it is an instance of the protocol's own worst-place-for-a-perishable-
+  claim bar: a stale binding living in a comment, in the one file no grep could see.
+  **PROVENANCE OF THE GO, stated because this lane's standing rule is that a relayed grant is
+  not a witnessed one.** The owner did not give this lane the go directly; the hub
+  (Dominion-launched empyrean session) pushed F28 -> F31 -> F27 under a standing delegation.
+  **Anchor verified firsthand here**, not accepted on the hub's word: empyrean `b445116` is
+  reachable from and is the tip of a freshly-fetched empyrean `origin/main`, and the RESUME
+  BRIEF at `docs/OVERSEER.md:29` carries the owner **verbatim** rather than paraphrased,
+  including *"I wanna clear + reboot everything then just have you again continuously push
+  things through"*, *"if anything's confused you can make decisions/fable can"* and
+  *"(you're the director/overseer)"*. That is a committed verbatim delegation read at a
+  committed revision, which is a materially stronger artifact than the unanchored secondhand
+  *"I guess"* this lane refused on 2026-08-22 — the distinction is the anchor and the
+  verbatim, not the fact of relay. Recorded so the difference is checkable rather than a
+  judgement call. Scope held: the pushed item was **this lane's own proposed order,
+  unchanged**, the fix is one line and reversible, and nothing irreversible or
+  design-changing was taken on relayed authority. **d-9 stays with the owner** (the hub
+  agrees and explicitly declined to rule it); its card already carries the changed
+  recommendation (`two-drivers`) and its full `because`, verified this session, so no
+  rule-8c append was needed.

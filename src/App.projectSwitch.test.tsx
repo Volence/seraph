@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/dom";
 import App from "./App";
 import * as ipc from "./api/ipc";
@@ -110,8 +110,31 @@ async function createFromOpenNewProjectDialog() {
   fireEvent.change(screen.getByPlaceholderText("/path/to/projects"), {
     target: { value: "/tmp/projects" },
   });
+  // Wait for the PRECONDITION, then assert the CONSEQUENCE without polling.
+  //
+  // The dialog loads its driver list in an effect, and handleCreate refuses
+  // with "Select a driver" — never reaching ipc.createProject at all — while
+  // driverId is still empty. Clicking Create first therefore sets up a wait
+  // that can never succeed: the old
+  //   `await waitFor(() => expect(ipc.createProject).toHaveBeenCalled())`
+  // spent its entire 1000ms default budget and then reported "expected
+  // vi.fn() to be called at least once", which reads as the product failing
+  // to create a project rather than as this test having jumped the gun. That
+  // was THE flake here (the failing run's own 1342ms duration is the tell),
+  // and it only ever bit under a loaded full-suite run, where React defers
+  // the dialog's passive effect past the point this helper clicks.
+  //
+  // Drained, not polled — the same reasoning the sibling cases in
+  // ArrangementView.test.tsx already carry. listDrivers is a mocked promise
+  // with no timers, so one async act() runs the effect and settles it, with
+  // no timeout budget for a loaded box to blow through.
+  await act(async () => {});
+  expect(screen.getByRole("option", { name: "Flamedriver (S3K)" })).toBeInTheDocument();
   fireEvent.click(screen.getByText("Create"));
-  await waitFor(() => expect(ipc.createProject).toHaveBeenCalled());
+  // handleCreate calls ipc.createProject synchronously, before its first
+  // await, so there is nothing to poll for: this either holds right now or
+  // names a real defect immediately instead of a minute later.
+  expect(ipc.createProject).toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -175,8 +198,12 @@ describe("the module clipboard does not survive a project switch", () => {
     copyProjectScopedPayloads();
 
     fireEvent.click(screen.getByRole("button", { name: "Open" }));
-    await waitFor(() => expect(ipc.openProject).toHaveBeenCalled());
+    // Drained, not polled: handleOpenProject is a chain of mocked promises
+    // (confirmDiscard, the dialog import, open, closeProject, openProject)
+    // with no timers, so one async act() settles it. Polling for the call
+    // instead would report a chain that broke as a call that never happened.
     await act(async () => {});
+    expect(ipc.openProject).toHaveBeenCalled();
 
     expectClipboardEmpty();
   });
@@ -198,15 +225,18 @@ describe("the module clipboard does not survive a project switch", () => {
       fireEvent.click(btn);
       await act(async () => {});
     }
-    await waitFor(() =>
-      expect(screen.getByPlaceholderText("Select .asm file")).toHaveValue("/tmp/projects"),
-    );
+    // The loop above already drained each Browse, so this precondition holds
+    // now or not at all — handleImport refuses with "Select a source file"
+    // while it is unset, which would surface as importSong "never called".
+    expect(screen.getByPlaceholderText("Select .asm file")).toHaveValue("/tmp/projects");
     // Two "Import" buttons exist now (TopBar's and the dialog's submit);
     // the dialog's is the later one in the tree.
     const importButtons = screen.getAllByRole("button", { name: "Import" });
     fireEvent.click(importButtons[importButtons.length - 1]);
-    await waitFor(() => expect(ipc.importSong).toHaveBeenCalled());
+    // Drained, not polled: handleImport awaits closeProject before importSong,
+    // all mocked promises with no timers.
     await act(async () => {});
+    expect(ipc.importSong).toHaveBeenCalled();
 
     expectClipboardEmpty();
   });

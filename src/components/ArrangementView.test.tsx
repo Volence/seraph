@@ -65,6 +65,36 @@ function renderView(overrides: Partial<Parameters<typeof ArrangementView>[0]> = 
   );
 }
 
+/**
+ * Wait for the precondition the window-level key handlers actually depend on.
+ *
+ * `findByText("Bass Lane")` only proves the fetched tracks reached the DOM.
+ * Ctrl+C/Ctrl+V are NOT read off that render: they are the listener a
+ * `useEffect` registered on `window`, closing over `tracks`. Painting the
+ * header and re-registering that listener are two separate steps — the commit
+ * happens in a microtask, the passive-effect flush rides React's scheduler on
+ * a MessageChannel macrotask — and `findByText` resolves off the first one (a
+ * MutationObserver microtask). RTL's `asyncWrapper` covers the gap with a bet:
+ * a `setTimeout(0)` drain it expects to run after the scheduler. Idle that bet
+ * wins every time (measured 20/20 here), but the scheduler yields to the host
+ * on a 5ms budget, so under full-suite CPU contention it can be preempted,
+ * yield without flushing, and repost — landing AFTER the drain. The listener
+ * still on `window` is then the mount-time one, whose `tracks` is `[]`: the
+ * region lookup misses, `copyRegions([])` no-ops (empty input is documented as
+ * a no-op), and the clipboard stays empty. That is exactly what the guards
+ * below catch, and why they only ever caught it under load.
+ *
+ * An `act()` drain closes it deterministically rather than more slowly: inside
+ * `act` React queues passive effects on the act queue and flushes them before
+ * act resolves, so there is no timing bet left to lose. Measured on this tree
+ * under identical sustained load, interleaved: 4 stale copies in 300 undrained
+ * mounts, 0 in 300 drained ones.
+ */
+async function tracksBoundToKeyHandlers() {
+  await screen.findByText("Bass Lane");
+  await act(async () => {});
+}
+
 describe("ArrangementView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -216,7 +246,7 @@ describe("ArrangementView", () => {
       const onSelectRegions = vi.fn();
       // seekTick 2000 with 1440-tick bars snaps down to 1440.
       renderView({ selectedRegions: [selected], onSelectRegions, seekTick: 2000 });
-      await screen.findByText("Bass Lane");
+      await tracksBoundToKeyHandlers();
 
       fireEvent.keyDown(window, { key: "c", ctrlKey: true });
       expect(getRegionClipboard()).toHaveLength(1);
@@ -244,7 +274,10 @@ describe("ArrangementView", () => {
 
     it("region copy defers to the piano roll while it owns a note selection", async () => {
       renderView({ selectedRegions: [selected] });
-      await screen.findByText("Bass Lane");
+      // Without the bind wait this case can pass for the WRONG reason: a stale
+      // handler copies nothing either, so "nothing pastes" would hold even if
+      // the G1 deferral were broken.
+      await tracksBoundToKeyHandlers();
       setPianoRollNoteSelectionActive(true);
       fireEvent.keyDown(window, { key: "c", ctrlKey: true });
       setPianoRollNoteSelectionActive(false);
@@ -257,7 +290,7 @@ describe("ArrangementView", () => {
 
     it("paste replays the copied payload when the source region is gone", async () => {
       renderView({ selectedRegions: [selected], seekTick: 0 });
-      await screen.findByText("Bass Lane");
+      await tracksBoundToKeyHandlers();
 
       fireEvent.keyDown(window, { key: "c", ctrlKey: true });
       // Assert the copy landed BEFORE depending on it: a copy that silently
@@ -285,7 +318,7 @@ describe("ArrangementView", () => {
       // half of this gate).
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       renderView({ selectedRegions: [selected], seekTick: 0 });
-      await screen.findByText("Bass Lane");
+      await tracksBoundToKeyHandlers();
 
       fireEvent.keyDown(window, { key: "c", ctrlKey: true });
       expect(getRegionClipboard()).toHaveLength(1);

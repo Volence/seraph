@@ -1,22 +1,32 @@
 {
   "schema": 1,
-  "name": "Silence voice 29",
+  "name": "Main Title voice 31",
   "tags": [],
   "provenance": {
     "game": "Batman & Robin",
     "songs": [
-      "Silence",
       "Main Title",
-      "Dark Studio"
+      "Gotham by Night",
+      "Joker's Theme",
+      "Moving Trucks",
+      "Flying Over The City",
+      "Moving Boss",
+      "Extreme Boss",
+      "Dark Studio",
+      "Animal Boss",
+      "Psycho Section",
+      "Space Boss",
+      "The Lab",
+      "Continue"
     ],
-    "slot": 29,
-    "hash": "sha256:3f64c2c1e7132b064dcdb91b8683735c8e03ed1afc5a4030599559014cd7f4a8"
+    "slot": 31,
+    "hash": "sha256:6ad97868ff0ea1e4f6f07fbb023b62e06ec027f9469abe06b4450b5e718d1fc6"
   },
   "type": "fm",
   "instrument": {
     "id": "00000000-0000-0000-0000-000000000000",
-    "name": "Silence voice 29",
-    "algorithm": 0,
+    "name": "Main Title voice 31",
+    "algorithm": 7,
     "feedback": 5,
     "operators": [
       {
@@ -55,7 +65,7 @@
         "d2r": 15,
         "sustainLevel": 0,
         "releaseRate": 15,
-        "totalLevel": 7,
+        "totalLevel": 0,
         "ssgEg": 0
       },
       {

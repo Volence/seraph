@@ -2,6 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, afterAll } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { installCanvasStub } from "./canvasStub";
 
 // React only emits its "update not wrapped in act(...)" warning when this global
 // is true. RTL sets it itself, but only from a beforeAll/afterAll block that it
@@ -115,3 +116,19 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   }
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 }
+
+// jsdom does not implement getContext, returns null, and prints one
+// "Not implemented: HTMLCanvasElement's getContext()" line per call through its
+// OWN virtual console -- which bypasses the reporter, so no reporter setting
+// reaches it. That was 1237 of 1365 lines in a full run, ~91% of the log.
+//
+// This does NOT suppress that message; the two parcels before this one existed
+// to stop hiding output and suppressing it would undo them. It makes jsdom's
+// statement false instead: the environment now HAS a 2D context, so there is
+// nothing left for jsdom to report. The side effect is that the twelve draw
+// functions in src/ finally execute under test instead of aborting on
+// `if (!ctx) return`.
+//
+// The stub rasterises nothing and is not evidence that anything renders
+// correctly. Read the header of ./canvasStub.ts before relying on it.
+installCanvasStub();

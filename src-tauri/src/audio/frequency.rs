@@ -93,9 +93,57 @@ pub fn psg_pitch_is_representable(midi_note: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    /// Default location of the S3K disassembly this table claims to match.
-    /// Overridable with `SERAPH_SKDISASM_DIR`. Relative to `src-tauri/`.
-    const SKDISASM_DEFAULT: &str = "../../skdisasm";
+    /// Last-ditch location of the S3K disassembly, used only when git cannot
+    /// answer. Relative to the process's working directory, which for
+    /// `cargo test` is `src-tauri/` in the MAIN checkout — see
+    /// `skdisasm_dir` for why that is not good enough on its own.
+    const SKDISASM_FALLBACK: &str = "../../skdisasm";
+
+    /// Where to look for the S3K disassembly, overridable with
+    /// `SERAPH_SKDISASM_DIR`.
+    ///
+    /// `skdisasm/` is a SIBLING of this repo, not part of it, so reaching it
+    /// means leaving the checkout. The old default counted `..` hops
+    /// (`../../skdisasm` from `src-tauri/`), which is right from the main
+    /// checkout at `<parent>/seraph/src-tauri` and WRONG from an agent
+    /// worktree at `<parent>/seraph/.claude/worktrees/<agent>/src-tauri`,
+    /// where the same two hops land in `.claude/worktrees/` (audit F39). The
+    /// hop count is a property of where the checkout happens to sit, so it
+    /// cannot be a constant.
+    ///
+    /// `git rev-parse --show-toplevel` does NOT fix this: inside a linked
+    /// worktree that reports the *worktree's* root, which is the wrong
+    /// directory again. `--git-common-dir` is the one thing every worktree
+    /// shares — it resolves to `<main checkout>/.git` from the main checkout
+    /// and from every worktree alike — so its parent is the repo and its
+    /// grandparent is the directory the sibling disassembly lives in.
+    ///
+    /// Returns `None` rather than guessing when git is unavailable or the
+    /// layout is unexpected; the caller then falls back and, failing that,
+    /// panics with instructions. An unreachable source must never be a pass.
+    fn skdisasm_dir() -> Option<std::path::PathBuf> {
+        // Anchored at the crate, not at the process's cwd, so the answer does
+        // not depend on where the test binary was launched from.
+        const CRATE_DIR: &str = env!("CARGO_MANIFEST_DIR");
+        let out = std::process::Command::new("git")
+            .args(["rev-parse", "--git-common-dir"])
+            .current_dir(CRATE_DIR)
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let raw = String::from_utf8(out.stdout).ok()?;
+        let raw = std::path::Path::new(raw.trim());
+        // Older gits print a path relative to the cwd we handed them.
+        let common = if raw.is_absolute() {
+            raw.to_path_buf()
+        } else {
+            std::path::Path::new(CRATE_DIR).join(raw)
+        };
+        let common = std::fs::canonicalize(common).ok()?;
+        Some(common.parent()?.parent()?.join("skdisasm"))
+    }
 
     /// Recomputes `PSG_PERIOD_TABLE` from the DRIVER'S OWN SOURCE and fails on
     /// any disagreement.
@@ -120,9 +168,11 @@ mod tests {
     /// use, so there is one knob rather than two.
     #[test]
     fn psg_table_still_matches_the_driver_it_claims_to_match() {
-        let dir = std::path::PathBuf::from(
-            std::env::var("SERAPH_SKDISASM_DIR").unwrap_or_else(|_| SKDISASM_DEFAULT.to_string()),
-        );
+        let dir = match std::env::var("SERAPH_SKDISASM_DIR") {
+            Ok(explicit) => std::path::PathBuf::from(explicit),
+            Err(_) => skdisasm_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from(SKDISASM_FALLBACK)),
+        };
         let driver = dir.join("Sound/Z80 Sound Driver.asm");
         let consts = dir.join("sonic3k.constants.asm");
         if !driver.exists() || !consts.exists() {

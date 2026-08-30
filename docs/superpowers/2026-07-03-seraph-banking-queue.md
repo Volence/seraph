@@ -2431,3 +2431,46 @@ For any future session executing this queue:
   backticked and `Path::new`-bearing lines survived intact (verified by grepping the committed
   message, not by assuming). The F29 message damaged earlier in this session stays damaged,
   because it is pushed.
+
+- 2026-08-30 (cont.): **F32 LANDED — TWO defects, not the one booked, and the second could
+  not fail at all.** Merged `b8bc434`, pushed, `origin/main` verified moved and equal to
+  HEAD. Merged-tree lanes, exit codes read directly: cargo **271 passed / 0 failed**, `npm
+  run build` exit 0 with zero warning or error lines, vitest **352/352 across 33 files**, no
+  `src/bindings.ts` drift. (Rust total unchanged at 271 — this parcel repaired two existing
+  tests rather than adding any, which is the honest reading of a count that did not move.)
+  **DEFECT 1, as booked:** both Zyrinx tests hardcoded `/home/volence/...` and `return`ed
+  early when the ROM was absent, so on any other tree they **reported green having checked
+  nothing**. Path now from `SERAPH_ZYRINX_ROM` (same default); a missing ROM **panics with
+  instructions**; skipping requires `SERAPH_SKIP_ROM_TESTS` set deliberately.
+  **DEFECT 2, NOT booked, found while fixing the first, and worse:**
+  `test_import_all_zyrinx_songs` looped 19 imports, `eprintln!`d `ERROR` on failure, and
+  **asserted nothing**. All 19 could have failed and it passed. **A print harness in a
+  test's clothing** — the same "cannot fail, therefore cannot report" shape as the silent
+  skip, one level in, and it was live even on the machine that HAS the ROM. It now collects
+  failures and zero-note imports and gates on both.
+  **GATE VALUES MEASURED, NOT TRANSCRIBED (bar 1).** Ran it first: all 19 slots import with
+  **0 errors, 0 warnings**, note counts ranging **5,702..571,753**, 6 tracks each. The flat
+  6 is the chip's six channels, not bar 5's suspicious constant; the note spread is the
+  varying work. The assertions encode the invariants measurement established — every slot
+  imports, an imported song has notes — rather than a brittle snapshot count.
+  **POISONED THREE WAYS, because there were two defects and an opt-out:** (1)
+  `SERAPH_ZYRINX_ROM=/nonexistent` → **both tests FAIL** (`2 failed`) with the explanation,
+  where they used to pass; (2) opt-out set → skips without failing, notice recoverable under
+  `--nocapture`; (3) widening the slot range → batch test **fails naming six bad slots**,
+  where it previously printed them and passed.
+  **NEW FINDING BOOKED — F35, and it is why the gate was NOT widened.** Poison 3's error text
+  revealed the driver reports valid song IDs as **0-19**, but the loop runs **1..20**, so
+  **slot 0 has never been tested**. It does import — as **"Silence", with 6,868 notes, byte
+  for byte slot 1 "Main Title"'s count**. A song named Silence carrying another song's note
+  count suggests **slot 0 resolves to slot 1's data**. Extending the gate over it would have
+  **ratified unverified behaviour** — bar 9's corollary, an unvalidated instrument recruiting
+  the suite into arguing for it — so the range stays `1..20`, the reasoning is a comment at
+  the exact spot, and the question is booked as **F35** instead.
+  **HONEST LIMIT OF THIS FIX, stated rather than glossed:** `SERAPH_SKIP_ROM_TESTS=1` still
+  produces a passing test that checked nothing, and cargo captures its notice unless
+  `--nocapture` is passed. That is the same false-green shape, gated behind a deliberate act.
+  It is accepted rather than solved: `libtest` has no runtime "skipped" state, so the
+  alternatives were an unconditional `#[ignore]` (which would end the real coverage this
+  machine has, since the ROM is present here) or no opt-out at all (which breaks the suite
+  for any tree without the ROM). **The residual risk is a stale env var in a shell profile
+  silently disabling this coverage forever.**

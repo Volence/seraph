@@ -170,10 +170,26 @@ export default function App() {
   /** Confirm discarding unsaved changes; true = proceed. */
   const confirmDiscard = useCallback(async (action: string) => {
     if (!dirtyRef.current) return true;
-    const { ask } = await import("@tauri-apps/plugin-dialog");
-    return ask(`You have unsaved changes. ${action} and discard them?`, {
-      title: "Unsaved changes",
-    });
+    try {
+      const { ask } = await import("@tauri-apps/plugin-dialog");
+      // Awaited, not returned bare: a bare `return ask(...)` settles OUTSIDE
+      // this try and the catch below would never see a rejected dialog.
+      return await ask(`You have unsaved changes. ${action} and discard them?`, {
+        title: "Unsaved changes",
+      });
+    } catch (e) {
+      // F48. Without this the rejection propagated to the caller, which had
+      // nothing to catch it either: the New/Open button silently did nothing
+      // and not one console line was printed.
+      //
+      // Returning false keeps EXACTLY the outcome that rejection already had
+      // -- the action is abandoned -- and adds the report that was missing.
+      // The alternative, treating an unavailable dialog as consent to discard,
+      // trades a dead button for possible data loss; that is a product call
+      // for the owner, not a change to smuggle in with an error message.
+      console.error("discard-confirm failed:", e);
+      return false;
+    }
   }, []);
 
   // Confirm on window close while dirty (Tauri v2 onCloseRequested).
@@ -185,14 +201,31 @@ export default function App() {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const win = getCurrentWindow();
         const fn = await win.onCloseRequested(async (event) => {
-          if (!dirtyRef.current) return;
-          event.preventDefault();
-          const { ask } = await import("@tauri-apps/plugin-dialog");
-          const quit = await ask(
-            "You have unsaved changes. Quit without saving?",
-            { title: "Unsaved changes" },
-          );
-          if (quit) await win.destroy();
+          // F48. The enclosing try covers REGISTRATION only. This body runs
+          // long after registration returns, when the user actually closes
+          // the window, so that try never covered a line of it. Tauri
+          // invokes this handler and drops the promise, so a rejected ask() or
+          // destroy() became an unhandled rejection: nothing visible happened,
+          // no console line was printed at all, and preventDefault had already
+          // fired, leaving the window unclosable with no trace of why.
+          //
+          // This catch REPORTS; it deliberately does not decide. The window
+          // stays open on a failure exactly as it did before, because letting
+          // a close through after a failed confirmation would risk the unsaved
+          // work this guard exists to protect -- and choosing between that and
+          // trapping the user is the owner's call, not an error handler's.
+          try {
+            if (!dirtyRef.current) return;
+            event.preventDefault();
+            const { ask } = await import("@tauri-apps/plugin-dialog");
+            const quit = await ask(
+              "You have unsaved changes. Quit without saving?",
+              { title: "Unsaved changes" },
+            );
+            if (quit) await win.destroy();
+          } catch (e) {
+            console.error("close-confirm failed:", e);
+          }
         });
         if (cancelled) fn();
         else unlisten = fn;

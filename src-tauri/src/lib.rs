@@ -9,6 +9,8 @@ pub mod model;
 mod project;
 mod sequencer;
 mod sn76489;
+#[cfg(test)]
+mod test_support;
 mod ym2612;
 
 use std::sync::Mutex;

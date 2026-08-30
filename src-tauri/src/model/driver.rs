@@ -142,3 +142,121 @@ impl DriverRegistry {
         self.drivers.values().map(|d| d.as_ref())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::model::song::ChannelAssignment;
+
+    /// `channel_name`'s `PsgNoise` arm must resolve to the entry the layout
+    /// FLAGS as noise -- not merely to some PSG entry that happens to sort
+    /// first.
+    ///
+    /// Audit F40, a vacuous-coverage finding: inverting that one arm
+    /// (`find(|c| c.is_noise)` -> `find(|c| !c.is_noise)`), so noise resolved
+    /// to a TONE channel, left the ENTIRE suite green. The FM side was covered
+    /// by `channel_validity_is_read_from_each_registered_driver_not_a_fixed_index`
+    /// (`export/smps.rs`); the noise side was not. Since `channel_name` became
+    /// the single authority, that one gap covered both of its call sites --
+    /// `validate_for_export`'s channel-existence check and
+    /// `ProjectManager::default_lane_name`.
+    ///
+    /// Every expectation here is READ OUT OF the profile's own layout, never
+    /// typed from memory as "PSG Noise": a profile that names its noise
+    /// channel something else is still checked, and a profile registered later
+    /// is covered without this test being edited (the F34 rule).
+    #[test]
+    fn psg_noise_resolves_to_the_layout_entry_flagged_noise() {
+        let registry = crate::driver::default_registry();
+        let mut profiles_checked = 0usize;
+
+        for driver in registry.profiles() {
+            let layout = driver.channel_layout();
+            let Some(noise) = layout.psg_channels.iter().find(|c| c.is_noise) else {
+                continue;
+            };
+            profiles_checked += 1;
+
+            let resolved = layout
+                .channel_name(&ChannelAssignment::PsgNoise)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "driver `{}` advertises a noise channel (`{}`) but PsgNoise resolved \
+                         to nothing",
+                        driver.id(),
+                        noise.name,
+                    )
+                });
+
+            // Stated as the RELATIONSHIP rather than as a name, so nothing
+            // here can be satisfied by a tone entry: this is the assertion
+            // that goes red when the arm is inverted.
+            assert!(
+                !layout.psg_channels.iter().any(|c| !c.is_noise && c.name == resolved),
+                "driver `{}` resolved PsgNoise to `{resolved}`, which its own layout flags as \
+                 a TONE channel",
+                driver.id(),
+            );
+            assert!(
+                layout.psg_channels.iter().any(|c| c.is_noise && c.name == resolved),
+                "driver `{}` resolved PsgNoise to `{resolved}`, which is not any entry its own \
+                 layout flags as noise",
+                driver.id(),
+            );
+            assert_eq!(
+                resolved,
+                noise.name.as_str(),
+                "driver `{}` flags `{}` as its noise channel, so PsgNoise must bind to it",
+                driver.id(),
+                noise.name,
+            );
+
+            // CONTROL for the numbered arm, and the thing that shows the two
+            // arms are separable rather than interchangeable. `Psg(n)` filters
+            // to NON-noise entries, so asking it for the noise entry's own
+            // index must not hand back the noise channel -- for Flamedriver
+            // that index is 3 and the answer is `None`, but the test never
+            // says 3.
+            assert_ne!(
+                layout.channel_name(&ChannelAssignment::Psg(noise.index)),
+                Some(noise.name.as_str()),
+                "driver `{}`: the numbered PSG arm must not reach the noise entry, but Psg({}) \
+                 resolved to `{}`",
+                driver.id(),
+                noise.index,
+                noise.name,
+            );
+
+            // CONTROL: the tone side works and names something else. Without
+            // this a reader cannot tell whether the noise assertion above is
+            // load-bearing or whether both arms simply return the same thing.
+            let mut tones_checked = 0usize;
+            for tone in layout.psg_channels.iter().filter(|c| !c.is_noise) {
+                assert_eq!(
+                    layout.channel_name(&ChannelAssignment::Psg(tone.index)),
+                    Some(tone.name.as_str()),
+                    "driver `{}`: Psg({}) must bind to the non-noise entry of that index",
+                    driver.id(),
+                    tone.index,
+                );
+                assert_ne!(
+                    tone.name, noise.name,
+                    "driver `{}` gives a tone entry and its noise entry the same name, so this \
+                     test cannot tell the two arms apart",
+                    driver.id(),
+                );
+                tones_checked += 1;
+            }
+            assert!(
+                tones_checked > 0,
+                "driver `{}` advertises no numbered PSG channel, so the control checked nothing",
+                driver.id(),
+            );
+        }
+
+        assert!(
+            profiles_checked > 0,
+            "no driver `default_registry()` registers advertises a noise channel, so this guard \
+             checked nothing -- it must fail rather than report green (F32)",
+        );
+    }
+}

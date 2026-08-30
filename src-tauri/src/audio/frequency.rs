@@ -103,46 +103,16 @@ mod tests {
     /// `SERAPH_SKDISASM_DIR`.
     ///
     /// `skdisasm/` is a SIBLING of this repo, not part of it, so reaching it
-    /// means leaving the checkout. The old default counted `..` hops
-    /// (`../../skdisasm` from `src-tauri/`), which is right from the main
-    /// checkout at `<parent>/seraph/src-tauri` and WRONG from an agent
-    /// worktree at `<parent>/seraph/.claude/worktrees/<agent>/src-tauri`,
-    /// where the same two hops land in `.claude/worktrees/` (audit F39). The
-    /// hop count is a property of where the checkout happens to sit, so it
-    /// cannot be a constant.
+    /// means leaving the checkout — which is `test_support::sibling_root`'s
+    /// whole job, and where the reasoning about `--git-common-dir` and why
+    /// counted `..` hops break in a worktree now lives (audits F39, F41). This
+    /// stays a named helper only so the call site reads as an intent.
     ///
-    /// `git rev-parse --show-toplevel` does NOT fix this: inside a linked
-    /// worktree that reports the *worktree's* root, which is the wrong
-    /// directory again. `--git-common-dir` is the one thing every worktree
-    /// shares — it resolves to `<main checkout>/.git` from the main checkout
-    /// and from every worktree alike — so its parent is the repo and its
-    /// grandparent is the directory the sibling disassembly lives in.
-    ///
-    /// Returns `None` rather than guessing when git is unavailable or the
-    /// layout is unexpected; the caller then falls back and, failing that,
-    /// panics with instructions. An unreachable source must never be a pass.
+    /// Inherits `sibling_root`'s `None`-rather-than-guess: the caller then
+    /// falls back and, failing that, panics with instructions. An unreachable
+    /// source must never be a pass.
     fn skdisasm_dir() -> Option<std::path::PathBuf> {
-        // Anchored at the crate, not at the process's cwd, so the answer does
-        // not depend on where the test binary was launched from.
-        const CRATE_DIR: &str = env!("CARGO_MANIFEST_DIR");
-        let out = std::process::Command::new("git")
-            .args(["rev-parse", "--git-common-dir"])
-            .current_dir(CRATE_DIR)
-            .output()
-            .ok()?;
-        if !out.status.success() {
-            return None;
-        }
-        let raw = String::from_utf8(out.stdout).ok()?;
-        let raw = std::path::Path::new(raw.trim());
-        // Older gits print a path relative to the cwd we handed them.
-        let common = if raw.is_absolute() {
-            raw.to_path_buf()
-        } else {
-            std::path::Path::new(CRATE_DIR).join(raw)
-        };
-        let common = std::fs::canonicalize(common).ok()?;
-        Some(common.parent()?.parent()?.join("skdisasm"))
+        crate::test_support::sibling_root().map(|root| root.join("skdisasm"))
     }
 
     /// Recomputes `PSG_PERIOD_TABLE` from the DRIVER'S OWN SOURCE and fails on

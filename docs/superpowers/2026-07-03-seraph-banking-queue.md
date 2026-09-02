@@ -3440,3 +3440,37 @@ For any future session executing this queue:
   Remedy banked: `[ -f ]`, `[ -e ]`, `stat`, `git ls-files`, or `/usr/bin/ls`; never `ls <path>`
   in a dispatch brief; and when any cheap probe says ABSENT or FAILED, run it against something
   known to exist before believing it.
+- 2026-09-02: **d-10 AND d-12 CLOSED BY THE HUB IN THE OWNER'S PLACE; THE HOLD ON THIS LANE STANDS
+  AND NOTHING WAS DISPATCHED.** Docs-only landing. Sequence tonight, every anchor verified here on
+  freshly-fetched empyrean `origin/main` before being written down, all three docs commits (the
+  right class for ruling records): (1) `63c85ae`, 03:22:03Z, the owner resumed the Raster/parallax
+  wave 1 project only, verbatim *"I'd like us to please continue our drive for the Raster/parallax
+  effects, wave 1 project so we continue going through it"*; the hub's own record reads *"Seraph is
+  not named and stays held"*. (2) `4e8e865b`, 03:46:15Z, the owner widened the delegation to open
+  decision cards, verbatim *"Feel free to make some decisions in the direction yyou generally know I
+  want to go for this project. If you cvan't tell refer them to me but you're an expert as well.
+  Best of best no shortcuts right?"*, and the hub took nine rulings under it, two of them this
+  lane's (R6): **d-10 `wire-then-fix`**, **d-12 `safe` now with `tell-me` booked as the end state**.
+  d-9 and *whether seraph runs at all* were both REFERRED back to him, unchanged.
+  **Both rulings pick exactly the option this lane recommended on the card**, so nothing was
+  decided against the lane's advice; the only thing to record carefully was provenance.
+  **SCOPE CAVEAT, recorded rather than glossed, because this lane has already been burned once by
+  a project-scoped instruction read as reaching seraph (the 08-30 entry above):** his words say
+  *"for this project"*, and seraph is outside that project. Reading them as covering every open
+  card suite-wide is the hub's inference, stated as such in its own record, with every ruling
+  listed for his review and *"one word to reverse"*. So both closures are filed in the d-11 shape:
+  `answered.by: "hub"`, no `said` (he did not speak to these questions), the quote and the caveat
+  in `detail`. He has not seen either question.
+  **Closure mechanics, per DECISIONS.md rules 8, 8c, 8d read at empyrean `origin/main`:** two
+  entries appended carrying `supersedes` set to the settled id, `question`/`options`/`recommend`
+  copied programmatically from the effective entry rather than retyped, the recipe's heal line run
+  first, whole file parsed after (**14 lines, ends `0a`, every line parses**, measured at
+  03:48:24Z). Both blockers dropped from `lane-status.json`, which under rule 9 is the receipt.
+  **BOOKED F51 (S):** the d-12 end state, an on-screen message when the confirmation prompt itself
+  fails to open, in place of the console line only. Both deciding lines in `App.tsx` still carry
+  the comment naming themselves as the line to change. Sits behind F50 whenever the hold lifts.
+  **Also relayed by the hub, not verified here because nothing is owed:** `contract/SUITE_PATHS.md`
+  (same commit) ratifies the suite path convention; by aeon's measurement seraph has zero
+  load-bearing home-path literals. Re-check firsthand if a parcel ever touches a path literal.
+  **Standing state:** F50 front row, owner-free on its merits, waiting on whether the LANE runs.
+  d-9 is his. F51 is new and behind F50. No agent is running.

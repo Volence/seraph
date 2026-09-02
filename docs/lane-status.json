@@ -1,21 +1,11 @@
 {
-  "focus": "Booted fresh and holding. Nothing running; everything from last night is landed and pushed.",
+  "focus": "Holding. Two of your three decision cards were closed by the hub on your delegation tonight; only the driver list is still yours.",
   "inFlight": [],
   "blockedOnOwner": [
     {
       "id": "d-9",
-      "what": "S0's driver list. Your wait-for-the-engine point is answered in the card and my recommendation changed because of it",
+      "what": "S0's driver list. Your wait-for-the-engine point is answered in the card and my recommendation changed because of it. The hub referred this one back to you tonight as a design direction for your own DAW",
       "since": "2026-08-22"
-    },
-    {
-      "id": "d-10",
-      "what": "Whether VGM export should actually carry drums, or wait until the export button is wired up. Nothing can make a VGM today, so this costs you nothing right now",
-      "since": "2026-08-30"
-    },
-    {
-      "id": "d-12",
-      "what": "What should happen if the 'you have unsaved changes' prompt itself fails to open. Rare, now reported either way, and my recommendation is to leave it alone",
-      "since": "2026-08-30"
     }
   ],
   "nextBoundary": "At a boundary now. Nothing started, so any moment is a clean one.",
@@ -25,28 +15,28 @@
       "title": "Importing a song discards your unsaved changes without asking, while New and Open both ask. The prompt already exists; one of the three doors does not use it",
       "state": "next",
       "size": "S",
-      "blockedBy": "not started: you said seraph is outside the project you are driving, so it waits for your word rather than being picked up"
+      "blockedBy": "lane held: stopped on the 2026-08-30 ruling that seraph is outside the effects project; nothing dispatches until the hold lifts"
     },
     {
       "id": "F36",
       "title": "Instrument channels are written in the order your tracks happen to be arranged, but the driver assigns them by position, so a label can name a different channel than the one that plays",
       "state": "open",
       "size": "M",
-      "blockedBy": "I have verified the mechanism but not its consequence; I will not put it to you until I have"
+      "blockedBy": "mechanism verified, consequence not yet; not put to anyone until it is"
     },
     {
       "id": "F27",
       "title": "Make playback follow the driver instead of promising both at once",
       "state": "open",
       "size": "M",
-      "blockedBy": "your channel 6 design call, deliberately carried forward as unsettled"
+      "blockedBy": "the Memra-only channel 6 mode setting, which d-7 settled the rest of and deliberately left for later"
     },
     {
       "id": "PITCH-FORMAT",
-      "title": "My half of the joint plan with the engine lane is written and handed over. Still needs you to confirm this is mine rather than theirs",
+      "title": "My half of the joint plan with the engine lane is written and handed over; the engine lane's measured reply on cycle and ROM cost is what moves it",
       "state": "open",
       "size": "L",
-      "blockedBy": "confirming with you that this is really yours to me and not just theirs",
+      "blockedBy": "aeon's measured reply on cycle and ROM cost",
       "project": "SOUND-TRUTH"
     },
     {
@@ -54,18 +44,25 @@
       "title": "The foundation piece: one agreed description of what a sound driver can do, generated from driver source",
       "state": "open",
       "size": "L",
-      "blockedBy": "d-9, your call on which drivers it targets",
+      "blockedBy": "the driver list decision (d-9)",
       "project": "SOUND-TRUTH"
+    },
+    {
+      "id": "F51",
+      "title": "When the 'unsaved changes' prompt itself fails to open, say so on screen instead of only in the log. Booked as the end state of d-12, which the hub closed tonight as keep-it-safe for now",
+      "state": "open",
+      "size": "S",
+      "blockedBy": "lane held: nothing dispatches until the hold lifts; behind F50 when it does"
     },
     {
       "id": "README-8",
       "title": "Two leftovers from the README pass, neither a bug: the app cannot author FM3 special mode, and channel overlap warnings are computed but never shown anywhere",
       "state": "open",
       "size": "M",
-      "blockedBy": "where overlap warnings should appear is a design call, and the FM3 one is a feature not a fix"
+      "blockedBy": "not a fix: FM3 special mode is a feature, and the overlap warnings have no place on screen yet"
     }
   ],
-  "updatedAt": "2026-08-30T10:56:35Z",
-  "awaiting": "your say-so on whether this lane runs at all today. You said seraph is outside the parallax/raster project, so I have started nothing. F50 is ready if you want it (importing a song throws away unsaved changes without asking, while New and Open both ask). d-9, d-10 and d-12 are decisions waiting on you.",
+  "updatedAt": "2026-09-02T03:48:40Z",
+  "awaiting": "whether this lane runs tonight. Your 08-30 hold stands; tonight's resume named the parallax/raster project only. F50 is ready if you want it (importing a song throws away unsaved changes without asking, while New and Open both ask). d-9 is still yours; d-10 and d-12 were closed by the hub in your place and are one word to reverse.",
   "atBoundary": true
 }

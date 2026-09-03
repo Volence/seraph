@@ -123,6 +123,7 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-02T18:20:19Z — CUT THE CEREMONY (owner; suite-wide while EFFECTS-W1 is open; outranks every process bar).** Not restated here: read the bullet beginning `2026-09-02T18:20:19Z — CUT THE CEREMONY` in empyrean `origin/main:docs/OVERSEER.md`, carried by empyrean `90554f2` (docs commit, reachable, verified here 2026-09-03). Relayed by the hub; the granting act was not witnessed here.
 - **2026-09-03T05:21:01Z — REPORT TO THE HUB WHENEVER YOU FINISH WORK OR STOP.** Owner,
   verbatim, banked by the hub at empyrean `f04afe3` (reachable from `origin/main`, verified
   here 2026-09-03; `git -C ../empyrean show f04afe3:docs/OVERSEER.md | grep -n 'loosk like aeon'`):

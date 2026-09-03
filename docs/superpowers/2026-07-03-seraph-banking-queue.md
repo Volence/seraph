@@ -3474,3 +3474,16 @@ For any future session executing this queue:
   load-bearing home-path literals. Re-check firsthand if a parcel ever touches a path literal.
   **Standing state:** F50 front row, owner-free on its merits, waiting on whether the LANE runs.
   d-9 is his. F51 is new and behind F50. No agent is running.
+- 2026-09-03: **TWO OWNER RULINGS BANKED, BOTH RELAYED BY THE HUB AND VERIFIED AT THE COMMIT; THE HOLD
+  STANDS AND NOTHING WAS DISPATCHED.** Docs-only landing, written at 2026-09-03T05:22:33Z. (1) empyrean `0689c55`
+  (reachable from `origin/main`), the owner at 2026-09-02T20:36:03Z answering the hub's typed-out
+  list, verbatim *"Seraph on hold till we get further with engine."* This is the first time the hold
+  rests on his own words rather than on seraph being outside the effects project, and it names the
+  trigger: engine progress. The hub parked d-9 with it; the card stays in `lane-status.json` marked
+  not owed until the hold lifts, because dropping it would be rule 9's receipt for a decision he did
+  not make. (2) empyrean `f04afe3` (reachable from `origin/main`), the owner at
+  2026-09-03T05:21:01Z, verbatim *"tell the agents any time theyy finish work or stop to report to you
+  please, loosk like aeon's stopped right now"*: every lane reports to the hub whenever it finishes a
+  piece of work or stops. Both entered in `docs/OVERSEER.md` under a new "Standing owner rulings"
+  section, placed above the queue so a cold boot meets them before the snapshot. Neither granting act
+  was witnessed here. **Standing state:** held; F50 front row for the day it lifts; no agent running.

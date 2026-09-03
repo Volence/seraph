@@ -121,6 +121,26 @@ a cold boot that reads only this file would never learn either file exists.
   instruction, 2026-08-23). Note the contrast with this document, which is written
   for a lane rather than for him.
 
+## Standing owner rulings (newest first; the queue Log carries the full entry)
+
+- **2026-09-03T05:21:01Z — REPORT TO THE HUB WHENEVER YOU FINISH WORK OR STOP.** Owner,
+  verbatim, banked by the hub at empyrean `f04afe3` (reachable from `origin/main`, verified
+  here 2026-09-03; `git -C ../empyrean show f04afe3:docs/OVERSEER.md | grep -n 'loosk like aeon'`):
+  *"tell the agents any time theyy finish work or stop to report to you please, loosk like
+  aeon's stopped right now"*. Applied here: whenever a landing, a boundary, a block, an owner
+  question, or an agent returning leaves this lane with nothing running, send the hub
+  (address it by repo, empyrean) ONE message: what landed (SHA from git output, never typed),
+  or why you stopped, and what you need. Relayed by the hub, verified at the commit; the
+  granting act was not witnessed here.
+- **2026-09-02T20:36:03Z — SERAPH IS HELD UNTIL THE ENGINE IS FURTHER ALONG.** Owner,
+  verbatim, banked by the hub at empyrean `0689c55` (reachable from `origin/main`, verified
+  here 2026-09-03): *"Seraph on hold till we get further with engine."* This supersedes the
+  2026-08-30 hold (which rested on seraph being outside the effects project) with a hold in
+  his own words and a named trigger: engine progress, his call when. d-9 (S0's driver list)
+  is parked with it and is not owed until he lifts the hold. Nothing dispatches; F50 stays
+  the front row for the day it lifts. Relayed by the hub, verified at the commit; the
+  granting act was not witnessed here.
+
 ## Queue — plan of record
 
 Canonical status record: `docs/superpowers/2026-07-03-seraph-banking-queue.md`

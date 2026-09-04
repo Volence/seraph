@@ -123,6 +123,33 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-04T15:38:47Z — BOOT DOCS ARE SPLIT BY WHEN A RULE IS READ; THE BOUND STAYS 100,000 B
+  AND IS NEVER RAISED.** Owner, one call for all six lanes, answering hub card 7 with
+  *"7. Sounds fine"* to the hub's recommendation. The rule itself lives in
+  `OVERSEER-PROTOCOL.md` under "The boot read is bounded", carried by empyrean `79498f7`
+  (verified here as an ancestor of `origin/main`; located with
+  `git -C ../empyrean show 79498f7:docs/OVERSEER-PROTOCOL.md | grep -n "SPLIT BY WHEN"`, line 125).
+  **Read it there, not from this pointer.** In short: the boot file keeps only what a fresh
+  session needs to ACT AT BOOT (scope, queue, resume brief, standing rulings that change what a
+  session does first); rules that matter only at a specific moment (how to land, how to dispatch,
+  review bars) move to a reference file named from the boot file by path and read at that moment.
+  **Applied here, and this is my call, stated so it can be overruled cheaply:** this file measured
+  **521 lines / 37,671 B on 2026-09-04**, 38% of the bound, and no ratchet was ever pinned in this
+  repo. So **no cut has been performed** and the rule is being applied forward: new material is
+  filed by when it is read, and the moment-specific sections already here (Verification lanes,
+  Worktree / environment quirks, Landing lane, the aeon coordination point) move out at the first
+  boundary where the file's size makes the move earn its cost. A lossless-proof cut on a file at
+  38% of bound spends more than the cheaper boot read returns, and the hub's own relay read it the
+  same way ("your file is inside the bound, so nothing to cut"). Relayed by the hub; the granting
+  act was not witnessed here.
+- **2026-09-04T15:38:57Z — THE SEVEN LEFTOVER WORKTREES: DELETE THEM.** Owner, verbatim,
+  *"yes deelete leftover seraph worktrees"*, banked by the hub in empyrean
+  `origin/main:docs/OVERSEER-LOG.md` line 5358 and **read firsthand here** at that revision.
+  Done the same session: the seven worktrees of already-merged parcels are gone, the preserved
+  `feat/view-state-persistence` worktree stays. Each branch was proved an ancestor of `main`
+  before its worktree was touched, and each worktree was proved clean; see the queue Log entry
+  for 2026-09-04. Standing consequence: **a parcel's worktree is removed at its landing**, so
+  this does not accumulate again.
 - **2026-09-04T15:24:29Z — THE HOLD IS REAFFIRMED IN HIS OWN WORD: "Keep".** Owner, verbatim,
   answering the hub's card (3) *"lift or keep seraph's hold"* as one of nine cards he cleared on
   surfacing (his browser had crashed overnight). Banked by the hub in empyrean

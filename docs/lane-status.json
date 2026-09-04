@@ -8,7 +8,7 @@
       "since": "2026-08-22"
     }
   ],
-  "nextBoundary": "At a boundary now. Nothing started, so any moment is a clean one.",
+  "nextBoundary": "At a boundary now. The deletion you cleared is finished and banked; nothing started.",
   "queue": [
     {
       "id": "F50",
@@ -62,7 +62,7 @@
       "blockedBy": "not a fix: FM3 special mode is a feature, and the overlap warnings have no place on screen yet"
     }
   ],
-  "updatedAt": "2026-09-04T15:26:00Z",
-  "awaiting": "nothing. You answered the one thing I was waiting on: asked on 09-04 whether to lift this lane's hold, you said \"Keep\", so it stands and I have banked it. Nothing is running and nothing is owed by you. F50 (Import silently throws away unsaved work) is the front row the day you do lift it. One cheap thing still yours to allow whenever you like: deleting seven leftover worktrees from parcels already merged; the one preserved branch stays.",
+  "updatedAt": "2026-09-04T15:41:03Z",
+  "awaiting": "nothing. Both of today's answers are banked and done: you kept the hold (\"Keep\"), and you cleared the worktree deletion, which is finished and gave back 29 GB. Nothing is running and nothing is owed by you. F50 (Import silently throws away unsaved work) is the front row the day you lift the hold.",
   "atBoundary": true
 }

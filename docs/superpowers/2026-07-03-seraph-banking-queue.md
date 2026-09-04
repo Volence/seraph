@@ -3515,3 +3515,36 @@ For any future session executing this queue:
   `0a` and every line parsing (measured this session); seven leftover worktrees from merged
   parcels still on disk plus the preserved `feat/view-state-persistence`, deletion of the seven
   still an open cheap ask to him. Neither granting act witnessed here.
+- 2026-09-04 (cont.): **THE SEVEN LEFTOVER WORKTREES ARE DELETED ON HIS WORD; 29 GB RECOVERED.
+  CARD 7's BOOT-DOC RULE BANKED AND DELIBERATELY NOT ACTED ON. HOLD UNCHANGED, NOTHING RUNNING.**
+  (1) **Deletion.** Owner, verbatim, *"yes deelete leftover seraph worktrees"*, banked by the hub
+  in empyrean `origin/main:docs/OVERSEER-LOG.md` line 5358 at empyrean `34fb7bb`+, located and
+  read firsthand here rather than taken from the relay. This answers the cheap ask this lane has
+  been carrying on its card since 09-02.
+  **Two checks were run before anything was removed, and they are the reason this was safe rather
+  than lucky.** (a) Every branch was proved an ancestor of `main` by `merge-base --is-ancestor`,
+  not by its name and not by an empty `main..branch` range, which bar 16(a) establishes is
+  two-valued: `parcel/f44-act-warnings` `74098ca5`, `parcel/f47-close-guard` `0bdecb79`,
+  `parcel/f45-agent-reporter-output` `611545b9`, `parcel/f40-noise-arm-and-rom-path` `4f978440`,
+  `parcel/f46-canvas-noise` `e8c72981`, `parcel/f43-copy-precondition` `f6d2ffbc`,
+  `parcel/f49-discard-guard` `9c44aa54`, all ancestors. `feat/view-state-persistence` `f6ae8c4c`
+  is **NOT** an ancestor and carries **3 unique commits**, which is exactly why it is the
+  preserved one; it was not touched. (b) Each of the seven working trees was proved clean
+  (`status --porcelain` empty) and no process anywhere on the box had its cwd inside a seraph
+  worktree (`/proc/*/cwd` walk). `git worktree remove` was used WITHOUT `--force`, so a dirty
+  tree would have refused rather than been destroyed.
+  **Result, measured:** `.claude/worktrees` **33 GB to 4.1 GB**, the remainder being the one
+  preserved worktree. The seven branch REFS were deliberately left in place: he authorised
+  deleting worktrees, refs are free, and every one is reachable from `main` anyway.
+  **Standing consequence recorded in `docs/OVERSEER.md`: a parcel's worktree is removed at its
+  landing**, so this does not accumulate to 29 GB again.
+  (2) **Card 7, boot-doc bound.** Owner, *"7. Sounds fine"*, one call for all six lanes: the bound
+  stays 100,000 B and boot docs split by WHEN A RULE IS READ, never by size and never raised.
+  Rule text at empyrean `79498f7` in `OVERSEER-PROTOCOL.md`, "The boot read is bounded", verified
+  here as an ancestor of `origin/main`. **No cut was performed and that is a judgement call, made
+  explicit so it can be overruled in one line:** `docs/OVERSEER.md` measured **521 lines /
+  37,671 B** before this entry's own additions, 38% of the bound, and no ratchet was ever pinned
+  in this repo. The rule is applied FORWARD instead: new material is filed by when it is read, and
+  the moment-specific sections that are already in the boot file (Verification lanes, Worktree
+  quirks, Landing lane, the aeon coordination point) move out at the first boundary where their
+  move earns its cost. The hub's relay read it the same way. Neither granting act witnessed here.

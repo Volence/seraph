@@ -142,6 +142,11 @@ a cold boot that reads only this file would never learn either file exists.
   38% of bound spends more than the cheaper boot read returns, and the hub's own relay read it the
   same way ("your file is inside the bound, so nothing to cut"). Relayed by the hub; the granting
   act was not witnessed here.
+  **SETTLED, 2026-09-04, hub confirming on read-back: no cut is owed here.** The split obligation
+  is scoped to files AT OR OVER the bound; below it the rule applies forward only, and **per-lane
+  judgement is the intended shape rather than uniformity**. So a future boot should not re-open
+  "do I owe a cut?" on the strength of the ruling's existence: the answer is no until this file
+  reaches 100,000 B, and the four sections named above are the ones that move when it does.
 - **2026-09-04T15:38:57Z — THE SEVEN LEFTOVER WORKTREES: DELETE THEM.** Owner, verbatim,
   *"yes deelete leftover seraph worktrees"*, banked by the hub in empyrean
   `origin/main:docs/OVERSEER-LOG.md` line 5358 and **read firsthand here** at that revision.

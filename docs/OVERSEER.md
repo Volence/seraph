@@ -123,6 +123,21 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-04T15:24:29Z — THE HOLD IS REAFFIRMED IN HIS OWN WORD: "Keep".** Owner, verbatim,
+  answering the hub's card (3) *"lift or keep seraph's hold"* as one of nine cards he cleared on
+  surfacing (his browser had crashed overnight). Banked by the hub in empyrean
+  `origin/main:docs/OVERSEER-LOG.md` under the heading beginning
+  `2026-09-04T15:24:29Z OWNER SURFACED (browser crashed overnight)`, at empyrean `34fb7bb`;
+  **located and read firsthand here** at that revision rather than taken from the relay. His whole
+  answer to the card is the token *"3. Keep"*.
+  **This does not supersede the 2026-09-02 hold; it re-states it.** Same hold, same named trigger
+  (engine progress, his call when), now put to him a second time and answered the same way. So do
+  not read it as a fresh decision with a fresh clock: the question "is seraph still held" has been
+  asked and answered twice and should not be put to him a third time without something new to say.
+  d-9 stays parked with it, F50 stays the front row for the day it lifts, nothing dispatches.
+  **Register worth recording:** unlike the 2026-08-22 S0 retarget (*"I don't think"*, ending in a
+  question mark), this is one unhedged word. It is his firmest statement on the hold to date.
+  Relayed by the hub; the granting act was not witnessed here.
 - **2026-09-02T18:20:19Z — CUT THE CEREMONY (owner; suite-wide while EFFECTS-W1 is open; outranks every process bar).** Not restated here: read the bullet beginning `2026-09-02T18:20:19Z — CUT THE CEREMONY` in empyrean `origin/main:docs/OVERSEER.md`, carried by empyrean `90554f2` (docs commit, reachable, verified here 2026-09-03). Relayed by the hub; the granting act was not witnessed here.
 - **2026-09-03T05:21:01Z — REPORT TO THE HUB WHENEVER YOU FINISH WORK OR STOP.** Owner,
   verbatim, banked by the hub at empyrean `f04afe3` (reachable from `origin/main`, verified

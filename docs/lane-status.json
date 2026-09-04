@@ -1,10 +1,10 @@
 {
-  "focus": "Holding. Two of your three decision cards were closed by the hub on your delegation tonight; only the driver list is still yours.",
+  "focus": "Held on your word, and you confirmed it today: seraph waits until the engine is further along. Nothing running.",
   "inFlight": [],
   "blockedOnOwner": [
     {
       "id": "d-9",
-      "what": "S0's driver list. Your wait-for-the-engine point is answered in the card and my recommendation changed because of it. The hub referred this one back to you tonight as a design direction for your own DAW",
+      "what": "S0's driver list. Parked with the hold, which you kept on 09-04 when the hub put it to you as card (3); not owed until you lift the hold. Left on the card so the answer is not lost",
       "since": "2026-08-22"
     }
   ],
@@ -15,7 +15,7 @@
       "title": "Importing a song discards your unsaved changes without asking, while New and Open both ask. The prompt already exists; one of the three doors does not use it",
       "state": "next",
       "size": "S",
-      "blockedBy": "lane held: stopped on the 2026-08-30 ruling that seraph is outside the effects project; nothing dispatches until the hold lifts"
+      "blockedBy": "lane held: you were asked again on 09-04 and answered \"Keep\"; nothing dispatches until you lift it"
     },
     {
       "id": "F36",
@@ -44,15 +44,15 @@
       "title": "The foundation piece: one agreed description of what a sound driver can do, generated from driver source",
       "state": "open",
       "size": "L",
-      "blockedBy": "the driver list decision (d-9)",
+      "blockedBy": "the driver list decision (d-9), parked with the hold",
       "project": "SOUND-TRUTH"
     },
     {
       "id": "F51",
-      "title": "When the 'unsaved changes' prompt itself fails to open, say so on screen instead of only in the log. Booked as the end state of d-12, which the hub closed tonight as keep-it-safe for now",
+      "title": "When the 'unsaved changes' prompt itself fails to open, say so on screen instead of only in the log. Booked as the end state of d-12, which the hub closed as keep-it-safe for now",
       "state": "open",
       "size": "S",
-      "blockedBy": "lane held: nothing dispatches until the hold lifts; behind F50 when it does"
+      "blockedBy": "lane held: you were asked again on 09-04 and answered \"Keep\"; nothing dispatches until you lift it; behind F50 when it does"
     },
     {
       "id": "README-8",
@@ -62,7 +62,7 @@
       "blockedBy": "not a fix: FM3 special mode is a feature, and the overlap warnings have no place on screen yet"
     }
   ],
-  "updatedAt": "2026-09-02T03:48:40Z",
-  "awaiting": "whether this lane runs tonight. Your 08-30 hold stands; tonight's resume named the parallax/raster project only. F50 is ready if you want it (importing a song throws away unsaved changes without asking, while New and Open both ask). d-9 is still yours; d-10 and d-12 were closed by the hub in your place and are one word to reverse.",
+  "updatedAt": "2026-09-04T15:26:00Z",
+  "awaiting": "nothing. You answered the one thing I was waiting on: asked on 09-04 whether to lift this lane's hold, you said \"Keep\", so it stands and I have banked it. Nothing is running and nothing is owed by you. F50 (Import silently throws away unsaved work) is the front row the day you do lift it. One cheap thing still yours to allow whenever you like: deleting seven leftover worktrees from parcels already merged; the one preserved branch stays.",
   "atBoundary": true
 }

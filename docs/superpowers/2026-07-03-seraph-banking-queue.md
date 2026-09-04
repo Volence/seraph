@@ -3487,3 +3487,31 @@ For any future session executing this queue:
   piece of work or stops. Both entered in `docs/OVERSEER.md` under a new "Standing owner rulings"
   section, placed above the queue so a cold boot meets them before the snapshot. Neither granting act
   was witnessed here. **Standing state:** held; F50 front row for the day it lifts; no agent running.
+- 2026-09-04: **THE OWNER WAS ASKED AGAIN WHETHER TO LIFT THIS LANE'S HOLD AND ANSWERED "Keep".
+  THE HOLD STANDS; NOTHING WAS DISPATCHED.** Docs-only landing, written at 2026-09-04T15:2xZ.
+  He surfaced after his browser crashed overnight and cleared nine hub cards in one message; card
+  (3) was *"lift or keep seraph's hold"* and his whole answer to it is *"3. Keep"*. Banked by the
+  hub in empyrean `origin/main:docs/OVERSEER-LOG.md` under the heading beginning
+  `2026-09-04T15:24:29Z OWNER SURFACED (browser crashed overnight)`, at empyrean `34fb7bb`.
+  **The relay named the file and the search string; the entry was located and read firsthand here
+  at that revision, and the quoted token comes from that read, not from the message.** The hub's
+  own application line in the same entry reads "(3) seraph stays HELD", which is their reading of
+  the same token and agrees with it.
+  **This is a re-statement, not a supersession.** The 2026-09-02T20:36:03Z hold (empyrean
+  `0689c55`, *"Seraph on hold till we get further with engine."*) is unchanged in scope and in
+  trigger; what is new is only that he was asked a second time, in a different context, and gave
+  the same answer in one unhedged word. Recorded that way deliberately, so a later session does
+  not read two entries as two separate holds with two separate clocks, and does not put the same
+  question to him a third time on the strength of the newer date. **d-9 stays parked** and stays
+  on the card marked not owed until the hold lifts; **F50** (Import silently discards unsaved
+  work) stays the front row for the day it lifts, **F51** behind it.
+  **Register, worth a line because this lane has twice had to weigh how firmly he meant
+  something:** the 2026-08-22 S0 retarget reached here as *"maybe s2 clone driver … ?"* and had
+  to be marked get-this-firsthand-before-designing-to-it. This is the opposite end of that scale
+  — a single word, no hedge, answering a question that named both options. Nothing here needs a
+  first-hand re-ask.
+  **Standing state, unchanged from 09-03 except for this confirmation:** held; nothing running;
+  no unpushed commits; `decisions.jsonl` 14 lines and `lane-log.jsonl` 21 lines, both ending
+  `0a` and every line parsing (measured this session); seven leftover worktrees from merged
+  parcels still on disk plus the preserved `feat/view-state-persistence`, deletion of the seven
+  still an open cheap ask to him. Neither granting act witnessed here.

@@ -123,6 +123,12 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-04T15:48:58Z — SUITE-WIDE CUT (owner; in force until EFFECTS-W1 closes).** Five-line
+  landing reports; NO new bars, invariants or corrections-of-the-record (a wrong claim gets one
+  line saying what is true now); only aeon and aurora run agents. Read it at empyrean `e395579`,
+  `docs/OVERSEER-LOG.md` line 5366 (verified here as an ancestor of `origin/main`). Quota reason:
+  16% of the week left. **Nothing changes for seraph, which is held and runs nothing** except this:
+  bank less. This bullet is deliberately one bullet. Relayed by the hub; not witnessed here.
 - **2026-09-04T15:38:47Z — BOOT DOCS ARE SPLIT BY WHEN A RULE IS READ; THE BOUND STAYS 100,000 B
   AND IS NEVER RAISED.** Owner, one call for all six lanes, answering hub card 7 with
   *"7. Sounds fine"* to the hub's recommendation. The rule itself lives in

@@ -1,5 +1,5 @@
 {
-  "focus": "Held on your word, and you confirmed it today: seraph waits until the engine is further along. Nothing running.",
+  "focus": "Held on your word: seraph waits until the engine is further along. Nothing running, nothing owed by you.",
   "inFlight": [],
   "blockedOnOwner": [
     {
@@ -8,7 +8,7 @@
       "since": "2026-08-22"
     }
   ],
-  "nextBoundary": "At a boundary now. The deletion you cleared is finished and banked; nothing started.",
+  "nextBoundary": "At a boundary now. Nothing started since the worktree deletion landed on 09-04.",
   "queue": [
     {
       "id": "F50",
@@ -60,9 +60,16 @@
       "state": "open",
       "size": "M",
       "blockedBy": "not a fix: FM3 special mode is a feature, and the overlap warnings have no place on screen yet"
+    },
+    {
+      "id": "F52",
+      "title": "Take the em dashes and en dashes out of the text seraph puts on screen, as you asked for across all the tools. About 26 lines of real labels and messages, the rest are code comments",
+      "state": "open",
+      "size": "S",
+      "blockedBy": "lane held: nothing dispatches until you lift it; behind F50 and F51 when it does"
     }
   ],
-  "updatedAt": "2026-09-04T15:41:03Z",
-  "awaiting": "nothing. Both of today's answers are banked and done: you kept the hold (\"Keep\"), and you cleared the worktree deletion, which is finished and gave back 29 GB. Nothing is running and nothing is owed by you. F50 (Import silently throws away unsaved work) is the front row the day you lift the hold.",
+  "updatedAt": "2026-09-05T15:24:59Z",
+  "awaiting": "nothing. Your no em dashes ruling reached me, is banked, and I am writing none from now on; the sweep of seraph's on screen text is booked as F52 for the day the hold lifts. Still stopped, nothing running.",
   "atBoundary": true
 }

@@ -3548,3 +3548,19 @@ For any future session executing this queue:
   the moment-specific sections that are already in the boot file (Verification lanes, Worktree
   quirks, Landing lane, the aeon coordination point) move out at the first boundary where their
   move earns its cost. The hub's relay read it the same way. Neither granting act witnessed here.
+- 2026-09-05: **OWNER RULING, NO EM OR EN DASHES IN ANY TOOL'S USER FACING TEXT. BOOKED AS
+  F52 BEHIND THE HOLD; THE FORWARD HALF IS LIVE NOW. NOTHING DISPATCHED.** His words,
+  *"do you wanna also send out a message ot everything to get rid of all current emdashes and
+  update so no more emdashes to all the tool agents?"*, relayed by the hub and read firsthand
+  here at empyrean `origin/main:docs/OVERSEER-LOG.md` line 5807 (`77450fb`), with the rule
+  itself in `design/CHROME_SPEC.md` "Text in the tools" at `24cdd17`, proved an ancestor of
+  `origin/main` before being cited. Full entry in `docs/OVERSEER.md` standing rulings.
+  **F52, size S, blocked by the hold.** Scope measured this session rather than guessed:
+  12 frontend lines over four components (PianoRoll 7, TrackHeader 2, LibraryPanel 2,
+  DacEditor 1) and about 14 Rust lines that can reach a user (ipc/commands.rs,
+  project/manager.rs, library/state.rs, library/extract.rs, import/vgm_import.rs). The 21
+  remaining Rust hits are harness assertion text in the two `*_audibility.rs` files and the
+  114 remaining frontend hits are code comments, so a sweep that greps the tree without
+  splitting comments from strings would report roughly ten times the real surface. Reviewer's
+  check when it runs: grep U+2014 and U+2013 over the strings a build ships, not over the
+  tree. This lane's own prose docs keep their dashes; they are written for a lane, not shipped.

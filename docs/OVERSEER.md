@@ -118,10 +118,34 @@ a cold boot that reads only this file would never learn either file exists.
 
 - `at` and `updatedAt` come from `date -u +%Y-%m-%dT%H:%M:%SZ` and nowhere else.
 - No em dashes or en dashes in either file's prose fields (standing owner
-  instruction, 2026-08-23). Note the contrast with this document, which is written
-  for a lane rather than for him.
+  instruction, 2026-08-23). **Widened suite-wide on 2026-09-05, see the standing
+  ruling below: the bar now covers every tool's user-facing text and everything
+  written new anywhere, so this bullet is a case of it rather than a separate rule.**
+  Note the contrast with this document, which is written for a lane rather than for
+  him, and which keeps its existing dashes.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
+
+- **2026-09-05T15:23:14Z — NO EM DASHES OR EN DASHES IN ANY TOOL'S USER FACING TEXT,
+  AND NONE WRITTEN NEW ANYWHERE.** Owner, verbatim, *"do you wanna also send out a message
+  ot everything to get rid of all current emdashes and update so no more emdashes to all the
+  tool agents?"*, following his earlier *"Can we add no emdashess to the design list, like no
+  emdashes in an of our tools."* Rule text in empyrean `design/CHROME_SPEC.md` under "Text in
+  the tools", carried by empyrean `24cdd17`; the wider sweep half is in empyrean
+  `origin/main:docs/OVERSEER-LOG.md` line 5807 at `77450fb`. **Both located and read firsthand
+  here at that revision**, not taken from the relay; `24cdd17` proved an ancestor of
+  `origin/main`. Relayed by the hub; the granting act was not witnessed here.
+  Two halves, and only one of them is live for a held lane. **(a) Forward, in force now:**
+  write no U+2014 and no U+2013 in anything new, in seraph's strings, docs, the two jsonl
+  files, or messages. Use a comma, a colon, a period, or parentheses. **(b) The sweep is a
+  queue row, F52, and waits for the hold** like everything else. Measured here the day it was
+  banked so the row carries a number rather than a guess: **12 frontend lines across four
+  components** (`PianoRoll.tsx` 7, `TrackHeader.tsx` 2, `LibraryPanel.tsx` 2, `DacEditor.tsx` 1)
+  and about **14 Rust lines that can reach a user** (`ipc/commands.rs`, `project/manager.rs`,
+  `library/state.rs`, `library/extract.rs`, `import/vgm_import.rs`); the other 21 Rust hits are
+  measurement harness messages in `*_audibility.rs`, and 114 frontend hits are code comments.
+  This document and the queue Log keep their existing dashes: they are written for a lane, not
+  shipped to him, and rewriting them would spend the whole row on prose nobody sees.
 
 - **2026-09-04T15:48:58Z — SUITE-WIDE CUT (owner; in force until EFFECTS-W1 closes).** Five-line
   landing reports; NO new bars, invariants or corrections-of-the-record (a wrong claim gets one

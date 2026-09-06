@@ -3564,3 +3564,58 @@ For any future session executing this queue:
   splitting comments from strings would report roughly ten times the real surface. Reviewer's
   check when it runs: grep U+2014 and U+2013 over the strings a build ships, not over the
   tree. This lane's own prose docs keep their dashes; they are written for a lane, not shipped.
+- 2026-09-06: **HOUSEKEEPING ON THE OWNER'S ASK: BOARD PRUNED TO FOUR ROWS, ONE DEAD WORKTREE
+  AND TWO REGENERABLE CACHES DELETED, ABOUT 8.2 GB BACK. HOLD UNCHANGED, NOTHING DISPATCHED.**
+  His words, relayed by the hub (empyrean-c2, ~15:0xZ), granting act not witnessed here:
+  *"can we get a cleanup of the board and then a cleanup of the worktrees or whatever all this
+  is"*. Housekeeping only, explicitly inside the hold.
+  (1) **Board.** `docs/lane-status.json` went from 8 rows to 4 (F50 next, then F51, F52, S0).
+  F27, F36, PITCH-FORMAT and README-8 moved verbatim to `docs/QUEUE-PARKED.md`, each with the
+  condition that puts it back. Grounded on `contract/LANE_STATUS.md` rule 6 (the file is a
+  pointer to where the lane is, not a record of what it decided), read at empyrean
+  `origin/main`. **The file was already inside every rule 7 bound before the cut and that is
+  worth recording, so nobody later reads this as a bound violation being repaired:** 3,653 B of
+  12 KB, 8 rows of 20, longest title 184 of 240. The cut is for legibility on his console, not
+  for size. Cost of it, stated because it is the half that bites later: a cold session reading
+  the board alone now undercounts this lane by four rows, which is why the boot doc's queue
+  section names `QUEUE-PARKED.md` in the same breath as the board. One visible side effect: of
+  the two `SOUND-TRUTH` rows, only S0 is still on the board, so the hub's project grouping sees
+  seraph's half of that project through S0 alone.
+  **Boundary audit run while the file was open (LANE_STATUS, "The boundary audit").** Check 1
+  passes: d-9 is the only `blockedOnOwner` row and its card exists. Check 2 passes: d-9 is
+  genuinely his and genuinely parked. **Check 3 is a deliberate non-fix and the next boot should
+  leave it alone:** F50/F51/F52 all say "nothing dispatches until you lift it", which the union
+  enumeration correctly surfaces as an owner-blocking claim with no card. There is no card
+  because he has been asked twice and answered *"Keep"* both times, and the 2026-09-04 entry
+  above says not to ask a third time without something new to say. Filing one would be the
+  third ask wearing a compliance costume.
+  (2) **Worktrees and scratch.** Manifested first, deleted second, nothing taken on a name.
+  **`.worktrees/phase4-sequencer`, 108 MB, deleted:** it is a worktree of `megadaw`, a repo that
+  no longer exists on this box, so its `.git` gitdir dangles and git cannot read the directory
+  at all (`status` there answers *"fatal: not a git repository"*). Because no git command can
+  speak for it, the content was checked as content: of its 127 files outside `node_modules`,
+  **122 hash to blobs already in seraph's object database**, and the five that do not are the
+  dangling `.git` pointer plus four `src-tauri/gen/schemas/*.json` files Tauri generates at
+  build time. Reachability spot-checked rather than assumed, since a blob can exist unreachably:
+  its `App.tsx` blob is carried by real commits on this history (`2e7030a`, `1e3ba77`). So the
+  authored content is preserved in this repo and the directory held nothing unique.
+  **The preserved F15 worktree was NOT touched, and its caches were:** `src-tauri/target`
+  (3.9 GB) and `node_modules` (152 MB) are gone, the worktree, its registration, its branch and
+  its source are intact and verified after the fact (`git worktree list` still lists it, status
+  still clean, still at `f6ae8c4`, `src/` still populated). Safe because the branch's **3 unique
+  commits are on the ref** and the working tree was clean, which also retires the standing note
+  above that an uncommitted `App.tsx` change lived there: it was committed as `f6ae8c4`.
+  **Main tree `src-tauri/target/debug/incremental`, 4.0 GB, deleted** (last written 08-31): a
+  per-session compiler cache whose loss costs one non-incremental rebuild of the local crate and
+  nothing else. `deps` (9.6 GB) and the rest of `target` were deliberately kept.
+  Before any deletion: no process anywhere on the box had a cwd or an open descriptor under
+  either worktree path (`/proc` walk over `cwd` and `fd`).
+  **Measured, by component, because the obvious instrument lies here:** 4.1 GB + 108 MB +
+  4.0 GB, about **8.2 GB**. `.claude/worktrees` went 4.1 GB to 6.6 MB. **`df` is NOT the
+  evidence and was not used as it:** free space on this filesystem moved by about 170 GB across
+  the same minutes, which is other lanes cleaning up under the same relayed ask, and attributing
+  a shared filesystem's delta to this lane's `rm` would have inflated the report twenty-fold.
+  Seraph now totals 12 GB, essentially all of it the main tree's debug `target`.
+  **Left for him, not decided here:** `cargo clean` would return that 12 GB at the price of a
+  cold rebuild the day the hold lifts. Not run, because a held lane is not a lane that will
+  never build.

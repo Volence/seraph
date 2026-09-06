@@ -223,6 +223,15 @@ a cold boot that reads only this file would never learn either file exists.
 
 Canonical status record: `docs/superpowers/2026-07-03-seraph-banking-queue.md`
 (read its Log and EXECUTION HANDOFF sections in full before dispatching anything).
+
+**The board is not the queue. `docs/lane-status.json` carries only rows that wait on the
+owner or would start the day the hold lifts (F50, F51, F52, S0 as of 2026-09-06); the rows
+taken off it live verbatim in `docs/QUEUE-PARKED.md` with the condition that puts each
+back.** Owner's ask, relayed by the hub 2026-09-06, granting act not witnessed here. So a
+cold session that reads the board alone will UNDERCOUNT this lane's open work by four rows:
+read `QUEUE-PARKED.md` too before concluding the queue is short. Moving a row is a copy in
+one direction and a deletion in the other, in the same edit, so the two files never both
+claim it.
 The **MEMRA execution sessions S0→S6** are the banked plan of record — each has a
 cold-executable plan under `docs/superpowers/plans/2026-07-03-s*.md`, each
 self-contained (paths, code, commands, gates).

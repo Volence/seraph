@@ -126,6 +126,36 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-09T07:0xZ - THE HOLD STAYS THROUGH THE NIGHT, AND SILENCE IS NOT A LIFT.** The owner
+  read this lane's question (the engine has moved: 810 aeon commits in five days, five of them in
+  the sound driver, checked firsthand here 2026-09-09) and went to bed **without answering it**.
+  His overnight direction names lens fixes, then the UX seat pair on the tools that have a UI, then
+  sigil on Sonic 1, then aeon planning regions. **Seraph appears nowhere in it.** Relayed by the hub,
+  granting act not witnessed here, and **verified firsthand at empyrean `0ed58f5`**, `docs/OVERSEER.md`,
+  the entry headed `2026-09-09T07:08Z - OWNER, GOING TO BED` (cited by heading, not by line
+  number, per the protocol's coordinate-rot rule), proved an ancestor of `origin/main`; his verbatim words there match the relay exactly.
+  (The relay arrived before that commit was pushed and this bullet said so; the hub pushed and
+  corrected within the minute, aeon having caught the gap.)
+  Nothing about it is load bearing for this lane anyway, because the hold was already in force and
+  stays. **What a rotation must not do: read the silence as a lift, or put the hold to him a third
+  time.** The 2026-09-04 entry below already says not to ask again without something new; the new
+  thing was said on 2026-09-09 and is on his card unanswered. d-9 stays parked with the hold.
+
+- **2026-09-07T22:41:35Z - WHEN THE HOLD LIFTS, THIS LANE OWES A UX SEAT PAIR (Roster C).** Owner
+  ruling, **located and read firsthand at empyrean `origin/main`** rather than taken from a relay,
+  carried by empyrean `97cd7258` (verified an ancestor of `origin/main`): the lens protocol gains
+  two seats, UXa a task walk and UXb a heuristic audit, run on oracle, aurora and sigil now,
+  **seraph when its hold lifts**, never aeon. Ruling text and paste-ready protocol wording are
+  empyrean `docs/2026-09-07-lens-ux-seat-amendment.md`; aeon lands it in
+  `docs/superpowers/LENS_PROTOCOL.md`. Conditions carried with it: a late panel at a new pin per
+  tool, a private display and a private instance, never the shared server and never his display,
+  which composes with this file's own `cargo run` warning below. His 2026-09-08T23:12:28Z resume
+  (empyrean `d5e81e65`, also verified reachable) restates the exclusion in one clause,
+  *"seraph stays held"*, and adds *"Seraph is not pushed"*.
+  **Banked here because it reached this repo only through a peer's message and would not survive a
+  rotation otherwise.** It is not a queue row and not owed today; it is what this lane picks up
+  alongside F50 on the day he lifts the hold.
+
 - **2026-09-05T15:23:14Z — NO EM DASHES OR EN DASHES IN ANY TOOL'S USER FACING TEXT,
   AND NONE WRITTEN NEW ANYWHERE.** Owner, verbatim, *"do you wanna also send out a message
   ot everything to get rid of all current emdashes and update so no more emdashes to all the

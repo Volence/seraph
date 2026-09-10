@@ -126,6 +126,24 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-10T07:5xZ - F50 BEING `next` WITH A BLOCKER IS CONTRACT-CORRECT ON A HELD LANE, AND THE
+  CONTRACT NOW SAYS SO BY NAME. DO NOT "FIX" THE BOARD.** A future session, or a hub sweep, will meet
+  a `next` row whose `blockedBy` names the hold and read it as the contradiction it genuinely is on
+  three other lanes. It is not one here. `contract/LANE_STATUS.md`, the `state` row of its field
+  table: `next` and a non-null `blockedBy` contradict each other **except on a lane with no `doing`
+  row**, which is answering a different question ("what I would take when the hold lifts"), and
+  **seraph's held F50 is written in as the reference case**. Aurora's clause, prompted by aurora's
+  own gate having produced the real defect: a check demanding the field be non-empty got it filled
+  with a lie that passed.
+  **Carrier is empyrean `7d9175d`** (located with `git log -S` over the file, proved an ancestor of
+  `origin/main`), which also amends the detector in `scripts/hub_check.py` so it stays silent on a
+  lane with no `doing` row; verified firsthand in that diff rather than taken on the relay. **The hub
+  relayed it as `8d00c45`, which is four minutes later and carries a different clause** (oracle's
+  "the write that STARTS a row names its successor"): a revision the text is readable at, not the
+  commit that carries it. Told the hub, since it is relaying the clause to other lanes tonight.
+  Nothing here changes: the board keeps the shape it has, and the reason it keeps it is now in the
+  contract instead of in one session's head.
+
 - **2026-09-10T05:45Z - HIS OVERNIGHT INSTRUCTION DOES NOT REACH THIS LANE, AND CLAUSE (3) IS THE
   TRAP A ROTATION WILL WALK INTO.** The owner went to bed leaving a standing instruction for the
   suite, **verified firsthand here** at empyrean `57824d0` (docs commit, proved an ancestor of

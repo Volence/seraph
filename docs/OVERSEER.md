@@ -126,6 +126,28 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-10T05:45Z - HIS OVERNIGHT INSTRUCTION DOES NOT REACH THIS LANE, AND CLAUSE (3) IS THE
+  TRAP A ROTATION WILL WALK INTO.** The owner went to bed leaving a standing instruction for the
+  suite, **verified firsthand here** at empyrean `57824d0` (docs commit, proved an ancestor of
+  `origin/main`; cited by its heading `OWNER, VERBATIM, 2026-09-10 (~05:45Z, empyrean-0e, going to
+  bed)`, never by line number). His words: *"have everything continue what it's on and then finish
+  up anyy lenses fixes that havent' finished. Then after that you can pick some small work that
+  doesn't need decisions or start the next project (or even do another lens sweep...). Either way
+  continue working till we can't."* **He does not name seraph anywhere in it.**
+  **Why this needs a bullet rather than nothing: clause (3) authorises "small work that doesn't need
+  decisions", and F50 is small and needs no decisions.** A fresh session that meets this quote from
+  any direction can read it as a lift of this lane's hold, and it would look like compliance. It is
+  not one. Two readings agree: *"continue what it's on"* applies to a lane that is ON a hold, and
+  **lifting a hold is itself a decision and it is his**, so clause (3) excludes it by its own terms.
+  The hub reached the same conclusion unprompted and declined to lift while he slept; the sentence
+  `SERAPH STAYS HELD` in that entry is the **hub's** application of his words, not his words, and is
+  recorded here as such. Either way nothing changes: the hold stands on the 09-02 ruling and the
+  09-04 *"Keep"*, d-9 stays parked, F50 stays the front row for the day he lifts it.
+  **One fact from the same entry that IS this lane's to act on, when it ever lands anything again:**
+  *"if not I'll check the changelog"*, and the changelog he reads is Dominion's view over
+  `docs/lane-log.jsonl`, not any `OVERSEER-LOG.md`. So an overnight write-up that is not a lane-log
+  entry is a write-up he never sees.
+
 - **2026-09-09T07:0xZ - THE HOLD STAYS THROUGH THE NIGHT, AND SILENCE IS NOT A LIFT.** The owner
   read this lane's question (the engine has moved: 810 aeon commits in five days, five of them in
   the sound driver, checked firsthand here 2026-09-09) and went to bed **without answering it**.

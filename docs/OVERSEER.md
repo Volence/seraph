@@ -126,6 +126,15 @@ a cold boot that reads only this file would never learn either file exists.
 
 ## Standing owner rulings (newest first; the queue Log carries the full entry)
 
+- **2026-09-11T18:23:49Z - THE HOLD NOW RESTS ON HIS OWN WORDS, "besides seraph".** Owner,
+  verbatim, heard directly by the hub and banked at empyrean `68b9a2e` (`docs/OVERSEER.md`, the
+  heading beginning `OWNER, VERBATIM, 2026-09-11T18:23:49Z`; verified here as an ancestor of
+  `origin/main`): *"I think we're trying to wrap up everything (besides seraph) so we can start
+  the region project."* The 09-10 bullet below, where `SERAPH STAYS HELD` was the hub's
+  application rather than his words, is overtaken on that point and on no other. Nothing
+  changes: the hold stands, d-9 stays parked, F50 is first the day he lifts it. Relayed by the
+  hub; the granting act was not witnessed here.
+
 - **2026-09-10T07:5xZ - F50 BEING `next` WITH A BLOCKER IS CONTRACT-CORRECT ON A HELD LANE, AND THE
   CONTRACT NOW SAYS SO BY NAME. DO NOT "FIX" THE BOARD.** A future session, or a hub sweep, will meet
   a `next` row whose `blockedBy` names the hold and read it as the contradiction it genuinely is on

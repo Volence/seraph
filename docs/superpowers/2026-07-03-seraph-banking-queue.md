@@ -3619,3 +3619,17 @@ For any future session executing this queue:
   **Left for him, not decided here:** `cargo clean` would return that 12 GB at the price of a
   cold rebuild the day the hold lifts. Not run, because a held lane is not a lane that will
   never build.
+- 2026-09-11: **THE HOLD NOW RESTS ON HIS OWN WORDS, AND THE 2026-09-09 ENTRY THIS LOG WAS OWED.
+  HOLD UNCHANGED, NOTHING DISPATCHED.**
+  (1) Owner, verbatim, heard directly by the hub at about 18:2xZ and banked at empyrean `68b9a2e`
+  (verified here as an ancestor of `origin/main`): *"I think we're trying to wrap up everything
+  (besides seraph) so we can start the region project."* He was answering the hub's proposal
+  ending *"...and seraph stays on hold. Go, or cards first?"* So `SERAPH STAYS HELD`, which the
+  09-10 entry in `docs/OVERSEER.md` records as the hub's application of his overnight words, is
+  now his. Register: hedged (*"I think"*) on the goal, unhedged on the exclusion. Relayed by the
+  hub; the granting act was not witnessed here.
+  (2) **2026-09-09, owed since then and folded in here per the hub's 09-09 ruling** (add it at
+  the next landing, never open one for it alone): the owner read this lane's question about the
+  engine having moved and went to bed without answering it; his overnight direction does not name
+  seraph. The hold stayed and silence is not a lift. Full text is the `2026-09-09T07:0xZ` bullet
+  in `docs/OVERSEER.md`, banked at `5805473`.

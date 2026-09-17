@@ -1,43 +1,35 @@
 {
-  "focus": "Held on your word: seraph waits until the engine is further along. Nothing running, nothing owed by you.",
+  "focus": "Held at your word. Nothing running, nothing owed, F50 is first the day you lift it.",
   "inFlight": [],
   "blockedOnOwner": [
     {
       "id": "d-9",
-      "what": "S0's driver list. Parked with the hold, which you kept on 09-04 when the hub put it to you as card (3); not owed until you lift the hold. Left on the card so the answer is not lost",
+      "what": "S0's driver list. Parked with the hold, which you kept on 09-04 and restated on 09-11 as \"besides seraph\"; not owed until you lift the hold. Left on the card so the answer is not lost",
       "since": "2026-08-22"
     }
   ],
-  "nextBoundary": "At a boundary now. Nothing started since the worktree deletion landed on 09-04.",
+  "nextBoundary": "At a boundary now. A fresh session would lose nothing.",
   "queue": [
     {
       "id": "F50",
       "title": "Importing a song discards your unsaved changes without asking, while New and Open both ask. The prompt already exists; one of the three doors does not use it",
       "state": "next",
       "size": "S",
-      "blockedBy": "lane held: you were asked again on 09-04 and answered \"Keep\"; nothing dispatches until you lift it"
+      "blockedBy": "lane held: you kept the hold on 09-04 and again on 09-11; nothing dispatches until you lift it"
     },
     {
-      "id": "F36",
-      "title": "Instrument channels are written in the order your tracks happen to be arranged, but the driver assigns them by position, so a label can name a different channel than the one that plays",
+      "id": "F51",
+      "title": "When the 'unsaved changes' prompt itself fails to open, say so on screen instead of only in the log. Booked as the end state of d-12, which the hub closed as keep-it-safe for now",
       "state": "open",
-      "size": "M",
-      "blockedBy": "mechanism verified, consequence not yet; not put to anyone until it is"
+      "size": "S",
+      "blockedBy": "lane held: nothing dispatches until you lift it; behind F50 when it does"
     },
     {
-      "id": "F27",
-      "title": "Make playback follow the driver instead of promising both at once",
+      "id": "F52",
+      "title": "Take the em dashes and en dashes out of the text seraph puts on screen, as you asked for across all the tools. About 26 lines of real labels and messages, the rest are code comments",
       "state": "open",
-      "size": "M",
-      "blockedBy": "the Memra-only channel 6 mode setting, which d-7 settled the rest of and deliberately left for later"
-    },
-    {
-      "id": "PITCH-FORMAT",
-      "title": "My half of the joint plan with the engine lane is written and handed over; the engine lane's measured reply on cycle and ROM cost is what moves it",
-      "state": "open",
-      "size": "L",
-      "blockedBy": "aeon's measured reply on cycle and ROM cost",
-      "project": "SOUND-TRUTH"
+      "size": "S",
+      "blockedBy": "lane held: nothing dispatches until you lift it; behind F50 and F51 when it does"
     },
     {
       "id": "S0",
@@ -46,30 +38,9 @@
       "size": "L",
       "blockedBy": "the driver list decision (d-9), parked with the hold",
       "project": "SOUND-TRUTH"
-    },
-    {
-      "id": "F51",
-      "title": "When the 'unsaved changes' prompt itself fails to open, say so on screen instead of only in the log. Booked as the end state of d-12, which the hub closed as keep-it-safe for now",
-      "state": "open",
-      "size": "S",
-      "blockedBy": "lane held: you were asked again on 09-04 and answered \"Keep\"; nothing dispatches until you lift it; behind F50 when it does"
-    },
-    {
-      "id": "README-8",
-      "title": "Two leftovers from the README pass, neither a bug: the app cannot author FM3 special mode, and channel overlap warnings are computed but never shown anywhere",
-      "state": "open",
-      "size": "M",
-      "blockedBy": "not a fix: FM3 special mode is a feature, and the overlap warnings have no place on screen yet"
-    },
-    {
-      "id": "F52",
-      "title": "Take the em dashes and en dashes out of the text seraph puts on screen, as you asked for across all the tools. About 26 lines of real labels and messages, the rest are code comments",
-      "state": "open",
-      "size": "S",
-      "blockedBy": "lane held: nothing dispatches until you lift it; behind F50 and F51 when it does"
     }
   ],
-  "updatedAt": "2026-09-05T15:24:59Z",
-  "awaiting": "nothing. Your no em dashes ruling reached me, is banked, and I am writing none from now on; the sweep of seraph's on screen text is booked as F52 for the day the hold lifts. Still stopped, nothing running.",
-  "atBoundary": true
+  "awaiting": "nothing from you. Booted, re-read the hold (still standing, nothing new from you or the hub) and stopped.",
+  "atBoundary": true,
+  "updatedAt": "2026-09-17T06:53:38Z"
 }

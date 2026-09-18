@@ -40,7 +40,7 @@
       "project": "SOUND-TRUTH"
     }
   ],
-  "awaiting": "One small thing, and it is less urgent than I first wrote it. On the night of 09-16 into 09-17 this lane was woken five times in five hours, once an hour until the wake window shut at 07:00; each time it booted, re-read the hold, saved an identical status and stopped. It did NOT happen last night, so my earlier \"it will keep happening\" was overstated: neither I nor the hub can read the live setting of that switch from here, only the fact that one window fired and the next did not. Two cheap ends whenever you want one: lift the hold, or leave seraph out of the overnight wake-ups. Nothing else is owed.",
+  "awaiting": "One small thing, your call, and my own figure for it was low. Dominion's journal records this lane Clear+Rebooted ELEVEN times, not five: six on the night of 09-15 into 09-16 and five on 09-16 into 09-17, once an hour until each window shut. Every one of them booted, re-read the hold, saved an identical status and stopped. I first said five because I counted commits, and the earlier night's sessions saved without committing, so they left no trace where I was looking. Sleep has been off since 09-17 and your 18:01 stop is why this session is fresh, so nothing is firing right now; it is a switch you flip per night, and a fired night costs this lane about six wakes. You may not have to choose between lifting the hold and excluding seraph: the hub has an open row (SKILL-BOOT-STOP-UNDER-SLEEP) to fix the boot rule that causes it, which would also stop aurora hitting the same thing. Nothing else is owed.",
   "atBoundary": true,
-  "updatedAt": "2026-09-18T18:05:22Z"
+  "updatedAt": "2026-09-18T18:08:29Z"
 }

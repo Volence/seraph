@@ -1,5 +1,5 @@
 {
-  "focus": "Held at your word. Nothing running, nothing owed, F50 is first the day you lift it.",
+  "focus": "Held at your word. Nothing running, nothing owed, the import fix is first the day you lift it.",
   "inFlight": [],
   "blockedOnOwner": [
     {
@@ -40,7 +40,7 @@
       "project": "SOUND-TRUTH"
     }
   ],
-  "awaiting": "One small thing, your call, and my own figure for it was low. Dominion's journal records this lane Clear+Rebooted ELEVEN times, not five: six on the night of 09-15 into 09-16 and five on 09-16 into 09-17, once an hour until each window shut. Every one of them booted, re-read the hold, saved an identical status and stopped. I first said five because I counted commits, and the earlier night's sessions saved without committing, so they left no trace where I was looking. Sleep has been off since 09-17 and your 18:01 stop is why this session is fresh, so nothing is firing right now; it is a switch you flip per night, and a fired night costs this lane about six wakes. You may not have to choose between lifting the hold and excluding seraph: the hub has an open row (SKILL-BOOT-STOP-UNDER-SLEEP) to fix the boot rule that causes it, which would also stop aurora hitting the same thing. Nothing else is owed.",
+  "awaiting": "Nothing from you. Still held on your 09-02 words, reaffirmed 09-04 and 09-11; nothing new has reached this lane since. The sleep-rotation note from 09-18 still stands if you arm sleep mode tonight.",
   "atBoundary": true,
-  "updatedAt": "2026-09-18T18:08:29Z"
+  "updatedAt": "2026-09-25T05:40:16Z"
 }
